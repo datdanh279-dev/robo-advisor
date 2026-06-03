@@ -82,10 +82,14 @@ _T4 = datetime.now(); print(f"[TRACE] data_loader import: {(_T4-_T3).total_secon
 from backend.expert_panel import hoi_dong_chuyen_gia
 _T4b = datetime.now(); print(f"[TRACE] expert_panel import: {(_T4b-_T4).total_seconds():.3f}s", file=__import__('sys').stderr)
 
-@st.cache_data(ttl=3600, show_spinner="Đang tải dữ liệu thị trường...")
 def _khoi_tao_dulieu():
     print("[TRACE] _khoi_tao_dulieu called", file=__import__('sys').stderr)
-    _ensure_data()
+    if "docs_loaded" not in st.session_state or not st.session_state.docs_loaded:
+        _ensure_data()
+        st.session_state.docs_loaded = True
+        st.session_state.doc_data = DOCS
+    else:
+        DOCS.update(st.session_state.doc_data)
     print("[TRACE] _khoi_tao_dulieu done", file=__import__('sys').stderr)
     return True
 
