@@ -223,8 +223,14 @@ def phan_tich_lich_su(ma_yahoo, ky_han="1y", benchmark="FUEVN100.VN"):
         if hist is None or len(hist) < 5:
             return None
 
-        gia_dong = hist['Close'].values
+        gia_dong = hist['Close'].dropna().values
+        if len(gia_dong) < 5:
+            return None
         loi_nhuan_ngay = np.diff(gia_dong) / gia_dong[:-1]
+        loi_nhuan_ngay = loi_nhuan_ngay[~np.isnan(loi_nhuan_ngay)]
+        loi_nhuan_ngay = loi_nhuan_ngay[~np.isinf(loi_nhuan_ngay)]
+        if len(loi_nhuan_ngay) < 4:
+            return None
 
         so_nam = len(gia_dong) / 252
         cagr = tinh_cagr(gia_dong[0], gia_dong[-1], so_nam) if so_nam > 0 else 0

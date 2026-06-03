@@ -1173,19 +1173,22 @@ def _render_tonghop():
             with st.spinner("Đang phân tích dữ liệu..."):
                 try:
                     pt = phan_tich_lich_su(ma_yahoo)
+                    if pt is None:
+                        st.warning(f"Không thể lấy dữ liệu cho {ma_chon}. Mã này có thể không khả dụng.")
+                        st.stop()
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
-                        st.metric("CAGR", f"{pt.get('cagr', 0)*100:.1f}%", delta=f"{pt.get('alpha', 0)*100:.1f}%")
+                        st.metric("CAGR", f"{(pt.get('cagr') or 0)*100:.1f}%", delta=f"{(pt.get('alpha') or 0)*100:.1f}%")
                     with col2:
-                        st.metric("Sharpe", f"{pt.get('sharpe', 0):.2f}")
+                        st.metric("Sharpe", f"{pt.get('sharpe') or 0:.2f}")
                     with col3:
-                        st.metric("Max DD", f"{pt.get('max_drawdown', 0)*100:.1f}%", delta_color="inverse")
+                        st.metric("Max DD", f"{(pt.get('max_drawdown') or 0)*100:.1f}%", delta_color="inverse")
                     with col4:
-                        st.metric("VaR 95%", f"{pt.get('var_95', 0)*100:.1f}%", delta_color="inverse")
+                        st.metric("VaR 95%", f"{(pt.get('var_95') or 0)*100:.1f}%", delta_color="inverse")
                     st.markdown("---")
                     st.markdown("### 📊 Drawdown history")
-                    dd = pt.get("drawdown_series", pd.Series(dtype=float))
-                    if not dd.empty:
+                    dd = pt.get("drawdown_series", np.array([]))
+                    if hasattr(dd, 'empty') and not dd.empty or isinstance(dd, np.ndarray) and dd.size > 0:
                         fig_dd = go.Figure()
                         fig_dd.add_trace(go.Scatter(y=dd*100, fill="tozeroy", line=dict(color="red", width=1), name="Drawdown %"))
                         fig_dd.update_layout(height=300, yaxis_title="Drawdown (%)",

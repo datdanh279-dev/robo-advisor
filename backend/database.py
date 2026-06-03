@@ -114,3 +114,24 @@ try:
 except Exception as e:
     import logging
     logging.getLogger(__name__).warning("DB dir create failed: %s", e)
+
+def _seed_default_user():
+    try:
+        data = _read()
+        username = "SÓI CÔ ĐỘC"
+        password = "080888"
+        if not any(u["username"] == username for u in data["users"]):
+            slot = len(data["users"]) + 1
+            data["users"].append({
+                "id": _next_id(data["users"]),
+                "username": username,
+                "beta_slot": slot if slot <= BETA_MAX else None,
+                "created_at": _now()
+            })
+        data["sessions"].setdefault(username, {})["password"] = password
+        _write(data)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Default user seed failed: %s", e)
+
+_seed_default_user()
