@@ -21,7 +21,7 @@ def _get_conn():
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
-BETA_MAX = 100
+BETA_MAX = 1000
 
 def _init_db_conn():
     os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
