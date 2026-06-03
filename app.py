@@ -165,9 +165,12 @@ header[data-testid="stHeader"] { display: none; }
 
 def hien_thi_login():
     st.markdown(LOGIN_CSS, unsafe_allow_html=True)
-    registered_count, max_slots = get_beta_progress()
+    try:
+        registered_count, max_slots = get_beta_progress()
+    except Exception:
+        registered_count, max_slots = 0, BETA_MAX
     remaining = max_slots - registered_count
-    pct = int(registered_count / max_slots * 100)
+    pct = int(registered_count / max_slots * 100) if max_slots else 0
     st.markdown(
         '<div class="login-container">'
         '<div class="login-title">🤖 Robo-Advisor</div>'
@@ -190,7 +193,10 @@ def hien_thi_login():
             password = st.text_input("Mật khẩu", type="password", placeholder="Nhập password...")
             submitted = st.form_submit_button("🔐 Đăng nhập", width='stretch')
             if submitted:
-                ok = kiem_tra_dang_nhap(username, password) or verify_user(username, password)
+                try:
+                    ok = kiem_tra_dang_nhap(username, password) or verify_user(username, password)
+                except Exception:
+                    ok = False
                 if ok:
                     st.session_state.password_ok = True
                     st.session_state.username = username
@@ -208,10 +214,14 @@ def hien_thi_login():
                         st.error("Tên đăng nhập ít nhất 3 ký tự")
                     elif len(reset_pass) < 6:
                         st.error("Mật khẩu ít nhất 6 ký tự")
-                    elif reset_password(reset_user, reset_pass):
-                        st.success("✅ Đặt lại mật khẩu thành công! Đăng nhập với mật khẩu mới.")
                     else:
-                        st.error("Tên đăng nhập không tồn tại trong hệ thống Beta")
+                        try:
+                            if reset_password(reset_user, reset_pass):
+                                st.success("✅ Đặt lại mật khẩu thành công! Đăng nhập với mật khẩu mới.")
+                            else:
+                                st.error("Tên đăng nhập không tồn tại trong hệ thống Beta")
+                        except Exception:
+                            st.error("Lỗi hệ thống, thử lại sau.")
     with tab_reg:
         st.markdown(f'<div class="step-badge">🎯 Còn {remaining} suất</div>', unsafe_allow_html=True)
         st.markdown(
@@ -233,7 +243,10 @@ def hien_thi_login():
                     elif len(reg_pass) < 6:
                         st.error("Mật khẩu ít nhất 6 ký tự")
                     else:
-                        success, slot = register_beta_user(reg_user, reg_pass)
+                        try:
+                            success, slot = register_beta_user(reg_user, reg_pass)
+                        except Exception:
+                            success, slot = False, 0
                         if success:
                             st.session_state.password_ok = True
                             st.session_state.username = reg_user
@@ -273,12 +286,18 @@ def hien_thi_otp():
                 st.session_state.authenticated = True
                 username = st.session_state.get("username", "unknown")
                 if "slot_beta" not in st.session_state:
-                    success, slot = register_beta_user(username, "")
+                    try:
+                        success, slot = register_beta_user(username, "")
+                    except Exception:
+                        success, slot = False, 0
                     if success:
                         st.session_state.slot_beta = slot
                     else:
                         st.session_state.slot_beta = 0
-                ensure_user(username)
+                try:
+                    ensure_user(username)
+                except Exception:
+                    pass
                 saved = load_state(username) or {}
                 if isinstance(saved, dict):
                     for k, v in saved.items():
@@ -504,7 +523,14 @@ with sidebar:
 
     st.markdown("---")
     username = st.session_state.get("username", "")
-    if username and is_founding_member(username):
+    if username:
+        try:
+            is_founding = is_founding_member(username)
+        except Exception:
+            is_founding = False
+    else:
+        is_founding = False
+    if is_founding:
         slot = st.session_state.get("slot_beta", 0)
         st.markdown(
             f'<div style="background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(201,168,76,0.03));'
@@ -612,7 +638,7 @@ def _render_quoc_te():
     st.plotly_chart(fig_qt, use_container_width=True)
 
 def _render_tonghop():
-    st.markdown(f"Cập nhật từ **TONG_HOP_v44** — {DOCS['ngay_cap_nhat']} | {len(DOCS['co_phieu_vn'])} mã VN · {len(DOCS['co_phieu_tg'])} mã TG · {len(DOCS['danh_sach_portfolio'])} mã trong danh mục")
+    st.markdown(f"Cập nhật từ **TONG_HOP_v44** — {DOCS.get('ngay_cap_nhat', 'N/A')} | {len(DOCS.get('co_phieu_vn', {}))} mã VN · {len(DOCS.get('co_phieu_tg', {}))} mã TG · {len(DOCS.get('danh_sach_portfolio', []))} mã trong danh mục")
     col_ref = st.columns([3, 1])
     with col_ref[1]:
         auto_refresh = st.checkbox("🔄 Tự động cập nhật (60s)", value=False, key="th_auto")
@@ -650,6 +676,7 @@ def _render_tonghop():
             if st.button("💾 Lưu session", key="save_kpi"):
                 import json, os
                 path = os.path.join(os.path.dirname(__file__), "data", "session_kpi.json")
+                os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(kpi, f, ensure_ascii=False, indent=2)
                 st.success("Đã lưu KPI vào data/session_kpi.json")
@@ -1132,6 +1159,7 @@ def _render_tonghop():
                     "thoi_gian": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
                 path = os.path.join(os.path.dirname(__file__), "data", "session.json")
+                os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(session_data, f, ensure_ascii=False, indent=2)
                 st.success(f"Đã lưu session vào data/session.json")
@@ -1594,8 +1622,11 @@ elif st.session_state.trang_thai == "chat":
                     tra_loi = tim_cau_tra_loi(cau_hoi, st.session_state.chat_history)
                 st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
                 username = st.session_state.get("username", "unknown")
-                save_chat(username, "user", cau_hoi)
-                save_chat(username, "bot", tra_loi)
+                try:
+                    save_chat(username, "user", cau_hoi)
+                    save_chat(username, "bot", tra_loi)
+                except Exception:
+                    pass
                 st.rerun()
     with col3:
         if st.session_state.chat_history and st.button("🗑️", use_container_width=True, help="Xóa lịch sử"):
@@ -1673,7 +1704,10 @@ if username and st.session_state.get("authenticated") and st.session_state.get("
     keys = {"trang_thai", "chat_history", "loai_nha_dau_tu", "diem_rui_ro", "da_phan_tich"}
     to_save = {k: st.session_state[k] for k in keys if k in st.session_state}
     if to_save:
-        save_state(username, to_save)
+        try:
+            save_state(username, to_save)
+        except Exception:
+            pass
 
 st.markdown("""<hr class="gold-divider">""", unsafe_allow_html=True)
 st.markdown(
