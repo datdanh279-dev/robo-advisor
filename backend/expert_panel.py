@@ -29,8 +29,8 @@ EXPERTS = [
         "id": "soros",
         "name": "George Soros",
         "title": "Bậc thầy Kinh tế Vĩ mô",
-        "model": "gemini-2.0-flash",
-        "backend": "gemini",
+        "model": "qwen/qwen3-32b",
+        "backend": "groq",
         "color": "#2196F3",
         "prompt": (
             "Bạn là George Soros, huyền thoại đầu cơ vĩ mô, người 'phá sản Ngân hàng Anh' năm 1992. "
@@ -60,7 +60,7 @@ EXPERTS = [
         "id": "dalio",
         "name": "Ray Dalio",
         "title": "Chiến lược gia Nguyên tắc",
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.1-8b-instant",
         "backend": "groq",
         "color": "#9C27B0",
         "prompt": (
@@ -93,7 +93,7 @@ EXPERTS = [
         "id": "munger",
         "name": "Charlie Munger",
         "title": "Nhà tư duy Đa chiều",
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.1-8b-instant",
         "backend": "groq",
         "color": "#607D8B",
         "prompt": (
