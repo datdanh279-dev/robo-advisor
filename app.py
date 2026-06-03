@@ -54,17 +54,29 @@ load_dotenv()
 import streamlit.components.v1 as components
 _GROQ_KEY = ''.join(chr(c) for c in [103,115,107,95,80,115,102,109,110,89,66,70,49,48,75,102,86,70,54,119,103,110,99,54,87,71,100,121,98,51,70,89,87,53,87,55,76,80,82,99,111,72,77,75,78,78,99,75,83,86,121,83,80,51,112,103])
 import sys, traceback
-_T3 = datetime.now(); print(f"[TRACE] stdlib/dotenv: {(_T3-_T2).total_seconds():.3f}s", file=__import__('sys').stderr)
-try:
-    from backend.data_loader import DOCS, load_all
-except Exception:
-    print("=" * 60, file=sys.stderr)
-    print("ERROR importing backend.data_loader:", file=sys.stderr)
-    traceback.print_exc()
-    print("=" * 60, file=sys.stderr)
-    DOCS = {}
-    def load_all():
-        pass
+_T3 = datetime.now(); print(f"[TRACE] stdlib/dotenv: {(_T3-_T2).total_seconds():.3f}s", file=sys.stderr)
+
+# Try to load data from Excel/JSON/snapshot
+DOCS = {}
+def load_all():
+    pass
+def _ensure_data():
+    global DOCS
+    try:
+        from backend.data_loader import DOCS as _DL_DOCS, load_all as _dl_load
+        _dl_load()
+        DOCS.update(_DL_DOCS)
+    except Exception as e:
+        print(f"[DATA] data_loader failed: {e}", file=sys.stderr)
+    if not DOCS.get("co_phieu_vn"):
+        try:
+            from backend.data_snapshot import get_snapshot
+            for k in ["co_phieu_vn","co_phieu_tg","live","danh_muc","kpi","liquid","esg","performance","stress","stress_vars"]:
+                v = get_snapshot(k)
+                if v is not None:
+                    DOCS[k] = v
+        except Exception as e:
+            print(f"[DATA] snapshot failed: {e}", file=sys.stderr)
 _T4 = datetime.now(); print(f"[TRACE] data_loader import: {(_T4-_T3).total_seconds():.3f}s", file=__import__('sys').stderr)
 
 from backend.expert_panel import hoi_dong_chuyen_gia
@@ -73,7 +85,7 @@ _T4b = datetime.now(); print(f"[TRACE] expert_panel import: {(_T4b-_T4).total_se
 @st.cache_data(ttl=3600, show_spinner="Đang tải dữ liệu thị trường...")
 def _khoi_tao_dulieu():
     print("[TRACE] _khoi_tao_dulieu called", file=__import__('sys').stderr)
-    load_all()
+    _ensure_data()
     print("[TRACE] _khoi_tao_dulieu done", file=__import__('sys').stderr)
     return True
 
