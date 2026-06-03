@@ -1,4 +1,4 @@
-streamlit>=1.31,<2
+streamlit==1.31.0
 pandas>=2
 numpy>=1
 plotly>=5
