@@ -287,12 +287,11 @@ def hien_thi_otp():
                 username = st.session_state.get("username", "unknown")
                 if "slot_beta" not in st.session_state:
                     try:
-                        success, slot = register_beta_user(username, "")
+                        from backend import database
+                        db_data = database._read()
+                        existing = [u for u in db_data["users"] if u["username"] == username]
+                        st.session_state.slot_beta = existing[0].get("beta_slot", 0) if existing else 0
                     except Exception:
-                        success, slot = False, 0
-                    if success:
-                        st.session_state.slot_beta = slot
-                    else:
                         st.session_state.slot_beta = 0
                 try:
                     ensure_user(username)
@@ -586,19 +585,21 @@ with sidebar:
 def _render_market():
     st.markdown("### Chỉ số thị trường Việt Nam")
     tt = lay_thong_tin_thi_truong()
-    cols = st.columns(len(tt))
-    for i, (ten, info) in enumerate(tt.items()):
-        with cols[i]:
-            change_color = "green" if info["thay_doi_1nam"] > 0 else "red"
-            change_sign = "+" if info["thay_doi_1nam"] > 0 else ""
-            gia = info['gia_hien_tai']
+    if tt:
+        cols = st.columns(len(tt))
+        for i, (ten, info) in enumerate(tt.items()):
+            with cols[i]:
+                thay_doi = info.get("thay_doi_1nam", 0) or 0
+                change_color = "green" if thay_doi > 0 else "red"
+                change_sign = "+" if thay_doi > 0 else ""
+                gia = info.get('gia_hien_tai', 0) or 0
             if info.get('don_vi') == '%':
                 gia_str = f"{gia*100:.1f}%"
             elif gia < 1:
                 gia_str = f"{gia*100:.1f}%"
             else:
                 gia_str = f"{gia:,.0f}"
-            st.markdown(f'<div class="card" style="text-align:center;padding:1rem;"><h4 style="color:var(--gold);margin:0;">{ten}</h4><h2 style="margin:0.5rem 0;">{gia_str}</h2><h4 style="color:{change_color};margin:0;">{change_sign}{info["thay_doi_1nam"]*100:.1f}%</h4><small style="color:var(--text-muted);">{info.get("mo_ta", info.get("bang_xep_hang", ""))[:60]}</small></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="card" style="text-align:center;padding:1rem;"><h4 style="color:var(--gold);margin:0;">{ten}</h4><h2 style="margin:0.5rem 0;">{gia_str}</h2><h4 style="color:{change_color};margin:0;">{change_sign}{thay_doi*100:.1f}%</h4><small style="color:var(--text-muted);">{info.get("mo_ta", info.get("bang_xep_hang", ""))[:60]}</small></div>', unsafe_allow_html=True)
     st.markdown("### Cổ phiếu Việt Nam nổi bật")
     col1, col2 = st.columns([1, 3])
     with col1:
@@ -665,7 +666,9 @@ def _render_tonghop():
         color_ll = "#4CAF50" if tong_lai_lo >= 0 else "#f44336"
         st.markdown(f"""<div class="metric-box"><h4>Tổng Lãi/Lỗ</h4><h2 style="color:{color_ll};">{tong_lai_lo:+,.0f} ₫</h2></div>""", unsafe_allow_html=True)
     with col_d3:
-        st.markdown(f"""<div class="metric-box"><h4>% Return DM</h4><h2 style="color:#4CAF50;">+{return_pct:.1f}%</h2></div>""", unsafe_allow_html=True)
+        return_color = "#4CAF50" if return_pct >= 0 else "#f44336"
+        return_sign = "+" if return_pct >= 0 else ""
+        st.markdown(f"""<div class="metric-box"><h4>% Return DM</h4><h2 style="color:{return_color};">{return_sign}{return_pct:.1f}%</h2></div>""", unsafe_allow_html=True)
     with col_d4:
         st.markdown(f"""<div class="metric-box"><h4>Số mã theo dõi</h4><h2>{len(kpi)}</h2></div>""", unsafe_allow_html=True)
     tab_kpi, tab_vn, tab_tg, tab_port, tab_liquid, tab_esg, tab_stress, tab_perf, tab_analytics = st.tabs(["📈 KPI Scorecard", "🇻🇳 Cổ phiếu VN", "🌐 Cổ phiếu TG","📊 Danh mục","💧 Thanh khoản","🌱 ESG","🌪️ Stress Test","📊 Performance","📈 Phân tích nâng cao"])
@@ -854,14 +857,21 @@ def _render_tonghop():
                 "ROIC%": f"{info.get('roic', 0)*100:.1f}" if info.get("roic") else "-",
                 "Biên LN%": f"{info.get('bien_ln', 0)*100:.1f}" if info.get("bien_ln") else "-",
             })
+        def parse_float(s, fallback=0):
+            if s == "-" or s is None:
+                return fallback
+            try:
+                return float(str(s).replace(",", ""))
+            except Exception:
+                return fallback
         if sort_by == "Giá giảm dần":
-            rows_vn.sort(key=lambda r: float(r["Giá (₫)"].replace(",", "")), reverse=True)
+            rows_vn.sort(key=lambda r: parse_float(r["Giá (₫)"]), reverse=True)
         elif sort_by == "P/E thấp nhất":
-            rows_vn.sort(key=lambda r: float(r["P/E"]) if r["P/E"] != "-" else 9999)
+            rows_vn.sort(key=lambda r: parse_float(r["P/E"], 9999))
         elif sort_by == "ROE cao nhất":
-            rows_vn.sort(key=lambda r: float(r["ROE%"]) if r["ROE%"] != "-" else -1, reverse=True)
+            rows_vn.sort(key=lambda r: parse_float(r["ROE%"], -1), reverse=True)
         elif sort_by == "Vốn hóa lớn nhất":
-            rows_vn.sort(key=lambda r: float(r["Vốn hóa (tỷ)"].replace(",", "")) if r["Vốn hóa (tỷ)"] != "-" else -1, reverse=True)
+            rows_vn.sort(key=lambda r: parse_float(r["Vốn hóa (tỷ)"]), reverse=True)
 
         if rows_vn:
             df_vn = pd.DataFrame(rows_vn)
@@ -1005,15 +1015,16 @@ def _render_tonghop():
         if not any_warn:
             st.success("✅ Tất cả mã đều có thanh khoản tốt.")
 
+    def pct_to_num(s):
+        try: return float(str(s).replace("%", ""))
+        except Exception: return 0
+
     with tab_esg:
         st.markdown("### 🌱 CHẤM ĐIỂM ESG THEO NGÀNH")
         st.markdown("Ma trận trọng số E·S·G — chuẩn MSCI/Sustainalytics")
         esg = DOCS["esg"]
         rows_esg = []
         for ten, info in esg.items():
-            def pct_to_num(s):
-                try: return float(str(s).replace("%", ""))
-                except Exception: return 0
             e_n = pct_to_num(info.get("e", "0%"))
             s_n = pct_to_num(info.get("s", "0%"))
             g_n = pct_to_num(info.get("g", "0%"))
@@ -1034,10 +1045,7 @@ def _render_tonghop():
         st.markdown("### 📊 Phân bổ điểm ESG")
         esg_names = [n for n in esg.keys() if n != "nan"]
         if esg_names:
-            def pct_to_num(s):
-                try: return float(str(s).replace("%", ""))
-                except Exception: return 0
-            e_vals = [pct_to_num(esg[n]["e"]) for n in esg_names]
+            e_vals = [pct_to_num(esg[n].get("e", "0%")) for n in esg_names]
             s_vals = [pct_to_num(esg[n]["s"]) for n in esg_names]
             g_vals = [pct_to_num(esg[n]["g"]) for n in esg_names]
             fig_esg = go.Figure(data=[
@@ -1399,7 +1407,8 @@ elif st.session_state.trang_thai == "portfolio":
     rows = []
     for ma, info in dm.items():
         lai_lo = (info.get("gia_thi_truong", 0) - info.get("gia_von", 0)) * info.get("so_luong", 0)
-        pct = (info.get("gia_thi_truong", 0) - info.get("gia_von", 0)) / info.get("gia_von", 1) * 100
+        gia_von = info.get("gia_von", 0) or 0
+        pct = (info.get("gia_thi_truong", 0) - gia_von) / gia_von * 100 if gia_von else 0
         rows.append({"Mã": ma, "Ngành": info.get("nganh", ""), "Số lượng": f'{info.get("so_luong", 0):,}',
             "Giá vốn": f'{info.get("gia_von", 0):,}₫', "Giá TT": f'{info.get("gia_thi_truong", 0):,}₫',
             "Lãi/Lỗ": f'{lai_lo:+,.0f}₫', "%": f"{pct:+.1f}%"})
