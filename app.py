@@ -1613,26 +1613,26 @@ elif st.session_state.trang_thai == "dashboard":
             if vn_key:
                 vni = tt[vn_key]
                 st.metric("🇻🇳 VN-Index",
-                          f"{vni.get('gia', 0):,.1f}",
-                          f"{vni.get('thay_doi_pct', 0):+.2f}%")
+                          f"{vni.get('gia_hien_tai', vni.get('gia', 0)):,.1f}",
+                          f"{vni.get('thay_doi_1nam', vni.get('thay_doi_pct', 0))*100:+.2f}%")
         with c2:
             if gold_key:
                 g = tt[gold_key]
                 st.metric("🥇 Vàng SJC",
-                          f"{g.get('gia', 0):,.0f}₫",
-                          f"{g.get('thay_doi_pct', 0):+.2f}%")
+                          f"{g.get('gia_hien_tai', g.get('gia', 0)):,.0f}₫",
+                          f"{g.get('thay_doi_1nam', g.get('thay_doi_pct', 0))*100:+.2f}%")
         with c3:
             if btc_key:
                 btc = qt[btc_key]
                 st.metric("₿ Bitcoin",
-                          f"${btc.get('gia', 0):,.0f}",
-                          f"{btc.get('thay_doi_pct', 0):+.2f}%")
+                          f"${btc.get('gia_hien_tai', btc.get('gia', 0)):,.0f}",
+                          f"{btc.get('thay_doi_1nam', btc.get('thay_doi_pct', 0))*100:+.2f}%")
         with c4:
             if sp_key:
                 sp = qt[sp_key]
                 st.metric("🇺🇸 S&P 500",
-                          f"{sp.get('gia', 0):,.0f}",
-                          f"{sp.get('thay_doi_pct', 0):+.2f}%")
+                          f"{sp.get('gia_hien_tai', sp.get('gia', 0)):,.0f}",
+                          f"{sp.get('thay_doi_1nam', sp.get('thay_doi_pct', 0))*100:+.2f}%")
 
 elif st.session_state.trang_thai == "chat":
     st.markdown('<p class="main-header">💬 Chat với Robo-Advisor</p>', unsafe_allow_html=True)
