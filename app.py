@@ -1,4 +1,6 @@
 import streamlit as st
+import nest_asyncio
+nest_asyncio.apply()
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -49,35 +51,44 @@ _T2 = datetime.now(); print(f"[TRACE] set_page_config: {(_T2-_T1).total_seconds(
 
 import random
 import json
-import os as os_mod
+import os
 from dotenv import load_dotenv
 load_dotenv()
 import streamlit.components.v1 as components
-_GROQ_KEY = ''.join(chr(c) for c in [103,115,107,95,80,115,102,109,110,89,66,70,49,48,75,102,86,70,54,119,103,110,99,54,87,71,100,121,98,51,70,89,87,53,87,55,76,80,82,99,111,72,77,75,78,78,99,75,83,86,121,83,80,51,112,103])
+_GROQ_KEY = os.getenv("GROQ_API_KEY", "")
+if not _GROQ_KEY:
+    try:
+        _GROQ_KEY = st.secrets.get("GROQ_API_KEY", "")
+    except Exception:
+        pass
+if not _GROQ_KEY:
+    _GROQ_KEY = ''.join(chr(c) for c in [103,115,107,95,80,115,102,109,110,89,66,70,49,48,75,102,86,70,54,119,103,110,99,54,87,71,100,121,98,51,70,89,87,53,87,55,76,80,82,99,111,72,77,75,78,78,99,75,83,86,121,83,80,51,112,103])
 import sys, traceback
 _T3 = datetime.now(); print(f"[TRACE] stdlib/dotenv: {(_T3-_T2).total_seconds():.3f}s", file=sys.stderr)
 
 # Try to load data from Excel/JSON/snapshot
 DOCS = {}
-def load_all():
-    pass
-def _ensure_data():
-    global DOCS
-    try:
-        from backend.data_loader import DOCS as _DL_DOCS, load_all as _dl_load
-        _dl_load()
-        DOCS.update(_DL_DOCS)
-    except Exception as e:
-        print(f"[DATA] data_loader failed: {e}", file=sys.stderr)
-    if not DOCS.get("co_phieu_vn"):
+
+@st.cache_data(ttl=300, show_spinner="📂 Đang tải dữ liệu thị trường...")
+def _load_data_cached():
+    """Load data with caching — chỉ đọc 1 lần vào RAM, dùng chung mọi user"""
+    from backend.data_loader import DOCS as _DL_DOCS, load_all as _dl_load
+    _dl_load()
+    docs = dict(_DL_DOCS)
+    if not docs.get("co_phieu_vn"):
         try:
             from backend.data_snapshot import get_snapshot
             for k in ["co_phieu_vn","co_phieu_tg","live","danh_muc","kpi","liquid","esg","performance","stress","stress_vars"]:
                 v = get_snapshot(k)
                 if v is not None:
-                    DOCS[k] = v
+                    docs[k] = v
         except Exception as e:
             print(f"[DATA] snapshot failed: {e}", file=sys.stderr)
+    return docs
+
+def _ensure_data():
+    global DOCS
+    DOCS = _load_data_cached()
 _T4 = datetime.now(); print(f"[TRACE] data_loader import: {(_T4-_T3).total_seconds():.3f}s", file=__import__('sys').stderr)
 
 from backend.expert_panel import hoi_dong_chuyen_gia
@@ -549,6 +560,8 @@ if "cau_tra_loi" not in st.session_state:
     st.session_state.cau_tra_loi = {}
 if "cau_hoi_index" not in st.session_state:
     st.session_state.cau_hoi_index = 0
+if "_survey_opts" not in st.session_state:
+    st.session_state._survey_opts = {}
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "da_phan_tich" not in st.session_state:
@@ -572,6 +585,7 @@ with sidebar:
 
     if st.button("📝 Khảo sát rủi ro", width='stretch'):
         st.session_state.trang_thai = "survey"
+        st.session_state._survey_opts = {}
         st.rerun()
 
     if st.button("📊 Danh mục đầu tư", width='stretch'):
@@ -1322,38 +1336,41 @@ if st.session_state.trang_thai == "survey":
     )
     st.markdown("---")
 
-    progress = st.progress(st.session_state.cau_hoi_index / len(CAU_HOI_KHAO_SAT))
+    with st.form("survey_form", clear_on_submit=False):
+        for idx, cau in enumerate(CAU_HOI_KHAO_SAT):
+            st.markdown(f"**{idx+1}. {cau['cau_hoi']}**")
+            lua_chon_nhan = [opt["nhan"] for opt in cau["lua_chon"]]
+            lua_chon_diem = {opt["nhan"]: opt["diem"] for opt in cau["lua_chon"]}
+            selected = st.radio(
+                "Chọn:",
+                lua_chon_nhan,
+                key=f"survey_q_{idx}",
+                index=None,
+                label_visibility="collapsed",
+            )
+            st.session_state._survey_opts[idx] = (cau["y"], lua_chon_diem, selected)
+            st.markdown("---")
 
-    if st.session_state.cau_hoi_index < len(CAU_HOI_KHAO_SAT):
-        cau = CAU_HOI_KHAO_SAT[st.session_state.cau_hoi_index]
-        st.markdown(f"### Câu {st.session_state.cau_hoi_index + 1}/{len(CAU_HOI_KHAO_SAT)}")
-        st.markdown(f"**{cau['cau_hoi']}**")
+        submitted = st.form_submit_button("✅ Hoàn thành khảo sát", use_container_width=True, type="primary")
 
-        lua_chon_nhan = [opt["nhan"] for opt in cau["lua_chon"]]
-        lua_chon_diem = {opt["nhan"]: opt["diem"] for opt in cau["lua_chon"]}
+    if submitted:
+        cau_tra_loi = {}
+        missing = False
+        for idx in range(len(CAU_HOI_KHAO_SAT)):
+            y, lua_chon_diem, selected = st.session_state._survey_opts.get(idx, (None, {}, None))
+            if selected is None or y is None:
+                missing = True
+                continue
+            cau_tra_loi[y] = lua_chon_diem[selected]
 
-        selected = st.radio(
-            "Chọn câu trả lời:",
-            lua_chon_nhan,
-            key=f"q_{st.session_state.cau_hoi_index}",
-            index=None,
-        )
+        if missing:
+            st.warning("Vui lòng trả lời tất cả 12 câu hỏi trước khi hoàn thành.")
+        else:
+            st.session_state.cau_tra_loi = cau_tra_loi
+            st.session_state.loai_nha_dau_tu = None
+            st.rerun()
 
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            if st.button("✅ Tiếp theo", disabled=selected is None, width='stretch'):
-                if selected:
-                    st.session_state.cau_tra_loi[cau["y"]] = lua_chon_diem[selected]
-                    st.session_state.cau_hoi_index += 1
-                    st.rerun()
-
-        with col2:
-            if st.button("🔙 Quay lại trang chủ", width='stretch'):
-                st.session_state.cau_hoi_index = 0
-                st.session_state.cau_tra_loi = {}
-                st.session_state.trang_thai = "home"
-                st.rerun()
-    else:
+    if st.session_state.get("cau_tra_loi"):
         loai, diem, mo_ta, danh_muc = danh_gia_rui_ro(st.session_state.cau_tra_loi)
         st.session_state.loai_nha_dau_tu = loai
         st.session_state.danh_muc_de_xuat = danh_muc
@@ -1478,14 +1495,15 @@ if st.session_state.trang_thai == "survey":
 
         with col2:
             if st.button("🔄 Làm lại khảo sát", width='stretch'):
-                st.session_state.cau_hoi_index = 0
+                st.session_state._survey_opts = {}
                 st.session_state.cau_tra_loi = {}
                 st.session_state.da_phan_tich = False
                 st.rerun()
 
         with col3:
             if st.button("🏠 Về trang chủ", width='stretch'):
-                st.session_state.cau_hoi_index = 0
+                st.session_state._survey_opts = {}
+                st.session_state.cau_tra_loi = {}
                 st.session_state.trang_thai = "home"
                 st.rerun()
 
@@ -1856,7 +1874,7 @@ elif st.session_state.trang_thai == "chat":
             if submitted and cau_hoi:
                 with st.status("🧠 Đang hỏi các chuyên gia...", expanded=True) as status:
                     st.write("📡 Bộ phân loại AI đang đánh giá độ phức tạp của câu hỏi...")
-                    results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY)
+                    results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
                     if results:
                         st.session_state.expert_results = results
                         mode = results.get("mode", "cao_cap")

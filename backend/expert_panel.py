@@ -269,9 +269,14 @@ async def _call_openrouter(session, prompt, question, api_key, model, timeout=60
     return None
 
 
-async def _call_expert(session, expert, question, api_keys):
+async def _call_expert(session, expert, question, api_keys, semaphore, context=""):
     prompt = expert["prompt"]
+    if context:
+        prompt = f"{prompt}\n\nDỮ LIỆU THỊ TRƯỜNG HIỆN TẠI:\n{context}"
     kwargs = {"prompt": prompt, "question": question}
+
+    async with semaphore:
+        await asyncio.sleep(0.3)  # Stagger 300ms giữa các request để tránh rate limit
 
     if expert["backend"] == "openai":
         api_key = api_keys.get("openai")
@@ -404,7 +409,7 @@ def _get_key(name):
     return val
 
 
-def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None):
+def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None):
     openai_key = _get_key("OPENAI_API_KEY")
     gemini_key = _get_key("GEMINI_API_KEY")
     openrouter_key = _get_key("OPENROUTER_API_KEY")
@@ -417,16 +422,41 @@ def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None):
         "groq": groq_key,
     }
 
+    # Build context from DOCS for AI injection
+    thi_truong_context = ""
+    if docs:
+        lines = []
+        for key in ["co_phieu_vn", "co_phieu_tg"]:
+            bucket = docs.get(key, {})
+            if bucket:
+                items = []
+                for ma, info in list(bucket.items())[:15]:
+                    ten = info.get("ten", ma)
+                    gia = info.get("gia", "N/A")
+                    thay_doi = info.get("thay_doi_pct", "")
+                    kpi = docs.get("kpi", {}).get(ma, {})
+                    pe = kpi.get("pe", "N/A")
+                    pb = kpi.get("pb", "N/A")
+                    items.append(f"- {ma} ({ten}): Giá {gia}, Thay đổi {thay_doi}, P/E {pe}, P/B {pb}")
+                label = "Cổ phiếu Việt Nam" if key == "co_phieu_vn" else "Cổ phiếu Thế giới"
+                lines.append(f"**{label}** (top 15):")
+                lines.extend(items)
+        if lines:
+            thi_truong_context = "\n".join(lines)
+
     try:
-        results = asyncio.run(_run_expert_panel_async(cau_hoi, api_keys))
+        results = asyncio.run(_run_expert_panel_async(cau_hoi, api_keys, thi_truong_context))
         return results
     except Exception as e:
         logger.error(f"Expert panel error: {e}")
         return None
 
 
-async def _run_expert_panel_async(question, api_keys):
+async def _run_expert_panel_async(question, api_keys, thi_truong_context=""):
     loai = phan_loai_cau_hoi(question)
+
+    # Giới hạn tối đa 3 request đồng thời để tránh rate limit
+    semaphore = asyncio.Semaphore(3)
 
     if loai == "don_gian":
         can_chon = {"buffett", "munger"}
@@ -442,7 +472,7 @@ async def _run_expert_panel_async(question, api_keys):
         expert_tasks = {}
         for exp in EXPERTS:
             if exp["id"] in can_chon:
-                expert_tasks[exp["id"]] = _call_expert(session, exp, question, api_keys)
+                expert_tasks[exp["id"]] = _call_expert(session, exp, question, api_keys, semaphore, thi_truong_context)
 
         raw = {}
         for eid, task in expert_tasks.items():

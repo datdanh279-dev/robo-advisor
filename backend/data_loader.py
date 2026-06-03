@@ -66,8 +66,8 @@ def doc_live_price():
         except:
             continue
         data[ma] = {
-            "ten": str(r.iloc[1])[:50] if pd.notna(r.iloc[1]) else "",
-            "nganh": str(r.iloc[2])[:30] if pd.notna(r.iloc[2]) else "",
+            "ten": str(r.iloc[1]).strip()[:50] if pd.notna(r.iloc[1]) else "",
+                "nganh": str(r.iloc[2]).strip()[:30] if pd.notna(r.iloc[2]) else "",
             "gia": gia, "thay_doi_pct": thay_doi_pct,
             "pe": pe, "pb": pb, "khoi_luong": kl,
         }
@@ -84,8 +84,8 @@ def doc_co_phieu_vn():
             continue
         try:
             data[ma] = {
-                "ten": str(r.iloc[1])[:50] if pd.notna(r.iloc[1]) else "",
-                "nganh": str(r.iloc[2])[:30] if pd.notna(r.iloc[2]) else "",
+                "ten": str(r.iloc[1]).strip()[:50] if pd.notna(r.iloc[1]) else "",
+                "nganh": str(r.iloc[2]).strip()[:30] if pd.notna(r.iloc[2]) else "",
                 "gia": float(r.iloc[3]) if pd.notna(r.iloc[3]) else 0,
                 "pe": float(r.iloc[4]) if pd.notna(r.iloc[4]) else 0,
                 "pb": float(r.iloc[5]) if pd.notna(r.iloc[5]) else 0,
@@ -93,8 +93,8 @@ def doc_co_phieu_vn():
                 "von_hoa": float(r.iloc[7]) if pd.notna(r.iloc[7]) else 0,
                 "eps": float(r.iloc[8]) if pd.notna(r.iloc[8]) else 0,
                 "ytd": float(r.iloc[9]) if pd.notna(r.iloc[9]) else 0,
-                "tin_hieu": str(r.iloc[10])[:20] if pd.notna(r.iloc[10]) else "",
-                "ghi_chu": str(r.iloc[11])[:100] if pd.notna(r.iloc[11]) else "",
+                "tin_hieu": str(r.iloc[10]).strip()[:20] if pd.notna(r.iloc[10]) else "",
+                "ghi_chu": str(r.iloc[11]).strip()[:100] if pd.notna(r.iloc[11]) else "",
                 "von_csh": float(r.iloc[12]) if pd.notna(r.iloc[12]) else 0,
                 "no_vay": float(r.iloc[13]) if pd.notna(r.iloc[13]) else 0,
                 "ebitda": float(r.iloc[14]) if pd.notna(r.iloc[14]) else 0,
@@ -107,11 +107,11 @@ def doc_co_phieu_vn():
                 "co_tuc_d": float(r.iloc[21]) if pd.notna(r.iloc[21]) else 0,
                 "pct_ngoai": float(r.iloc[22]) if pd.notna(r.iloc[22]) else 0,
                 "insider_pct": float(r.iloc[23]) if pd.notna(r.iloc[23]) else 0,
-                "chu_tich": str(r.iloc[24])[:50] if pd.notna(r.iloc[24]) else "",
-                "esg_score": str(r.iloc[25])[:20] if pd.notna(r.iloc[25]) else "",
-                "dao_duc": str(r.iloc[26])[:20] if pd.notna(r.iloc[26]) else "",
-                "canh_bao": str(r.iloc[27])[:50] if pd.notna(r.iloc[27]) else "",
-                "san": str(r.iloc[28])[:10] if pd.notna(r.iloc[28]) else "",
+                "chu_tich": str(r.iloc[24]).strip()[:50] if pd.notna(r.iloc[24]) else "",
+                "esg_score": str(r.iloc[25]).strip()[:20] if pd.notna(r.iloc[25]) else "",
+                "dao_duc": str(r.iloc[26]).strip()[:20] if pd.notna(r.iloc[26]) else "",
+                "canh_bao": str(r.iloc[27]).strip()[:50] if pd.notna(r.iloc[27]) else "",
+                "san": str(r.iloc[28]).strip()[:10] if pd.notna(r.iloc[28]) else "",
             }
         except:
             continue
@@ -128,16 +128,10 @@ def doc_co_phieu_tg():
             continue
         try:
             data[ma] = {
-                "ten": str(r.iloc[1])[:50] if pd.notna(r.iloc[1]) else "",
-                "san": str(r.iloc[2])[:10] if pd.notna(r.iloc[2]) else "",
-                "gia": float(r.iloc[3]) if pd.notna(r.iloc[3]) else 0,
-                "pe": float(r.iloc[4]) if pd.notna(r.iloc[4]) else 0,
-                "pb": float(r.iloc[5]) if pd.notna(r.iloc[5]) else 0,
-                "roe": float(r.iloc[6]) if pd.notna(r.iloc[6]) else 0,
-                "von_hoa": float(r.iloc[7]) if pd.notna(r.iloc[7]) else 0,
-                "ytd": float(r.iloc[8]) if pd.notna(r.iloc[8]) else 0,
-                "tin_hieu": str(r.iloc[9])[:20] if pd.notna(r.iloc[9]) else "",
-                "nganh": str(r.iloc[10])[:30] if pd.notna(r.iloc[10]) else "",
+                "ten": str(r.iloc[1]).strip()[:50] if pd.notna(r.iloc[1]) else "",
+                "san": str(r.iloc[2]).strip()[:10] if pd.notna(r.iloc[2]) else "",
+                "tin_hieu": str(r.iloc[9]).strip()[:20] if pd.notna(r.iloc[9]) else "",
+                "nganh": str(r.iloc[10]).strip()[:30] if pd.notna(r.iloc[10]) else "",
             }
         except:
             continue
@@ -154,8 +148,8 @@ def doc_danh_muc():
             continue
         try:
             data[ma] = {
-                "nganh": str(r.iloc[1])[:30] if pd.notna(r.iloc[1]) else "",
-                "cong_ty": str(r.iloc[2])[:20] if pd.notna(r.iloc[2]) else "",
+                "nganh": str(r.iloc[1]).strip()[:30] if pd.notna(r.iloc[1]) else "",
+                "cong_ty": str(r.iloc[2]).strip()[:20] if pd.notna(r.iloc[2]) else "",
                 "ty_trong_muc_tieu": float(r.iloc[3]) if pd.notna(r.iloc[3]) else 0,
                 "so_luong": float(r.iloc[4]) if pd.notna(r.iloc[4]) else 0,
                 "gia_von": float(r.iloc[5]) if pd.notna(r.iloc[5]) else 0,
@@ -184,7 +178,7 @@ def doc_kpi():
                 continue
             try:
                 portfolio[ma] = {
-                    "nganh": str(r.iloc[1])[:30] if pd.notna(r.iloc[1]) else "",
+                        "nganh": str(r.iloc[1]).strip()[:30] if pd.notna(r.iloc[1]) else "",
                     "gia": float(r.iloc[2]) if pd.notna(r.iloc[2]) else 0,
                     "lai_lo_pct": float(r.iloc[3]) if pd.notna(r.iloc[3]) else 0,
                     "roe": float(r.iloc[4]) if pd.notna(r.iloc[4]) else 0,
@@ -192,15 +186,15 @@ def doc_kpi():
                     "upside": float(r.iloc[6]) if pd.notna(r.iloc[6]) else 0,
                     "diem_mua": float(r.iloc[7]) if pd.notna(r.iloc[7]) else 0,
                     "diem_ban": float(r.iloc[8]) if pd.notna(r.iloc[8]) else 0,
-                    "ket_luan": str(r.iloc[9])[:30] if pd.notna(r.iloc[9]) else "",
-                    "hanh_dong": str(r.iloc[10])[:30] if pd.notna(r.iloc[10]) else "",
+                    "ket_luan": str(r.iloc[9]).strip()[:30] if pd.notna(r.iloc[9]) else "",
+                    "hanh_dong": str(r.iloc[10]).strip()[:30] if pd.notna(r.iloc[10]) else "",
                     "ty_trong_ht": float(r.iloc[11]) if pd.notna(r.iloc[11]) else 0,
                     "ty_trong_mt": float(r.iloc[12]) if pd.notna(r.iloc[12]) else 0,
                     "chenh_lech": float(r.iloc[13]) if pd.notna(r.iloc[13]) else 0,
                     "beta": float(r.iloc[14]) if pd.notna(r.iloc[14]) else 0,
                     "var_1": float(r.iloc[15]) if pd.notna(r.iloc[15]) else 0,
                     "co_tuc": float(r.iloc[16]) if pd.notna(r.iloc[16]) else 0,
-                    "trang_thai": str(r.iloc[17])[:20] if pd.notna(r.iloc[17]) else "",
+                    "trang_thai": str(r.iloc[17]).strip()[:20] if pd.notna(r.iloc[17]) else "",
                 }
             except:
                 continue
@@ -244,7 +238,7 @@ def doc_esg():
                         "e": str(r.iloc[1]) if pd.notna(r.iloc[1]) else "0%",
                         "s": str(r.iloc[2]) if pd.notna(r.iloc[2]) else "0%",
                         "g": str(r.iloc[3]) if pd.notna(r.iloc[3]) else "0%",
-                        "mo_ta": str(r.iloc[5])[:100] if pd.notna(r.iloc[5]) else "",
+                        "mo_ta": str(r.iloc[5]).strip()[:100] if pd.notna(r.iloc[5]) else "",
                     }
                 except:
                     continue
@@ -278,18 +272,18 @@ def doc_stress():
                     continue
                 try:
                     impact[ma] = {
-                        "nganh": str(r.iloc[1])[:30] if pd.notna(r.iloc[1]) else "",
+                    "nganh": str(r.iloc[1]).strip()[:30] if pd.notna(r.iloc[1]) else "",
                         "gia_ht": float(r.iloc[2]) if pd.notna(r.iloc[2]) else 0,
                         "pe_ht": float(r.iloc[3]) if pd.notna(r.iloc[3]) else 0,
-                        "tac_dong_ls": str(r.iloc[4])[:20] if pd.notna(r.iloc[4]) else "",
-                        "tac_dong_tg": str(r.iloc[5])[:20] if pd.notna(r.iloc[5]) else "",
-                        "tac_dong_lp": str(r.iloc[6])[:20] if pd.notna(r.iloc[6]) else "",
+                        "tac_dong_ls": str(r.iloc[4]).strip()[:20] if pd.notna(r.iloc[4]) else "",
+                        "tac_dong_tg": str(r.iloc[5]).strip()[:20] if pd.notna(r.iloc[5]) else "",
+                        "tac_dong_lp": str(r.iloc[6]).strip()[:20] if pd.notna(r.iloc[6]) else "",
                         "pe_stress": float(r.iloc[7]) if pd.notna(r.iloc[7]) else 0,
                         "gia_hop_ly_base": float(r.iloc[8]) if pd.notna(r.iloc[8]) else 0,
                         "gia_hop_ly_stress": float(r.iloc[9]) if pd.notna(r.iloc[9]) else 0,
-                        "chenh_lech": str(r.iloc[10])[:20] if pd.notna(r.iloc[10]) else "",
-                        "downside": str(r.iloc[11])[:20] if pd.notna(r.iloc[11]) else "",
-                        "hanh_dong": str(r.iloc[12])[:50] if pd.notna(r.iloc[12]) else "",
+                        "chenh_lech": str(r.iloc[10]).strip()[:20] if pd.notna(r.iloc[10]) else "",
+                        "downside": str(r.iloc[11]).strip()[:20] if pd.notna(r.iloc[11]) else "",
+                        "hanh_dong": str(r.iloc[12]).strip()[:50] if pd.notna(r.iloc[12]) else "",
                     }
                 except:
                     continue

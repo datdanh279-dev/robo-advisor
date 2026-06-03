@@ -21,3 +21,8 @@ python -m streamlit run app.py
 ## Sau khi code thay đổi
 
 Chỉ cần F5 refresh browser là đủ, Streamlit tự reload.
+
+## Web chính thức (deploy)
+
+Luôn dùng web này, KHÔNG dùng localhost:
+https://robo-advisor-jkp9byppflcdsrgapbm4vd.streamlit.app/
