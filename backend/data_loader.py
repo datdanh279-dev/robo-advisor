@@ -309,12 +309,49 @@ def doc_performance():
             params["thue"] = float(v1) if v1 else 0.001
     return params
 
-def _safe_load(sheet_name: str, loader, default=None):
+_JSON_DIR = os.path.join(_PROJECT_DIR, "data")
+
+_JSON_FALLBACK = {
+    "live": "live.json",
+    "co_phieu_vn": "co_phieu_vn.json",
+    "co_phieu_tg": "co_phieu_tg.json",
+    "danh_muc": "danh_muc.json",
+    "kpi": "kpi.json",
+    "liquid": "liquid.json",
+    "esg": "esg.json",
+    "performance": "performance.json",
+    "stress_vars": "stress_vars.json",
+    "stress": "stress.json",
+}
+
+def _load_json_fallback(key: str):
+    fname = _JSON_FALLBACK.get(key)
+    if not fname:
+        return None
+    fpath = os.path.join(_JSON_DIR, fname)
+    if not os.path.exists(fpath):
+        return None
     try:
-        return loader()
+        import json
+        with open(fpath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning("JSON fallback '%s' failed: %s", fname, e)
+        return None
+
+def _safe_load(sheet_name: str, loader, key: str = "", default=None):
+    try:
+        data = loader()
+        if data:
+            return data
     except Exception as e:
         logger.warning("Sheet '%s' failed to load: %s", sheet_name, e)
-        return default if default is not None else {}
+    if key:
+        fb = _load_json_fallback(key)
+        if fb is not None:
+            logger.info("Using JSON fallback for '%s'", key)
+            return fb
+    return default if default is not None else {}
 
 _LOADED = False
 
@@ -322,15 +359,18 @@ def load_all():
     global DOCS, _LOADED
     if _LOADED:
         return
-    DOCS["live"] = _safe_load("live", doc_live_price)
-    DOCS["co_phieu_vn"] = _safe_load("co_phieu_vn", doc_co_phieu_vn)
-    DOCS["co_phieu_tg"] = _safe_load("co_phieu_tg", doc_co_phieu_tg)
-    DOCS["danh_muc"] = _safe_load("danh_muc", doc_danh_muc)
-    DOCS["kpi"] = _safe_load("kpi", doc_kpi, default={})
-    DOCS["liquid"] = _safe_load("liquid", doc_liquid)
-    DOCS["esg"] = _safe_load("esg", doc_esg)
-    DOCS["performance"] = _safe_load("performance", doc_performance)
+    DOCS["live"] = _safe_load("live", doc_live_price, key="live")
+    DOCS["co_phieu_vn"] = _safe_load("co_phieu_vn", doc_co_phieu_vn, key="co_phieu_vn")
+    DOCS["co_phieu_tg"] = _safe_load("co_phieu_tg", doc_co_phieu_tg, key="co_phieu_tg")
+    DOCS["danh_muc"] = _safe_load("danh_muc", doc_danh_muc, key="danh_muc")
+    DOCS["kpi"] = _safe_load("kpi", doc_kpi, key="kpi", default={})
+    DOCS["liquid"] = _safe_load("liquid", doc_liquid, key="liquid")
+    DOCS["esg"] = _safe_load("esg", doc_esg, key="esg")
+    DOCS["performance"] = _safe_load("performance", doc_performance, key="performance")
     sv, s = _safe_load("stress", lambda: doc_stress(), default=({}, {}))
+    if not sv and not s:
+        sv = _load_json_fallback("stress_vars") or {}
+        s = _load_json_fallback("stress") or {}
     DOCS["stress_vars"], DOCS["stress"] = sv, s
     DOCS["ngay_cap_nhat"] = _NGAY_FILE
     kpi = DOCS.get("kpi", {})
