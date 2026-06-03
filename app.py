@@ -28,6 +28,7 @@ from backend.market_data import (
     CO_PHIEU_VN,
     DANH_SACH_NGANH,
     cap_nhat_toan_bo,
+    cap_nhat_co_phieu_vn,
 )
 from backend.chat_advisor import tim_cau_tra_loi
 from backend.calculations import (
@@ -90,6 +91,7 @@ def _khoi_tao_dulieu():
         st.session_state.doc_data = DOCS
     else:
         DOCS.update(st.session_state.doc_data)
+    cap_nhat_co_phieu_vn()
     print("[TRACE] _khoi_tao_dulieu done", file=__import__('sys').stderr)
     return True
 

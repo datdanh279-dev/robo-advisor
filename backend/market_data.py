@@ -35,17 +35,34 @@ def _build_co_phieu_vn():
     global CO_PHIEU_VN
     live = DOCS["live"]
     if not live:
+        db_vn = DOCS.get("co_phieu_vn", {})
+        if db_vn:
+            CO_PHIEU_VN = {}
+            for ma, info in db_vn.items():
+                CO_PHIEU_VN[ma] = {
+                    "ten": info.get("ten", ""),
+                    "nganh": info.get("nganh", ""),
+                    "gia": info.get("gia", 0),
+                    "thay_doi_1nam": info.get("ytd", 0) / 100 if isinstance(info.get("ytd"), (int, float)) else 0,
+                    "pe": info.get("pe", 0),
+                    "pb": info.get("pb", 0),
+                    "eps": info.get("eps", 0),
+                    "roe": info.get("roe", 0),
+                    "von_hoa": info.get("von_hoa", 0),
+                    "tin_hieu": info.get("tin_hieu", ""),
+                }
+            return
         CO_PHIEU_VN = {
-            "VCB": {"ten": "Vietcombank", "nganh": "Ngân hàng", "gia": 95000, "thay_doi_1nam": 0.22},
-            "VIC": {"ten": "Vingroup", "nganh": "Bất động sản", "gia": 45000, "thay_doi_1nam": -0.05},
-            "FPT": {"ten": "FPT Corporation", "nganh": "Công nghệ", "gia": 120000, "thay_doi_1nam": 0.35},
-            "VNM": {"ten": "Vinamilk", "nganh": "Sữa & Thực phẩm", "gia": 72000, "thay_doi_1nam": 0.08},
-            "HPG": {"ten": "Hòa Phát", "nganh": "Thép", "gia": 28000, "thay_doi_1nam": 0.15},
-            "MSN": {"ten": "Masan Group", "nganh": "Hàng tiêu dùng", "gia": 85000, "thay_doi_1nam": 0.10},
-            "SSI": {"ten": "SSI Securities", "nganh": "Chứng khoán", "gia": 38000, "thay_doi_1nam": 0.45},
-            "MWG": {"ten": "Thế Giới Di Động", "nganh": "Bán lẻ", "gia": 55000, "thay_doi_1nam": -0.12},
-            "ACB": {"ten": "ACB Bank", "nganh": "Ngân hàng", "gia": 25000, "thay_doi_1nam": 0.18},
-            "GAS": {"ten": "Petrovietnam Gas", "nganh": "Dầu khí", "gia": 115000, "thay_doi_1nam": 0.20},
+            "VCB": {"ten": "Vietcombank", "nganh": "Ngân hàng", "gia": 95000, "thay_doi_1nam": 0.22, "pe": 15, "pb": 3.2, "tin_hieu": "GIỮ"},
+            "VIC": {"ten": "Vingroup", "nganh": "Bất động sản", "gia": 45000, "thay_doi_1nam": -0.05, "pe": 30, "pb": 2.1, "tin_hieu": "TRÁNH"},
+            "FPT": {"ten": "FPT Corporation", "nganh": "Công nghệ", "gia": 120000, "thay_doi_1nam": 0.35, "pe": 22, "pb": 5.1, "tin_hieu": "MUA"},
+            "VNM": {"ten": "Vinamilk", "nganh": "Sữa & Thực phẩm", "gia": 72000, "thay_doi_1nam": 0.08, "pe": 18, "pb": 3.5, "tin_hieu": "GIỮ"},
+            "HPG": {"ten": "Hòa Phát", "nganh": "Thép", "gia": 28000, "thay_doi_1nam": 0.15, "pe": 12, "pb": 1.8, "tin_hieu": "MUA"},
+            "MSN": {"ten": "Masan Group", "nganh": "Hàng tiêu dùng", "gia": 85000, "thay_doi_1nam": 0.10, "pe": 25, "pb": 3.0, "tin_hieu": "GIỮ"},
+            "SSI": {"ten": "SSI Securities", "nganh": "Chứng khoán", "gia": 38000, "thay_doi_1nam": 0.45, "pe": 20, "pb": 2.8, "tin_hieu": "MUA"},
+            "MWG": {"ten": "Thế Giới Di Động", "nganh": "Bán lẻ", "gia": 55000, "thay_doi_1nam": -0.12, "pe": 40, "pb": 4.2, "tin_hieu": "TRÁNH"},
+            "ACB": {"ten": "ACB Bank", "nganh": "Ngân hàng", "gia": 25000, "thay_doi_1nam": 0.18, "pe": 8, "pb": 1.5, "tin_hieu": "MUA"},
+            "GAS": {"ten": "Petrovietnam Gas", "nganh": "Dầu khí", "gia": 115000, "thay_doi_1nam": 0.20, "pe": 16, "pb": 2.5, "tin_hieu": "GIỮ"},
         }
         return
     db = DOCS["co_phieu_vn"]
@@ -58,14 +75,17 @@ def _build_co_phieu_vn():
             "ten": info.get("ten", db_info.get("ten", "")),
             "nganh": info.get("nganh", db_info.get("nganh", "")),
             "gia": info.get("gia", 0),
-            "thay_doi_1nam": db_info.get("ytd", info.get("thay_doi_pct", 0)) / 100 if isinstance(info.get("thay_doi_pct", 0), (int, float)) else 0,
-            "pe": info.get("pe", db_info.get("pe", 0)),
-            "pb": info.get("pb", db_info.get("pb", 0)),
+            "thay_doi_1nam": (db_info.get("ytd", 0) / 100) if isinstance(db_info.get("ytd"), (int, float)) and db_info.get("ytd") else 0,
+            "pe": db_info.get("pe", info.get("pe", 0)),
+            "pb": db_info.get("pb", info.get("pb", 0)),
             "eps": db_info.get("eps", 0),
             "roe": db_info.get("roe", 0),
             "von_hoa": db_info.get("von_hoa", 0),
             "tin_hieu": db_info.get("tin_hieu", ""),
         }
+
+def cap_nhat_co_phieu_vn():
+    _build_co_phieu_vn()
 
 _build_co_phieu_vn()
 
