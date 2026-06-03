@@ -49,6 +49,14 @@ import os as os_mod
 from dotenv import load_dotenv
 load_dotenv()
 import streamlit.components.v1 as components
+from backend.data_loader import load_all, DOCS
+
+@st.cache_data(ttl=3600, show_spinner="Đang tải dữ liệu thị trường...")
+def _khoi_tao_dulieu():
+    load_all()
+    return True
+
+_khoi_tao_dulieu()
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False

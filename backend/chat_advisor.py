@@ -1184,6 +1184,11 @@ def tim_quy(cau_thuong, cau_khong_dau):
     return None
 
 def tim_cau_tra_loi(cau_hoi, lich_su=None):
+    global STOCK_INFO, WORLD_STOCK_INFO
+    if not STOCK_INFO and DOCS.get("co_phieu_vn"):
+        STOCK_INFO = _build_stock_info()
+    if not WORLD_STOCK_INFO and DOCS.get("co_phieu_tg"):
+        WORLD_STOCK_INFO = _build_world_stock_info()
     cau_thuong = cau_hoi.lower().strip()
     cau_khong_dau = xu_ly_bo_dau(cau_thuong)
 

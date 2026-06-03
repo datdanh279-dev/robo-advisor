@@ -21,17 +21,27 @@ for _p in _EXCEL_CANDIDATES:
         EXCEL_PATH = _p
         break
 
-if EXCEL_PATH is None:
-    EXCEL_PATH = _EXCEL_CANDIDATES[-1]
-    logger.warning("Excel file not found — falling back to %s", EXCEL_PATH)
-
 _NGAY_FILE = "29/05/2026"
-if EXCEL_PATH and os.path.exists(EXCEL_PATH):
-    _mtime = os.path.getmtime(EXCEL_PATH)
-    _NGAY_FILE = datetime.fromtimestamp(_mtime).strftime("%d/%m/%Y")
+_WB = None
+
+def _get_wb():
+    global _WB
+    if _WB is None and EXCEL_PATH and os.path.exists(EXCEL_PATH):
+        _WB = pd.ExcelFile(EXCEL_PATH)
+        _mtime = os.path.getmtime(EXCEL_PATH)
+        global _NGAY_FILE
+        _NGAY_FILE = datetime.fromtimestamp(_mtime).strftime("%d/%m/%Y")
+    return _WB
+
+def _read_sheet(sheet_name, header=None):
+    wb = _get_wb()
+    if wb is None or sheet_name not in wb.sheet_names:
+        return pd.DataFrame()
+    return pd.read_excel(wb, sheet_name=sheet_name, header=header)
 
 def doc_live_price():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="📡 LIVE PRICE FEED", header=None)
+    df = _read_sheet("📡 LIVE PRICE FEED")
+    if df.empty: return {}
     data = {}
     for i in range(2, len(df)):
         r = df.iloc[i]
@@ -49,16 +59,14 @@ def doc_live_price():
         data[ma] = {
             "ten": str(r.iloc[1])[:50] if pd.notna(r.iloc[1]) else "",
             "nganh": str(r.iloc[2])[:30] if pd.notna(r.iloc[2]) else "",
-            "gia": gia,
-            "thay_doi_pct": thay_doi_pct,
-            "pe": pe,
-            "pb": pb,
-            "khoi_luong": kl,
+            "gia": gia, "thay_doi_pct": thay_doi_pct,
+            "pe": pe, "pb": pb, "khoi_luong": kl,
         }
     return data
 
 def doc_co_phieu_vn():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="📈 Cổ Phiếu VN 🔍", header=None)
+    df = _read_sheet("📈 Cổ Phiếu VN 🔍")
+    if df.empty: return {}
     data = {}
     for i in range(3, len(df)):
         r = df.iloc[i]
@@ -66,7 +74,7 @@ def doc_co_phieu_vn():
         if not ma or ma == "NAN" or len(ma) > 6:
             continue
         try:
-            entry = {
+            data[ma] = {
                 "ten": str(r.iloc[1])[:50] if pd.notna(r.iloc[1]) else "",
                 "nganh": str(r.iloc[2])[:30] if pd.notna(r.iloc[2]) else "",
                 "gia": float(r.iloc[3]) if pd.notna(r.iloc[3]) else 0,
@@ -98,11 +106,11 @@ def doc_co_phieu_vn():
             }
         except:
             continue
-        data[ma] = entry
     return data
 
 def doc_co_phieu_tg():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="🌐 Cổ Phiếu TG 🔍", header=None)
+    df = _read_sheet("🌐 Cổ Phiếu TG 🔍")
+    if df.empty: return {}
     data = {}
     for i in range(3, len(df)):
         r = df.iloc[i]
@@ -127,7 +135,8 @@ def doc_co_phieu_tg():
     return data
 
 def doc_danh_muc():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="HỆ THỐNG QUẢN LÝ ", header=None)
+    df = _read_sheet("HỆ THỐNG QUẢN LÝ ")
+    if df.empty: return {}
     data = {}
     for i in range(4, len(df)):
         r = df.iloc[i]
@@ -135,7 +144,7 @@ def doc_danh_muc():
         if not ma or ma == "NAN" or len(ma) > 6:
             continue
         try:
-            entry = {
+            data[ma] = {
                 "nganh": str(r.iloc[1])[:30] if pd.notna(r.iloc[1]) else "",
                 "cong_ty": str(r.iloc[2])[:20] if pd.notna(r.iloc[2]) else "",
                 "ty_trong_muc_tieu": float(r.iloc[3]) if pd.notna(r.iloc[3]) else 0,
@@ -147,11 +156,11 @@ def doc_danh_muc():
             }
         except:
             continue
-        data[ma] = entry
     return data
 
 def doc_kpi():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="📈 Dashboard KPI", header=None)
+    df = _read_sheet("📈 Dashboard KPI")
+    if df.empty: return {}
     portfolio = {}
     kpi_header = None
     for i in range(len(df)):
@@ -189,7 +198,8 @@ def doc_kpi():
     return portfolio
 
 def doc_liquid():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="💧 Thanh Khoản ADTV", header=None)
+    df = _read_sheet("💧 Thanh Khoản ADTV")
+    if df.empty: return {}
     data = {}
     for i in range(len(df)):
         if str(df.iloc[i].tolist()[0]).strip() == "Mã CP":
@@ -210,7 +220,8 @@ def doc_liquid():
     return data
 
 def doc_esg():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="🌱 ESG Scoring", header=None)
+    df = _read_sheet("🌱 ESG Scoring")
+    if df.empty: return {}
     data = {}
     for i in range(len(df)):
         if str(df.iloc[i].tolist()[0]).strip() == "Ngành":
@@ -220,13 +231,10 @@ def doc_esg():
                 if not ten or ten == "nan":
                     continue
                 try:
-                    e_val = str(r.iloc[1]) if pd.notna(r.iloc[1]) else "0%"
-                    s_val = str(r.iloc[2]) if pd.notna(r.iloc[2]) else "0%"
-                    g_val = str(r.iloc[3]) if pd.notna(r.iloc[3]) else "0%"
                     data[ten] = {
-                        "e": e_val,
-                        "s": s_val,
-                        "g": g_val,
+                        "e": str(r.iloc[1]) if pd.notna(r.iloc[1]) else "0%",
+                        "s": str(r.iloc[2]) if pd.notna(r.iloc[2]) else "0%",
+                        "g": str(r.iloc[3]) if pd.notna(r.iloc[3]) else "0%",
                         "mo_ta": str(r.iloc[5])[:100] if pd.notna(r.iloc[5]) else "",
                     }
                 except:
@@ -235,7 +243,8 @@ def doc_esg():
     return data
 
 def doc_stress():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="🌪️ Macro Stress", header=None)
+    df = _read_sheet("🌪️ Macro Stress")
+    if df.empty: return {}, {}
     variables = {}
     impact = {}
     for i in range(len(df)):
@@ -279,13 +288,13 @@ def doc_stress():
     return variables, impact
 
 def doc_performance():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="📊 Performance", header=None)
+    df = _read_sheet("📊 Performance")
+    if df.empty: return {}
     params = {}
     for i in range(len(df)):
         r = df.iloc[i]
         v0 = str(r.iloc[0]).strip() if pd.notna(r.iloc[0]) else ""
         v1 = r.iloc[1] if pd.notna(r.iloc[1]) else None
-        v2 = str(r.iloc[2])[:100] if pd.notna(r.iloc[2]) else ""
         if "Lãi suất phi rủi ro" in v0:
             params["Rf"] = float(v1) if v1 else 0.045
         elif "Lợi nhuận VN-Index" in v0:
@@ -307,25 +316,37 @@ def _safe_load(sheet_name: str, loader, default=None):
         logger.warning("Sheet '%s' failed to load: %s", sheet_name, e)
         return default if default is not None else {}
 
+_LOADED = False
+
+def load_all():
+    global DOCS, _LOADED
+    if _LOADED:
+        return
+    DOCS["live"] = _safe_load("live", doc_live_price)
+    DOCS["co_phieu_vn"] = _safe_load("co_phieu_vn", doc_co_phieu_vn)
+    DOCS["co_phieu_tg"] = _safe_load("co_phieu_tg", doc_co_phieu_tg)
+    DOCS["danh_muc"] = _safe_load("danh_muc", doc_danh_muc)
+    DOCS["kpi"] = _safe_load("kpi", doc_kpi, default={})
+    DOCS["liquid"] = _safe_load("liquid", doc_liquid)
+    DOCS["esg"] = _safe_load("esg", doc_esg)
+    DOCS["performance"] = _safe_load("performance", doc_performance)
+    sv, s = _safe_load("stress", lambda: doc_stress(), default=({}, {}))
+    DOCS["stress_vars"], DOCS["stress"] = sv, s
+    DOCS["ngay_cap_nhat"] = _NGAY_FILE
+    kpi = DOCS.get("kpi", {})
+    DOCS["danh_sach_portfolio"] = sorted(
+        [k for k in kpi.keys() if k != "NAN"],
+        key=lambda x: kpi[x].get("ty_trong_ht", 0) if x in kpi else 0,
+        reverse=True
+    ) or ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM"]
+    _LOADED = True
+
 DOCS = {
-    "live": _safe_load("live", doc_live_price),
-    "co_phieu_vn": _safe_load("co_phieu_vn", doc_co_phieu_vn),
-    "co_phieu_tg": _safe_load("co_phieu_tg", doc_co_phieu_tg),
-    "danh_muc": _safe_load("danh_muc", doc_danh_muc),
-    "kpi": _safe_load("kpi", doc_kpi, default={}),
-    "liquid": _safe_load("liquid", doc_liquid),
-    "esg": _safe_load("esg", doc_esg),
-    "performance": _safe_load("performance", doc_performance),
+    "live": {}, "co_phieu_vn": {}, "co_phieu_tg": {}, "danh_muc": {},
+    "kpi": {}, "liquid": {}, "esg": {}, "performance": {},
+    "stress_vars": {}, "stress": {}, "ngay_cap_nhat": _NGAY_FILE,
+    "danh_sach_portfolio": ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM"],
 }
-_sv, _s = _safe_load("stress", lambda: doc_stress(), default=({}, {}))
-DOCS["stress_vars"], DOCS["stress"] = _sv, _s
-DOCS["ngay_cap_nhat"] = _NGAY_FILE
-_kpi = DOCS.get("kpi", {})
-DOCS["danh_sach_portfolio"] = sorted(
-    [k for k in _kpi.keys() if k != "NAN"],
-    key=lambda x: _kpi[x].get("ty_trong_ht", 0) if x in _kpi else 0,
-    reverse=True
-) or ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM"]
 
 import threading
 _DOCS_LOCK = threading.Lock()
