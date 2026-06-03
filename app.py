@@ -66,6 +66,9 @@ except Exception:
         pass
 _T4 = datetime.now(); print(f"[TRACE] data_loader import: {(_T4-_T3).total_seconds():.3f}s", file=__import__('sys').stderr)
 
+from backend.expert_panel import hoi_dong_chuyen_gia
+_T4b = datetime.now(); print(f"[TRACE] expert_panel import: {(_T4b-_T4).total_seconds():.3f}s", file=__import__('sys').stderr)
+
 @st.cache_data(ttl=3600, show_spinner="Đang tải dữ liệu thị trường...")
 def _khoi_tao_dulieu():
     print("[TRACE] _khoi_tao_dulieu called", file=__import__('sys').stderr)
@@ -1617,145 +1620,240 @@ elif st.session_state.trang_thai == "dashboard":
 
 elif st.session_state.trang_thai == "chat":
     st.markdown('<p class="main-header">💬 Chat với Robo-Advisor</p>', unsafe_allow_html=True)
-    st.markdown(
-        "Hỏi tôi về đầu tư, cổ phiếu, vàng, bất động sản, hay bất kỳ chủ đề tài chính nào!"
-    )
-    st.markdown("---")
 
-    for i, msg in enumerate(st.session_state.chat_history):
-        if msg["role"] == "bot":
-            st.markdown(
-                f'<div class="chat-message bot-message">🤖 <strong>Robo-Advisor:</strong><br>{msg["content"]}</div>',
-                unsafe_allow_html=True,
+    tab_chat, tab_expert = st.tabs(["💬 Chat", "👑 Hội đồng Chuyên gia"])
+
+    with tab_chat:
+        st.markdown("Hỏi tôi về đầu tư, cổ phiếu, vàng, bất động sản, hay bất kỳ chủ đề tài chính nào!")
+        st.markdown("---")
+
+        for i, msg in enumerate(st.session_state.chat_history):
+            if msg["role"] == "bot":
+                st.markdown(
+                    f'<div class="chat-message bot-message">🤖 <strong>Robo-Advisor:</strong><br>{msg["content"]}</div>',
+                    unsafe_allow_html=True,
+                )
+                if st.button("🔊 Đọc", key=f"tts_{i}", use_container_width=True):
+                    st.session_state.tts_msg = msg["content"]
+                    st.rerun()
+            else:
+                st.markdown(
+                    f'<div class="chat-message user-message">👤 <strong>Bạn:</strong><br>{msg["content"]}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        def _exec_js(js_code, height=1):
+            html = f"<script>{js_code}</script>"
+            try:
+                components.html(html, height=height)
+            except Exception:
+                import html as _h
+                st.markdown(
+                    f'<iframe srcdoc="{_h.escape(html)}" '
+                    f'style="width:0;height:1px;border:none;overflow:hidden;" '
+                    f'sandbox="allow-scripts"></iframe>',
+                    unsafe_allow_html=True,
+                )
+
+        if tts_text := st.session_state.pop("tts_msg", None):
+            safe = json.dumps(tts_text, ensure_ascii=False)
+            _exec_js(
+                f"window.speechSynthesis.cancel();"
+                f"var u=new SpeechSynthesisUtterance({safe});"
+                f"u.lang='vi-VN';u.rate=1.0;u.pitch=1.0;u.volume=1.0;"
+                f"window.speechSynthesis.speak(u);"
             )
-            if st.button("🔊 Đọc", key=f"tts_{i}", use_container_width=True):
-                st.session_state.tts_msg = msg["content"]
+
+        if "show_mic" not in st.session_state:
+            st.session_state.show_mic = False
+
+        col1, col2, col3 = st.columns([1, 6, 4])
+        with col1:
+            if st.button("🎤", use_container_width=True, help="Nhập bằng giọng nói"):
+                st.session_state.show_mic = not st.session_state.show_mic
                 st.rerun()
-        else:
-            st.markdown(
-                f'<div class="chat-message user-message">👤 <strong>Bạn:</strong><br>{msg["content"]}</div>',
-                unsafe_allow_html=True,
-            )
+        with col2:
+            with st.form(key="chat_form", clear_on_submit=True):
+                cau_hoi = st.text_input(
+                    "Nhập câu hỏi của bạn:",
+                    placeholder="VD: Nên đầu tư cổ phiếu gì?",
+                    key="chat_input",
+                    label_visibility="collapsed",
+                )
+                submitted = st.form_submit_button("Gửi", use_container_width=True)
+                if submitted and cau_hoi:
+                    st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
+                    with st.spinner("🤖 Robo-Advisor đang suy nghĩ..."):
+                        tra_loi = tim_cau_tra_loi(cau_hoi, st.session_state.chat_history)
+                    st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
+                    username = st.session_state.get("username", "unknown")
+                    try:
+                        save_chat(username, "user", cau_hoi)
+                        save_chat(username, "bot", tra_loi)
+                    except Exception:
+                        pass
+                    st.rerun()
+        with col3:
+            if st.session_state.chat_history and st.button("🗑️", use_container_width=True, help="Xóa lịch sử"):
+                st.session_state.chat_history = []
+                st.rerun()
 
-    def _exec_js(js_code, height=1):
-        html = f"<script>{js_code}</script>"
-        try:
-            components.html(html, height=height)
-        except Exception:
-            import html as _h
-            st.markdown(
-                f'<iframe srcdoc="{_h.escape(html)}" '
-                f'style="width:0;height:1px;border:none;overflow:hidden;" '
-                f'sandbox="allow-scripts"></iframe>',
-                unsafe_allow_html=True,
-            )
+        if st.session_state.show_mic:
+            mic_html = """
+                <div style="text-align:center;padding:12px;background:linear-gradient(135deg,#0a0e27,#1a1040);border-radius:12px;border:1px solid #FFD70044;">
+                    <div style="color:#8892B0;font-size:13px;margin-bottom:6px;">Bam micro, noi xong tu dong gui</div>
+                    <div id="mic_status" style="color:#8892B0;font-size:12px;margin-bottom:6px;">Bam vao micro de bat dau</div>
+                    <button id="mic_btn"
+                        style="font-size:30px;padding:10px 20px;border-radius:50%;border:2px solid #FFD700;background:#FFD70011;color:#FFD700;cursor:pointer;">
+                        🎤
+                    </button>
+                </div>
+                <script>
+                document.getElementById('mic_btn').onclick = function() {
+                    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    if (!SR) { alert('Trinh duyet khong ho tro'); return; }
+                    var r = new SR();
+                    r.lang = 'vi-VN';
+                    r.continuous = false;
+                    r.interimResults = false;
+                    document.getElementById('mic_status').innerText = 'Dang nghe...';
+                    this.style.background = '#FFD700';
+                    this.style.color = '#02050E';
+                    r.onresult = function(e) {
+                        var text = e.results[0][0].transcript;
+                        document.getElementById('mic_status').innerText = 'Da nhan: ' + text;
+                        try {
+                            var doc = window.parent.document;
+                            var inp = doc.querySelector('input[type="text"]');
+                            if (inp) {
+                                var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+                                setter.call(inp, text);
+                                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                setTimeout(function() {
+                                    var btns = doc.querySelectorAll('button');
+                                    for (var b of btns) {
+                                        if (b.textContent.trim() === 'Gui' || b.textContent.trim() === 'Gửi') {
+                                            b.click();
+                                            break;
+                                        }
+                                    }
+                                }, 400);
+                            }
+                        } catch(e) { alert('Loi: ' + e.message); }
+                    };
+                    r.onerror = function(e) {
+                        document.getElementById('mic_status').innerText = 'Loi: ' + e.error;
+                        this.style.background = '#FFD70011';
+                        this.style.color = '#FFD700';
+                    };
+                    r.start();
+                };
+                </script>
+            """
+            try:
+                components.html(mic_html, height=130)
+            except Exception:
+                import html as _h
+                st.markdown(
+                    f'<iframe srcdoc="{_h.escape(mic_html)}" '
+                    f'style="width:100%;height:130px;border:none;border-radius:12px;" '
+                    f'sandbox="allow-scripts allow-same-origin allow-microphone"></iframe>',
+                    unsafe_allow_html=True,
+                )
 
-    if tts_text := st.session_state.pop("tts_msg", None):
-        safe = json.dumps(tts_text, ensure_ascii=False)
-        _exec_js(
-            f"window.speechSynthesis.cancel();"
-            f"var u=new SpeechSynthesisUtterance({safe});"
-            f"u.lang='vi-VN';u.rate=1.0;u.pitch=1.0;u.volume=1.0;"
-            f"window.speechSynthesis.speak(u);"
+    with tab_expert:
+        st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
+        st.markdown(
+            "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại** do AI đóng vai. "
+            "Chủ tịch Hội đồng sẽ tổng hợp và chọn ra phương án tốt nhất."
         )
+        st.markdown("---")
 
-    if "show_mic" not in st.session_state:
-        st.session_state.show_mic = False
+        for exp in [
+            {"id": "buffett", "name": "Warren Buffett", "title": "Đầu tư Giá trị", "color": "#4CAF50"},
+            {"id": "soros", "name": "George Soros", "title": "Kinh tế Vĩ mô", "color": "#2196F3"},
+            {"id": "lynch", "name": "Peter Lynch", "title": "Đầu tư Tăng trưởng", "color": "#FF9800"},
+            {"id": "dalio", "name": "Ray Dalio", "title": "Nguyên tắc Thị trường", "color": "#9C27B0"},
+            {"id": "graham", "name": "Benjamin Graham", "title": "Phân tích Cơ bản", "color": "#795548"},
+            {"id": "munger", "name": "Charlie Munger", "title": "Tâm lý học Đầu tư", "color": "#607D8B"},
+        ]:
+            st.markdown(
+                f'<div style="display:inline-block;background:{exp["color"]}22;'
+                f'border:1px solid {exp["color"]}55;border-radius:20px;padding:4px 14px;margin:3px;'
+                f'font-size:0.8rem;">'
+                f'<b style="color:{exp["color"]};">{exp["name"]}</b>'
+                f'<span style="color:#8892B0;margin-left:6px;">— {exp["title"]}</span></div>',
+                unsafe_allow_html=True,
+            )
 
-    col1, col2, col3 = st.columns([1, 6, 4])
-    with col1:
-        if st.button("🎤", use_container_width=True, help="Nhập bằng giọng nói"):
-            st.session_state.show_mic = not st.session_state.show_mic
-            st.rerun()
-    with col2:
-        with st.form(key="chat_form", clear_on_submit=True):
+        st.markdown("---")
+
+        if "expert_results" not in st.session_state:
+            st.session_state.expert_results = None
+
+        with st.form(key="expert_form", clear_on_submit=True):
             cau_hoi = st.text_input(
-                "Nhập câu hỏi của bạn:",
-                placeholder="VD: Nên đầu tư cổ phiếu gì?",
-                key="chat_input",
+                "Câu hỏi của bạn:",
+                placeholder="VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
+                key="expert_question",
                 label_visibility="collapsed",
             )
-            submitted = st.form_submit_button("Gửi", use_container_width=True)
+            submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
             if submitted and cau_hoi:
-                st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
-                with st.spinner("🤖 Robo-Advisor đang suy nghĩ..."):
-                    tra_loi = tim_cau_tra_loi(cau_hoi, st.session_state.chat_history)
-                st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
-                username = st.session_state.get("username", "unknown")
-                try:
-                    save_chat(username, "user", cau_hoi)
-                    save_chat(username, "bot", tra_loi)
-                except Exception:
-                    pass
+                with st.status("🧠 Đang hỏi 6 chuyên gia...", expanded=True) as status:
+                    st.write("📡 Đang gọi các chuyên gia AI song song...")
+                    results = hoi_dong_chuyen_gia(cau_hoi)
+                    if results:
+                        st.session_state.expert_results = results
+                        st.write("✅ Đã nhận phản hồi từ tất cả chuyên gia.")
+                        if results.get("chairman"):
+                            st.write("👑 Chủ tịch Hội đồng đang đưa ra kết luận...")
+                        status.update(label="✅ Hoàn tất!", state="complete")
+                    else:
+                        status.update(label="❌ Thất bại", state="error")
+                        st.error("Không thể kết nối với các chuyên gia. Kiểm tra API keys.")
                 st.rerun()
-    with col3:
-        if st.session_state.chat_history and st.button("🗑️", use_container_width=True, help="Xóa lịch sử"):
-            st.session_state.chat_history = []
-            st.rerun()
 
-    if st.session_state.show_mic:
-        mic_html = """
-            <div style="text-align:center;padding:12px;background:linear-gradient(135deg,#0a0e27,#1a1040);border-radius:12px;border:1px solid #FFD70044;">
-                <div style="color:#8892B0;font-size:13px;margin-bottom:6px;">Bam micro, noi xong tu dong gui</div>
-                <div id="mic_status" style="color:#8892B0;font-size:12px;margin-bottom:6px;">Bam vao micro de bat dau</div>
-                <button id="mic_btn"
-                    style="font-size:30px;padding:10px 20px;border-radius:50%;border:2px solid #FFD700;background:#FFD70011;color:#FFD700;cursor:pointer;">
-                    🎤
-                </button>
-            </div>
-            <script>
-            document.getElementById('mic_btn').onclick = function() {
-                var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SR) { alert('Trinh duyet khong ho tro'); return; }
-                var r = new SR();
-                r.lang = 'vi-VN';
-                r.continuous = false;
-                r.interimResults = false;
-                document.getElementById('mic_status').innerText = 'Dang nghe...';
-                this.style.background = '#FFD700';
-                this.style.color = '#02050E';
-                r.onresult = function(e) {
-                    var text = e.results[0][0].transcript;
-                    document.getElementById('mic_status').innerText = 'Da nhan: ' + text;
-                    try {
-                        var doc = window.parent.document;
-                        var inp = doc.querySelector('input[type="text"]');
-                        if (inp) {
-                            var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                            setter.call(inp, text);
-                            inp.dispatchEvent(new Event('input', { bubbles: true }));
-                            inp.dispatchEvent(new Event('change', { bubbles: true }));
-                            setTimeout(function() {
-                                var btns = doc.querySelectorAll('button');
-                                for (var b of btns) {
-                                    if (b.textContent.trim() === 'Gui' || b.textContent.trim() === 'Gửi') {
-                                        b.click();
-                                        break;
-                                    }
-                                }
-                            }, 400);
-                        }
-                    } catch(e) { alert('Loi: ' + e.message); }
-                };
-                r.onerror = function(e) {
-                    document.getElementById('mic_status').innerText = 'Loi: ' + e.error;
-                    this.style.background = '#FFD70011';
-                    this.style.color = '#FFD700';
-                };
-                r.start();
-            };
-            </script>
-        """
-        try:
-            components.html(mic_html, height=130)
-        except Exception:
-            import html as _h
-            st.markdown(
-                f'<iframe srcdoc="{_h.escape(mic_html)}" '
-                f'style="width:100%;height:130px;border:none;border-radius:12px;" '
-                f'sandbox="allow-scripts allow-same-origin allow-microphone"></iframe>',
-                unsafe_allow_html=True,
-            )
+        if st.session_state.expert_results:
+            results = st.session_state.expert_results
+            st.markdown("---")
+            st.markdown("### 🗳️ Ý kiến Chuyên gia")
+
+            cols = st.columns(3)
+            for i, expert in enumerate(results["experts"]):
+                with cols[i % 3]:
+                    with st.expander(
+                        f"**{expert['name']}** — {expert['title']}",
+                        expanded=(i < 3),
+                    ):
+                        if expert["response"].startswith("❌"):
+                            st.error(expert["response"])
+                        elif expert["response"].startswith("⚠️"):
+                            st.warning(expert["response"])
+                        else:
+                            st.markdown(
+                                f'<div style="border-left:4px solid {expert["color"]};'
+                                f'padding:0.8rem 1rem;background:{expert["color"]}08;'
+                                f'border-radius:8px;font-size:0.9rem;line-height:1.6;">'
+                                f'{expert["response"]}</div>',
+                                unsafe_allow_html=True,
+                            )
+
+            if results.get("chairman"):
+                st.markdown("---")
+                st.markdown(
+                    '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(255,215,0,0.02));'
+                    'border:2px solid #FFD700;border-radius:16px;padding:1.5rem;margin:1rem 0;">'
+                    '<h3 style="color:#FFD700;margin:0 0 0.5rem;">👑 Kết luận của Chủ tịch Hội đồng</h3>'
+                    f'<div style="color:#ECE8E1;font-size:0.95rem;line-height:1.7;">'
+                    f'{results["chairman"]}</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+            if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
+                st.session_state.expert_results = None
+                st.rerun()
 
 
 
