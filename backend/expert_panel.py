@@ -335,11 +335,22 @@ async def _call_chairman(session, question, expert_results, api_key, api_keys):
     return None
 
 
+def _get_key(name):
+    val = os.environ.get(name, "")
+    if not val:
+        try:
+            import streamlit as st
+            val = st.secrets.get(name, "")
+        except Exception:
+            pass
+    return val
+
+
 def hoi_dong_chuyen_gia(cau_hoi):
-    openai_key = os.environ.get("OPENAI_API_KEY", "")
-    gemini_key = os.environ.get("GEMINI_API_KEY", "")
-    openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
-    groq_key = os.environ.get("GROQ_API_KEY", "")
+    openai_key = _get_key("OPENAI_API_KEY")
+    gemini_key = _get_key("GEMINI_API_KEY")
+    openrouter_key = _get_key("OPENROUTER_API_KEY")
+    groq_key = _get_key("GROQ_API_KEY")
 
     api_keys = {
         "openai": openai_key,
