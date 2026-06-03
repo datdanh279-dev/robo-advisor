@@ -9,6 +9,15 @@ logger = logging.getLogger(__name__)
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)
 
+# Ultimate fallback: embedded data from Excel snapshot
+try:
+    from backend.data_snapshot import get_snapshot as _get_snapshot
+except Exception:
+    try:
+        from data_snapshot import get_snapshot as _get_snapshot
+    except Exception:
+        def _get_snapshot(key): return None
+
 _EXCEL_CANDIDATES = [
     os.environ.get("EXCEL_PATH"),
     os.path.join(_PROJECT_DIR, "data", "TONG_HOP_v44_SOI_HOP_NHAT.xlsx"),
@@ -351,6 +360,11 @@ def _safe_load(sheet_name: str, loader, key: str = "", default=None):
         if fb is not None:
             logger.info("Using JSON fallback for '%s'", key)
             return fb
+    if key:
+        snap = _get_snapshot(key)
+        if snap is not None:
+            logger.info("Using snapshot for '%s'", key)
+            return snap
     return default if default is not None else {}
 
 _LOADED = False
@@ -371,6 +385,9 @@ def load_all():
     if not sv and not s:
         sv = _load_json_fallback("stress_vars") or {}
         s = _load_json_fallback("stress") or {}
+        if not sv and not s:
+            sv = _get_snapshot("stress_vars") or {}
+            s = _get_snapshot("stress") or {}
     DOCS["stress_vars"], DOCS["stress"] = sv, s
     DOCS["ngay_cap_nhat"] = _NGAY_FILE
     kpi = DOCS.get("kpi", {})
