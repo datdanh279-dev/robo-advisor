@@ -1,0 +1,92 @@
+import sqlite3
+import json
+import os
+from datetime import datetime
+
+_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "users.db")
+
+def _get_conn():
+    os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
+def init_db():
+    conn = _get_conn()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            key TEXT NOT NULL,
+            value TEXT,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(username, key)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def save_state(username, data):
+    conn = _get_conn()
+    for k, v in data.items():
+        val = json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
+        conn.execute("""
+            INSERT INTO sessions (username, key, value, updated_at)
+            VALUES (?, ?, ?, datetime('now'))
+            ON CONFLICT(username, key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
+        """, (username, k, val))
+    conn.commit()
+    conn.close()
+
+def load_state(username):
+    conn = _get_conn()
+    rows = conn.execute("SELECT key, value FROM sessions WHERE username=?", (username,)).fetchall()
+    conn.close()
+    data = {}
+    for row in rows:
+        try:
+            data[row["key"]] = json.loads(row["value"])
+        except (json.JSONDecodeError, TypeError):
+            data[row["key"]] = row["value"]
+    return data
+
+def save_chat(username, role, content):
+    conn = _get_conn()
+    conn.execute("INSERT INTO chat_history (username, role, content) VALUES (?, ?, ?)", (username, role, content))
+    conn.commit()
+    conn.close()
+
+def load_chat(username, limit=50):
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT role, content, created_at FROM chat_history WHERE username=? ORDER BY id DESC LIMIT ?",
+        (username, limit)
+    ).fetchall()
+    conn.close()
+    return [{"role": r["role"], "content": r["content"], "time": r["created_at"]} for r in reversed(rows)]
+
+def ensure_user(username):
+    conn = _get_conn()
+    conn.execute("INSERT OR IGNORE INTO users (username) VALUES (?)", (username,))
+    conn.commit()
+    conn.close()
+
+init_db()

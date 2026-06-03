@@ -1,0 +1,345 @@
+BỘ GIÁO DỤC VÀ ĐÀO TẠO
+---
+TRƯỜNG ĐẠI HỌC KIÊN GIANG
+---
+KHOA KINH TẾ – TÀI CHÍNH NGÂN HÀNG
+---
+──────── ❖ ────────
+---
+PHIẾU ĐĂNG KÝ DỰ THI
+---
+CUỘC THI Ý TƯỞNG KHỞI NGHIỆP ĐỔI MỚI SÁNG TẠO
+KGU START-UP LẦN VII, NĂM 2026
+---
+────────────────────
+---
+TÊN DỰ ÁN:
+---
+KGU ROBO-ADVISOR — TƯ VẤN ĐẦU TƯ CÁ NHÂN BẰNG TRÍ TUỆ NHÂN TẠO DÀNH CHO NGƯỜI VIỆT
+---
+Lĩnh vực: Tài chính – Ngân hàng & Khoa học công nghệ
+---
+NHÓM THỰC HIỆN
+---
+Trưởng nhóm: DANH ĐẠT
+---
+Ngành: Tài chính – Ngân hàng (Mã ngành: 7340201)
+---
+Trường Đại học Kiên Giang
+---
+Kiên Giang, tháng 5/2026
+---
+PHỤ LỤC 1
+---
+A. THÔNG TIN VẮN TẮT VỀ CÁC THÀNH VIÊN THAM GIA DỰ ÁN
+---
+1. Họ và tên trưởng nhóm: DANH ĐẠT
+---
+2. Lớp: [Sinh viên tự điền — ví dụ: TCNH-K20]
+---
+3. MSSV: [Sinh viên tự điền]
+---
+4. Ngành học: Tài chính – Ngân hàng (Mã ngành 7340201)
+---
+5. Số điện thoại liên hệ: [Sinh viên tự điền]
+---
+6. Email: datdanh279@gmail.com
+---
+7. Tên dự án: KGU Robo-Advisor — Tư vấn đầu tư cá nhân bằng AI dành cho người Việt
+---
+8. Địa điểm triển khai: Trường Đại học Kiên Giang (Không gian Khởi nghiệp Tầng 5 — Nhà Điều hành Trung tâm)
+---
+9. Thời điểm triển khai dự kiến: Từ tháng 6/2026 (MVP) → ra mắt chính thức Q1/2027
+---
+10. Danh sách thành viên trong nhóm (tối đa 5 người):
+---
+Người hướng dẫn:
+---
+• Người 1: [Tên Giảng viên Khoa Kinh tế]; Chức vụ: Giảng viên Khoa Kinh tế, Trường Đại học Kiên Giang
+---
+• Người 2: [Có thể mời thêm cố vấn từ Sở GDCK TP.HCM hoặc CTCK SSI]
+---
+B. VAI TRÒ, TẦM QUAN TRỌNG CỦA DỰ ÁN
+---
+1. Tính cần thiết của sản phẩm dịch vụ
+---
+1.1. Trạng thái hiện tại của dự án
+---
+Dự án hiện đang ở giai đoạn Ý TƯỞNG ban đầu, đã có nghiên cứu thị trường sơ bộ và bản thiết kế MVP (Minimum Viable Product). Nhóm dự kiến phát triển prototype từ tháng 6/2026 và ra mắt phiên bản chính thức Q1/2027 sau khi nhận được giấy phép tư vấn đầu tư của Ủy ban Chứng khoán Nhà nước (UBCKNN).
+---
+1.2. Mục tiêu, giá trị, tầm nhìn
+---
+• Sứ mạng: Dân chủ hóa việc đầu tư tài chính cá nhân — đưa dịch vụ tư vấn đầu tư chuyên nghiệp đến với 50 triệu người Việt thu nhập trung bình mà CTCK truyền thống chưa phục vụ.
+---
+• Tầm nhìn 2030: Trở thành nền tảng Robo-Advisor số 1 Đông Nam Á với 1 triệu người dùng, AUM (tài sản quản lý) đạt 5.000 tỷ VNĐ.
+---
+• Giá trị cốt lõi: AI minh bạch + Phí thấp + Đào tạo miễn phí + Phục vụ người Việt bình dân (đặc biệt ĐBSCL).
+---
+• Sản phẩm tạo giá trị cho: (1) Người Việt thu nhập trung bình muốn tăng tài sản; (2) Tiểu thương, nông dân ĐBSCL có tiền nhàn rỗi; (3) Sinh viên muốn học đầu tư thực tế; (4) Hệ sinh thái Fintech Việt Nam.
+---
+1.3. Đối tượng khách hàng quan trọng nhất
+---
+• Khách hàng cốt lõi (60% target): Người trẻ 22–35 tuổi, đi làm 1–10 năm, thu nhập 8–25 triệu/tháng, có dư 1–10 triệu/tháng để đầu tư nhưng KHÔNG biết bắt đầu từ đâu — vốn dĩ chưa được CTCK phục vụ tốt.
+---
+• Khách hàng thứ hai (25% target): Tiểu thương, nông dân khá giả ĐBSCL có tiền nhàn rỗi 50–500 triệu — hiện đang gửi tiết kiệm lãi suất thấp.
+---
+• Khách hàng thứ ba (15% target): Sinh viên Trường Đại học Kiên Giang và các trường ĐH khu vực miền Tây — thực hành kiến thức tài chính học được.
+---
+1.4. Lý do khách hàng chọn KGU Robo-Advisor
+---
+• AI cá nhân hóa thật sự: Chấm điểm khẩu vị rủi ro qua 12 câu hỏi → đề xuất danh mục riêng cho từng người (khác với Finhay/Tikop chỉ có vài gói chung).
+---
+• Đầu tư từ 100.000 VNĐ — đặc biệt phù hợp tiểu thương/sinh viên (CTCK truyền thống yêu cầu tối thiểu 10 triệu).
+---
+• Phí siêu rẻ 0,3%/năm — chỉ bằng 1/5 phí CTCK truyền thống, 1/3 phí Finhay.
+---
+• Giao diện tiếng Việt + ngôn ngữ đơn giản — không thuật ngữ chứng khoán phức tạp.
+---
+• Miễn phí đào tạo: Workshop hàng tuần qua Zoom, kênh YouTube giáo dục tài chính cá nhân tiếng Việt.
+---
+• Bảo mật cao: Tuân thủ tiêu chuẩn ISO 27001 + lưu trữ tại VN (Viettel IDC).
+---
+1.5. Giá trị mang lại cho cộng đồng & xã hội
+---
+• Nâng cao hiểu biết tài chính cho người Việt: Theo Standard & Poor's 2023, chỉ 24% người Việt có hiểu biết tài chính cơ bản — chúng tôi muốn đẩy con số này lên 50% trong 5 năm.
+---
+• Giảm bất bình đẳng tiếp cận đầu tư: Người ĐBSCL thu nhập 5–10 triệu/tháng có cùng cơ hội đầu tư như người Hà Nội/HCM.
+---
+• Đóng góp cho thị trường vốn VN: Khi thu hút thêm 500.000 nhà đầu tư cá nhân vào TTCK → tăng thanh khoản + ổn định thị trường.
+---
+• Tạo việc làm: 50 việc làm chất lượng cao (Data Scientist, Software Engineer, chuyên gia tài chính) cho sinh viên tốt nghiệp ĐH Kiên Giang trong 5 năm.
+---
+• Phòng tránh lừa đảo tài chính: Người dân biết đầu tư chính thống → giảm tham gia tín dụng đen, đa cấp ponzi (theo Bộ Công an 2024, lừa đảo tài chính gây thiệt hại 1.000 tỷ/năm tại VN).
+---
+2. Tính độc đáo, sáng tạo
+---
+2.1. Sản phẩm có khác biệt gì so với thị trường hiện tại?
+---
+Robo-Advisor đúng nghĩa CHƯA TỒN TẠI ở Việt Nam. Các "đối thủ" hiện tại như Finhay, Tikop, Infina chỉ là app đầu tư đơn giản — KHÔNG có AI cá nhân hóa thực sự, không có tự động rebalancing, không có tối ưu danh mục theo Modern Portfolio Theory.
+---
+Trên thế giới, các Robo-Advisor như Betterment, Wealthfront (Mỹ) đã quản lý AUM hơn 60 tỷ USD. Tại châu Á, StashAway (Singapore) đã có 500.000 user, AUM 1 tỷ USD. VIỆT NAM CÒN BỎ TRỐNG — đây là cơ hội của chúng tôi.
+---
+Bảng so sánh chi tiết với đối thủ:
+---
+2.2. Công nghệ và giải pháp mới
+---
+• Sử dụng Modern Portfolio Theory (Markowitz 1952) tự động cân chỉnh danh mục — chưa có app VN nào áp dụng đúng theo lý thuyết này.
+---
+• Áp dụng Reinforcement Learning để học khẩu vị rủi ro cá nhân theo thời gian — học từ hành vi click, hỏi-đáp với chatbot.
+---
+• AI tiếng Việt huấn luyện trên 100.000 báo cáo phân tích chứng khoán Việt Nam (SSI, VCSC, VNDirect, FiinGroup) — hiểu ngữ cảnh thị trường VN tốt hơn ChatGPT generic.
+---
+• Tích hợp dữ liệu "ngoài chính thống": Sentiment từ Facebook/Zalo, lưu lượng tìm kiếm Google → dự báo xu hướng thị trường (cách Renaissance Technologies dùng cho Medallion Fund).
+---
+• Xử lý realtime trên cloud Việt Nam (Viettel IDC) — đáp ứng Nghị định 53/2022 về bảo vệ dữ liệu cá nhân.
+---
+2.3. Đột phá về chi phí và giá cạnh tranh
+---
+• Chi phí vận hành thấp do tự động hóa: 1 nhân viên có thể phục vụ 5.000 khách hàng (so với 200 khách của CTCK truyền thống) → phí 0,3% vẫn có lời.
+---
+• Không cần văn phòng đắt đỏ — toàn bộ vận hành online từ Kiên Giang/Cần Thơ, tiết kiệm 70% chi phí mặt bằng so với HCM/HN.
+---
+• Tận dụng sinh viên Trường ĐH Kiên Giang thực tập có lương → nguồn nhân lực rẻ + có chuyên môn TCNH.
+---
+PHỤ LỤC 2
+---
+NỘI DUNG CHÍNH CỦA DỰ ÁN
+---
+C. TỔNG QUAN ĐỀ ÁN
+---
+1. Mô hình kinh doanh — Business Model Canvas
+---
+2. Sứ mạng, tầm nhìn, mục tiêu, giá trị cốt lõi
+---
+Sứ mạng (Mission)
+---
+"Đưa dịch vụ tư vấn đầu tư chuyên nghiệp đến với mọi người Việt — đặc biệt là 50 triệu người thu nhập trung bình chưa được phục vụ bởi CTCK truyền thống — bằng công nghệ AI minh bạch, chi phí thấp và phương pháp giáo dục dễ hiểu."
+---
+Tầm nhìn (Vision) đến năm 2030
+---
+"KGU Robo-Advisor trở thành nền tảng tư vấn đầu tư cá nhân bằng AI số 1 Việt Nam, mở rộng ra ASEAN, phục vụ 1 triệu nhà đầu tư với AUM 5.000 tỷ VNĐ, đóng góp 0,5% vào thanh khoản TTCK Việt Nam."
+---
+Mục tiêu cụ thể
+---
+• Năm 1 (2026): Hoàn thành MVP, 500 user beta, xin giấy phép UBCKNN.
+---
+• Năm 2 (2027): 5.000 user thật, AUM 30 tỷ, hòa vốn vận hành.
+---
+• Năm 3 (2028): 50.000 user, AUM 250 tỷ, có lợi nhuận.
+---
+• Năm 5 (2030): 300.000 user, AUM 1.500 tỷ, mở rộng Campuchia.
+---
+Giá trị cốt lõi (Core Values)
+---
+• MINH BẠCH — AI giải thích được, phí công khai, không hoa hồng ẩn.
+---
+• HỌC TẬP — Người dùng phải HIỂU mới được đầu tư, đào tạo miễn phí.
+---
+• BÌNH ĐẲNG — Người Cà Mau có cơ hội giống người HCM.
+---
+• AN TOÀN — Bảo mật dữ liệu cao, tuân thủ pháp luật tuyệt đối.
+---
+3. Kế hoạch nhân sự
+---
+Cơ cấu nhân sự 5 năm
+---
+• Năm 1 (5 người): CEO + CTO + Data Scientist + Marketing + Sinh viên thực tập
+---
+• Năm 2 (12 người): + 2 Engineer + 2 Customer Success + 1 Lawyer + 2 Sales
+---
+• Năm 3 (25 người): + Data Engineer + UX Designer + Tài chính + HR
+---
+• Năm 5 (50 người): Mở rộng văn phòng HCM, Cần Thơ
+---
+Yêu cầu chuyên môn các vị trí chủ chốt
+---
+• CEO: Kiến thức tài chính + lãnh đạo + pitching nhà đầu tư (Trưởng nhóm — DANH ĐẠT đảm nhiệm).
+---
+• CTO: Master/PhD Khoa học máy tính, kinh nghiệm ML 5+ năm — tuyển từ FPT, VinAI hoặc cộng đồng AI Việt Nam.
+---
+• Data Scientist: Cử nhân Toán/Thống kê/CNTT, biết Python, scikit-learn, PyTorch — có thể tuyển từ sinh viên xuất sắc ĐH Kiên Giang/Cần Thơ.
+---
+• Marketing Lead: Kinh nghiệm Fintech, hiểu social media VN, kỹ năng content tiếng Việt.
+---
+4. Kế hoạch Marketing
+---
+4.1. Làm thế nào để khách hàng biết tới?
+---
+• Kênh chính: TikTok + YouTube giáo dục tài chính (kênh 100K+ subscriber trong 12 tháng — học theo Money With Katie, Hieu Nguyen Money).
+---
+• Facebook Group cộng đồng "Đầu tư bằng AI cho người Việt" — target 50.000 thành viên.
+---
+• Hợp tác KOL tài chính: Phương Hằng, Hieu TV, Ngọc Vũ về quay sponsored content.
+---
+• SEO Google: 200 bài viết về kiến thức đầu tư cơ bản, tiếng Việt — top kết quả Google trong 18 tháng.
+---
+• Workshop offline tại các trường ĐH miền Tây: ĐH Kiên Giang, ĐH Cần Thơ, ĐH An Giang — mỗi quý 4 buổi.
+---
+• Quảng cáo Zalo + Facebook target tiểu thương ĐBSCL, ngân sách 200 triệu/tháng năm 2.
+---
+4.2. Giải pháp truyền thông độc đáo
+---
+• Series video "100 ngày đầu tư từ 100.000 VNĐ" — theo chân nhân vật thực tế (sinh viên ĐH Kiên Giang), chứng minh sản phẩm hiệu quả với người mới.
+---
+• Chương trình "AI dạy mẹ tôi đầu tư" — kể chuyện gần gũi, đặc biệt cho phụ huynh ĐBSCL.
+---
+• Hợp tác Vietnambiz, CafeF, VNExpress Kinh doanh viết bài chuyên gia.
+---
+4.3. Kênh bán hàng & phân phối
+---
+• App di động iOS + Android (miễn phí tải, tính phí trên AUM).
+---
+• Website kgu-robo.vn cho khách hàng máy tính.
+---
+• Tích hợp Zalo Mini App — không cần tải app, truy cập 80 triệu user Zalo VN.
+---
+• Hợp tác với app ngân hàng VCB Digibank, MB Bank Plus — banner "Đầu tư thông minh với AI".
+---
+• Đối tác đại học: SV tốt nghiệp ĐH Kiên Giang được tài khoản miễn phí 12 tháng + 1 triệu seed money.
+---
+5. Kế hoạch sản xuất – kinh doanh
+---
+5.1. Quy trình hoạt động
+---
+• Bước 1: User tải app → đăng ký, KYC qua VNeID (xác minh danh tính online).
+---
+• Bước 2: AI hỏi 12 câu xác định khẩu vị rủi ro + mục tiêu tài chính (mua nhà, học hành con cái, hưu trí).
+---
+• Bước 3: AI đề xuất danh mục phù hợp (mix giữa cổ phiếu VN30, trái phiếu chính phủ, quỹ ETF, vàng SJC).
+---
+• Bước 4: User chuyển khoản qua liên kết ngân hàng → app tự động mua đúng danh mục.
+---
+• Bước 5: AI giám sát và rebalance tự động hàng tháng/quý theo biến động thị trường.
+---
+• Bước 6: User nhận báo cáo hiệu suất hàng tháng + alerts khi cần điều chỉnh.
+---
+5.2. Công nghệ và hạ tầng
+---
+• Backend: Python (FastAPI), database PostgreSQL + TimescaleDB cho dữ liệu thị trường.
+---
+• AI/ML: PyTorch, scikit-learn, mô hình LSTM dự báo xu hướng + Markowitz tối ưu danh mục.
+---
+• Cloud: AWS hoặc Viettel IDC (chi phí ~30 triệu/tháng năm 1, scale lên 200 triệu/tháng năm 3).
+---
+• Mobile app: React Native (1 codebase iOS + Android, tiết kiệm chi phí phát triển).
+---
+• Bảo mật: ISO 27001, mã hóa AES-256, OAuth 2.0 + biometric login.
+---
+6. Kế hoạch Tài chính
+---
+6.1. Tổng vốn dự kiến và nguồn vốn
+---
+• Năm 1: 300 triệu VNĐ — Vốn tự có nhóm + Trường ĐH Kiên Giang hỗ trợ (giải thưởng cuộc thi) + gia đình.
+---
+• Năm 2: 1,5 tỷ VNĐ — Vốn vay Quỹ Khởi nghiệp ĐBSCL + Angel Investor (qua Vietnam Innovative Startup Accelerator).
+---
+• Năm 3+: 8 tỷ VNĐ Series A — gọi vốn từ Genesia Ventures, ThinkZone Ventures, Do Ventures.
+---
+• Năm 5: 30 tỷ Series B — quỹ quốc tế (East Ventures, Openspace).
+---
+6.2. Roadmap tăng trưởng 5 năm
+---
+6.3. Dự kiến tài chính chi tiết
+---
+6.4. Khả năng hoàn vốn
+---
+• BREAK-EVEN: Cuối năm 3 (sau 30 tháng từ MVP).
+---
+• HOÀN VỐN ĐẦU TƯ: Năm 4 — Lợi nhuận lũy kế năm 4 đạt 6,85 tỷ > Tổng vốn đầu tư 5 năm 9,8 tỷ → còn thiếu 3 tỷ → HOÀN VỐN TOÀN BỘ CUỐI NĂM 5.
+---
+• ROI 5 năm: Lợi nhuận sau thuế lũy kế 5 năm ~20 tỷ / Tổng vốn 9,8 tỷ = 204% (chưa tính giá trị thoái vốn).
+---
+• Giá trị công ty (valuation) năm 5: ước tính 150–250 tỷ VNĐ (theo bội số AUM x 10%).
+---
+7. Các nguồn lực khác hỗ trợ
+---
+• Đã có doanh nghiệp/tổ chức tư vấn: Trường Đại học Kiên Giang — Phòng Công tác sinh viên & Khởi nghiệp (sẵn sàng hỗ trợ ươm tạo).
+---
+• Đối tác tiềm năng đã liên hệ: Công ty CK SSI (cung cấp API), MB Bank (kết nối thanh toán).
+---
+• Đội ngũ sáng lập: Trưởng nhóm DANH ĐẠT — sinh viên Tài chính Ngân hàng ĐH Kiên Giang, có kinh nghiệm phân tích định lượng (Kinh tế lượng, hồi quy bội), thực hành Python.
+---
+• Ý tưởng có thể phát triển thành đề tài NCKH sinh viên cấp Trường — đăng ký Cuộc thi NCKH SV 2026–2027.
+---
+• Cố vấn chuyên môn (dự kiến mời): Giảng viên Khoa Kinh tế ĐH Kiên Giang + Chuyên viên Phân tích SSI/VCSC.
+---
+8. Tính khả thi của dự án
+---
+8.1. Ý nghĩa xã hội (tổng kết)
+---
+Dự án giải quyết 3 vấn đề lớn của xã hội Việt Nam: (1) Hiểu biết tài chính thấp (chỉ 24% người Việt có hiểu biết tài chính cơ bản); (2) Bất bình đẳng tiếp cận đầu tư giữa thành thị và nông thôn; (3) Phòng tránh lừa đảo tài chính, tín dụng đen. Khi 1 triệu người Việt dùng KGU Robo-Advisor đúng cách, ước tính TĂNG TÀI SẢN cá nhân của họ trung bình 8-12%/năm (so với gửi tiết kiệm 5-6%/năm) — tổng giá trị tạo ra cho xã hội đạt 3.000-5.000 tỷ VNĐ/năm.
+---
+8.2. Đội ngũ có đủ năng lực không?
+---
+• ĐAM MÊ — Trưởng nhóm DANH ĐẠT đã tự học Python, làm hồi quy bội SPSS, quan tâm sâu đến đầu tư tài chính cá nhân.
+---
+• CHUYÊN MÔN — Kiến thức TCNH từ chương trình ĐH Kiên Giang + kinh tế lượng + lập trình Python.
+---
+• QUYẾT TÂM — Nhóm 5 sinh viên sẽ dành 12-18 tháng từ năm cuối ĐH đến sau tốt nghiệp để xây dựng.
+---
+• Ý THỨC ĐÓNG GÓP XÃ HỘI — Mục tiêu phục vụ chính cộng đồng quê hương ĐBSCL (Kiên Giang, An Giang, Cà Mau).
+---
+• MẠNG LƯỚI — Tận dụng cộng đồng cựu sinh viên ĐH Kiên Giang, network khu vực ĐBSCL.
+---
+8.3. Có kinh phí thực hiện?
+---
+Năm 1 chỉ cần 300 triệu — hoàn toàn khả thi từ: (a) Giải thưởng KGU Start-up (3 triệu nếu nhất, các giải thưởng tỉnh/khu vực 50-200 triệu); (b) Vốn tự có gia đình 100 triệu; (c) Hỗ trợ Quỹ Khởi nghiệp Kiên Giang 100 triệu; (d) Đối tác doanh nghiệp tài trợ 50 triệu.
+---
+8.4. Trong ngắn hạn có thấy hiệu quả?
+---
+• 3 tháng đầu: Hoàn thành MVP, có 100 user thật dùng beta.
+---
+• 6 tháng: 500 user, có feedback rõ ràng, validate hypothesis.
+---
+• 12 tháng: Đạt 5.000 user, có doanh thu thực, sẵn sàng gọi vốn vòng đầu.
+---
+• 18 tháng: Hòa vốn vận hành — dấu hiệu rõ ràng dự án có thể tự bền vững.
+---
+Kiên Giang, tháng 5/2026
+---
+Đại diện nhóm tác giả
+---
+(Ký và ghi rõ họ tên)
+---
+DANH ĐẠT
+---
