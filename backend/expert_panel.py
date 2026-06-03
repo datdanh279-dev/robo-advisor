@@ -346,11 +346,11 @@ def _get_key(name):
     return val
 
 
-def hoi_dong_chuyen_gia(cau_hoi):
+def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None):
     openai_key = _get_key("OPENAI_API_KEY")
     gemini_key = _get_key("GEMINI_API_KEY")
     openrouter_key = _get_key("OPENROUTER_API_KEY")
-    groq_key = _get_key("GROQ_API_KEY")
+    groq_key = groq_key_override or _get_key("GROQ_API_KEY")
 
     api_keys = {
         "openai": openai_key,

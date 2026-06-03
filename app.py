@@ -1803,7 +1803,7 @@ elif st.session_state.trang_thai == "chat":
             if submitted and cau_hoi:
                 with st.status("🧠 Đang hỏi 6 chuyên gia...", expanded=True) as status:
                     st.write("📡 Đang gọi các chuyên gia AI song song...")
-                    results = hoi_dong_chuyen_gia(cau_hoi)
+                    results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=st.secrets.get("GROQ_API_KEY"))
                     if results:
                         st.session_state.expert_results = results
                         st.write("✅ Đã nhận phản hồi từ tất cả chuyên gia.")
