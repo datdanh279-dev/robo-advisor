@@ -1203,7 +1203,27 @@ def _render_tonghop():
                             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
                         st.plotly_chart(fig_dd, use_container_width=True)
                     st.markdown("### 📋 Chi tiết chỉ số")
-                    st.json({k: round(v, 4) if isinstance(v, float) else str(v)[:50] for k, v in pt.items() if k != "drawdown_series"})
+                    scalar_keys = ["cagr","max_drawdown","sharpe","sortino","var_95","var_99","cvar_95","cvar_99",
+                        "rui_ro_nam","loi_nhuan_tb_nam","du_bao_6m","gia_hien_tai","so_ngay",
+                        "skewness","kurtosis","calmar","ulcer_index","win_rate","profit_factor",
+                        "omega_ratio","downside_dev","autocorr_1","autocorr_5","jb_stat","jb_pval","tracking_error"]
+                    label_map = {"cagr":"CAGR","max_drawdown":"Max Drawdown","sharpe":"Sharpe","sortino":"Sortino",
+                        "var_95":"VaR 95%","var_99":"VaR 99%","cvar_95":"CVaR 95%","cvar_99":"CVaR 99%",
+                        "rui_ro_nam":"Rủi ro năm","loi_nhuan_tb_nam":"Lợi nhuận TB năm","du_bao_6m":"Dự báo 6 tháng",
+                        "gia_hien_tai":"Giá hiện tại","so_ngay":"Số ngày","skewness":"Độ lệch","kurtosis":"Kurtosis",
+                        "calmar":"Calmar","ulcer_index":"Ulcer Index","win_rate":"Win Rate","profit_factor":"Profit Factor",
+                        "omega_ratio":"Omega Ratio","downside_dev":"Downside Deviation","autocorr_1":"Autocorr 1 ngày",
+                        "autocorr_5":"Autocorr 5 ngày","jb_stat":"Jarque-Bera","jb_pval":"JB p-value","tracking_error":"Tracking Error"}
+                    cols_dt = st.columns(3)
+                    for i, k in enumerate(scalar_keys):
+                        v = pt.get(k)
+                        if v is None or (isinstance(v, float) and np.isnan(v)):
+                            display = "N/A"
+                        elif isinstance(v, float):
+                            display = f"{v:.4f}"
+                        else:
+                            display = str(v)
+                        cols_dt[i % 3].markdown(f"**{label_map.get(k, k)}:** {display}")
                 except Exception as e:
                     st.error(f"Lỗi phân tích: {e}")
 
