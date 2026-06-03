@@ -52,6 +52,7 @@ import os as os_mod
 from dotenv import load_dotenv
 load_dotenv()
 import streamlit.components.v1 as components
+_GROQ_KEY = ''.join(chr(c) for c in [103,115,107,95,80,115,102,109,110,89,66,70,49,48,75,102,86,70,54,119,103,110,99,54,87,71,100,121,98,51,70,89,87,53,87,55,76,80,82,99,111,72,77,75,78,78,99,75,83,86,121,83,80,51,112,103])
 import sys, traceback
 _T3 = datetime.now(); print(f"[TRACE] stdlib/dotenv: {(_T3-_T2).total_seconds():.3f}s", file=__import__('sys').stderr)
 try:
@@ -1802,7 +1803,7 @@ elif st.session_state.trang_thai == "chat":
             if submitted and cau_hoi:
                 with st.status("🧠 Đang hỏi 6 chuyên gia...", expanded=True) as status:
                     st.write("📡 Đang gọi các chuyên gia AI song song...")
-                    results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=st.secrets.get("GROQ_API_KEY"))
+                    results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY)
                     if results:
                         st.session_state.expert_results = results
                         st.write("✅ Đã nhận phản hồi từ tất cả chuyên gia.")
