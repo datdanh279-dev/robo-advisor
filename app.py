@@ -34,7 +34,7 @@ from backend.calculations import (
     phan_tich_danh_muc_nang_cao,
     tinh_tuong_quan,
 )
-from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, is_founding_member, get_beta_progress, BETA_MAX
+from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX
 
 st.set_page_config(
     page_title="Robo-Advisor AI - Đầu tư thông minh",
