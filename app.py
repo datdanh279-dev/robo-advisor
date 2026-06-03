@@ -705,9 +705,10 @@ def _render_tonghop():
     kpi = DOCS["kpi"]
     dm = DOCS["danh_muc"]
     perf = DOCS["performance"]
-    tong_gt = sum(dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0) if ma in dm else 0 for ma in kpi)
-    tong_lai_lo = sum(kpi[ma].get("lai_lo_pct", 0) * dm[ma].get("gia_von", 0) * dm[ma].get("so_luong", 0) / 100 if ma in dm else 0 for ma in kpi)
-    return_pct = (perf.get("Rp", 0) * 100) or (tong_lai_lo / tong_gt * 100 if tong_gt else 0)
+    tong_gt = sum(dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0) for ma in dm)
+    tong_von = sum(dm[ma].get("gia_von", 0) * dm[ma].get("so_luong", 0) for ma in dm)
+    tong_lai_lo = sum((dm[ma].get("gia_thi_truong", 0) - dm[ma].get("gia_von", 0)) * dm[ma].get("so_luong", 0) for ma in dm)
+    return_pct = (perf.get("Rp", 0) * 100) or (tong_lai_lo / tong_von * 100 if tong_von else 0)
     col_d1, col_d2, col_d3, col_d4 = st.columns(4)
     with col_d1:
         st.markdown(f"""<div class="metric-box"><h4>Tổng GT Danh mục</h4><h2 style="color:#FFD700;">{tong_gt:,.0f} ₫</h2></div>""", unsafe_allow_html=True)
@@ -1528,8 +1529,8 @@ elif st.session_state.trang_thai == "dashboard":
                     "Ngành": info.get("nganh", ""),
                     "Giá": f"{info.get('gia', 0):,.0f}",
                     "P/E": f"{info.get('pe', 0):.1f}",
-                    "ROE%": f"{info.get('roe', 0):.1f}",
-                    "P&L%": f"{info.get('lai_lo_pct', 0):.1f}",
+                    "ROE%": f"{info.get('roe', 0)*100:.1f}",
+                    "P&L%": f"{info.get('lai_lo_pct', 0)*100:.1f}",
                     "Điểm MUA": f"{info.get('diem_mua', 0):.0f}",
                     "Điểm BÁN": f"{info.get('diem_ban', 0):.0f}",
                     "KL": info.get("ket_luan", ""),
