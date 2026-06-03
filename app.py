@@ -64,7 +64,6 @@ def kiem_tra_dang_nhap(username, password):
     pwd  = st.secrets.get("auth", {}).get("password") or os_mod.environ.get("KGU_PASS")
     if user and pwd:
         return username == user and password == pwd
-    st.error("🔴 Lỗi hệ thống: chưa cấu hình tài khoản. Vui lòng liên hệ quản trị viên.")
     return False
 
 def tao_ma_otp():
