@@ -1,9 +1,11 @@
 import sqlite3
 import json
 import os
+import tempfile
 from datetime import datetime
 
-_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "users.db")
+_DB_DIR = os.path.join(tempfile.gettempdir(), "robo-advisor-data")
+_DB_PATH = os.path.join(_DB_DIR, "users.db")
 _DB_INITIALIZED = False
 
 def _get_conn():
@@ -14,7 +16,7 @@ def _get_conn():
         except Exception:
             import logging
             logging.getLogger(__name__).warning("lazy init_db failed", exc_info=True)
-    os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
+    os.makedirs(_DB_DIR, exist_ok=True)
     conn = sqlite3.connect(_DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -24,7 +26,7 @@ def _get_conn():
 BETA_MAX = 1000
 
 def _init_db_conn():
-    os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
+    os.makedirs(_DB_DIR, exist_ok=True)
     conn = sqlite3.connect(_DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
