@@ -1,6 +1,4 @@
 import streamlit as st
-import nest_asyncio
-nest_asyncio.apply()
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px

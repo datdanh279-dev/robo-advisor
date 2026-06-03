@@ -410,6 +410,9 @@ def _get_key(name):
 
 
 def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None):
+    import nest_asyncio
+    nest_asyncio.apply()
+
     openai_key = _get_key("OPENAI_API_KEY")
     gemini_key = _get_key("GEMINI_API_KEY")
     openrouter_key = _get_key("OPENROUTER_API_KEY")
