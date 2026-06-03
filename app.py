@@ -34,7 +34,7 @@ from backend.calculations import (
     phan_tich_danh_muc_nang_cao,
     tinh_tuong_quan,
 )
-from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX
+from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX, reset_password
 
 st.set_page_config(
     page_title="Robo-Advisor AI - Đầu tư thông minh",
@@ -198,6 +198,20 @@ def hien_thi_login():
                     st.rerun()
                 else:
                     st.error("Sai tên đăng nhập hoặc mật khẩu!")
+        with st.expander("Quên mật khẩu?", expanded=False):
+            with st.form("reset_form"):
+                reset_user = st.text_input("Tên đăng nhập", placeholder="Nhập username...", key="reset_user")
+                reset_pass = st.text_input("Mật khẩu mới", type="password", placeholder="Nhập mật khẩu mới...", key="reset_pass")
+                reset_submit = st.form_submit_button("🔄 Đặt lại mật khẩu")
+                if reset_submit:
+                    if len(reset_user) < 3:
+                        st.error("Tên đăng nhập ít nhất 3 ký tự")
+                    elif len(reset_pass) < 6:
+                        st.error("Mật khẩu ít nhất 6 ký tự")
+                    elif reset_password(reset_user, reset_pass):
+                        st.success("✅ Đặt lại mật khẩu thành công! Đăng nhập với mật khẩu mới.")
+                    else:
+                        st.error("Tên đăng nhập không tồn tại trong hệ thống Beta")
     with tab_reg:
         st.markdown(f'<div class="step-badge">🎯 Còn {remaining} suất</div>', unsafe_allow_html=True)
         st.markdown(

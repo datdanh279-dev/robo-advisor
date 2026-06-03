@@ -155,6 +155,17 @@ def ensure_user(username):
     conn.commit()
     conn.close()
 
+def reset_password(username, new_password):
+    conn = _get_conn()
+    row = conn.execute("SELECT COUNT(*) FROM users WHERE username=?", (username,)).fetchone()
+    if not row or row[0] == 0:
+        conn.close()
+        return False
+    conn.execute("INSERT OR REPLACE INTO sessions (username, key, value) VALUES (?, 'password', ?)", (username, new_password))
+    conn.commit()
+    conn.close()
+    return True
+
 try:
     init_db()
 except Exception as e:
