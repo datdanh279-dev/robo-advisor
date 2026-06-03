@@ -2,6 +2,14 @@ import numpy as np
 import pandas as pd
 from .data_loader import DOCS
 
+# Floating-Point Safety: tất cả mảng tỷ trọng đều được làm tròn và chuẩn hóa
+# trước khi nạp vào thuật toán tối ưu, tránh lỗi sum=0.9999999 gây treo scipy
+def _chuan_hoa_ty_trong(w, decimals=8):
+    w = np.round(np.array(w, dtype=np.float64), decimals)
+    w = np.clip(w, 0, 1)
+    w = w / w.sum() if w.sum() > 0 else w
+    return w
+
 # Lưu ý (GIGO fix): Các giá trị loi_nhuan_trung_binh dưới đây là
 # LỢI NHUẬN TRUNG BÌNH LỊCH SỬ của từng kênh (Historical Mean Returns),
 # KHÔNG phải dự báo hồi quy tuyến tính. Dùng historical mean returns
@@ -87,7 +95,7 @@ MA_TRAN_TUONG_QUAN = pd.DataFrame(
 
 
 def tinh_toan_danh_muc(ty_trong):
-    ty_trong = np.array(ty_trong)
+    ty_trong = _chuan_hoa_ty_trong(ty_trong)
     loi_nhuan = np.array([THONG_TIN_KENH[k]["loi_nhuan_trung_binh"] for k in THONG_TIN_KENH])
     rui_ro = np.array([THONG_TIN_KENH[k]["rui_ro"] for k in THONG_TIN_KENH])
 
@@ -117,7 +125,7 @@ def mo_phong_monte_carlo(so_lan=1000):
 
     ket_qua = []
     for _ in range(so_lan):
-        w = np.random.dirichlet(np.ones(n), 1)[0]
+        w = _chuan_hoa_ty_trong(np.random.dirichlet(np.ones(n), 1)[0])
         loi_nhuan_kv = np.dot(w, loi_nhuan)
         phuong_sai = np.dot(w.T, np.dot(ma_tran_hiep_bien, w))
         rui_ro_dm = np.sqrt(phuong_sai)
@@ -146,9 +154,10 @@ def toi_uu_danh_muc():
     bounds = tuple((0, 1) for _ in range(n))
 
     w0 = np.array([1.0 / n] * n)
-    ket_qua = minimize(ham_muc_tieu, w0, method="SLSQP", bounds=bounds, constraints=constraints)
+    ket_qua = minimize(ham_muc_tieu, w0, method="SLSQP", bounds=bounds, constraints=constraints, options={"ftol": 1e-10, "maxiter": 1000})
 
-    return ket_qua.x
+    w = _chuan_hoa_ty_trong(ket_qua.x)
+    return w
 
 
 def tinh_toan_phan_bo_lai_lo(ty_trong, so_tien_dau_tu, ty_le_loi_nhuan_thi_truong=None):

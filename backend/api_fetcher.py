@@ -1,9 +1,43 @@
-import requests, re, json, os, sys, io, contextlib, logging, time
+import requests, re, json, os, sys, io, contextlib, logging, time, random
 from datetime import datetime, time as dt_time
 from concurrent.futures import ThreadPoolExecutor
-import yfinance as yf
 
 logger = logging.getLogger(__name__)
+
+# User-Agent rotation để tránh bị Yahoo chặn IP trên shared hosting
+_YF_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+]
+_YF_SESSION = None
+
+def _yf_session():
+    global _YF_SESSION
+    if _YF_SESSION is None:
+        _YF_SESSION = requests.Session()
+        _YF_SESSION.headers.update({"User-Agent": random.choice(_YF_USER_AGENTS)})
+    return _YF_SESSION
+
+def _yf_retry(ma, period="1y", retries=3, delay=2):
+    """Wrapper cho yfinance với retry + User-Agent rotation, tránh IP ban"""
+    import yfinance as yf
+    for attempt in range(retries):
+        try:
+            session = _yf_session()
+            ticker = yf.Ticker(ma, session=session)
+            with contextlib.redirect_stderr(io.StringIO()):
+                hist = ticker.history(period=period)
+            if not hist.empty:
+                return hist
+        except Exception as e:
+            logger.debug(f"yfinance {ma} attempt {attempt+1}/{retries}: {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+                # Refresh session + user-agent cho lần retry
+                _YF_SESSION = None
+    return None
 
 CACHE = {}
 CACHE_TTL = {}
@@ -21,15 +55,10 @@ def dang_trong_gio_giao_dich_vn():
     return _TRADING_START <= now.time() <= _TRADING_END
 
 def gia_dong_cua_gan_nhat(ma, default=None):
-    """Lấy giá đóng cửa gần nhất (có thể là phiên trước)"""
-    try:
-        with contextlib.redirect_stderr(io.StringIO()):
-            ticker = yf.Ticker(ma)
-            hist = ticker.history(period="5d")
-            if not hist.empty:
-                return float(hist['Close'].iloc[-1])
-    except Exception:
-        pass
+    """Lấy giá đóng cửa gần nhất (có thể là phiên trước), có retry"""
+    hist = _yf_retry(ma, "5d", retries=2, delay=1)
+    if hist is not None and not hist.empty:
+        return float(hist['Close'].iloc[-1])
     return default
 
 def _cache_get(key):
@@ -76,15 +105,13 @@ def lay_ty_gia_usd_vnd():
 
 def lay_chi_so_yahoo(ma, ky_han="1y"):
     try:
-        with contextlib.redirect_stderr(io.StringIO()):
-            ticker = yf.Ticker(ma)
-            hist = ticker.history(period=ky_han)
-            if hist.empty:
-                return None, None, 0
-            gia_hien_tai = float(hist['Close'].iloc[-1])
-            gia_cu = float(hist['Close'].iloc[0])
-            thay_doi = (gia_hien_tai - gia_cu) / gia_cu if gia_cu > 0 else 0
-            return gia_hien_tai, thay_doi, hist
+        hist = _yf_retry(ma, ky_han, retries=2, delay=1)
+        if hist is None or hist.empty:
+            return None, None, 0
+        gia_hien_tai = float(hist['Close'].iloc[-1])
+        gia_cu = float(hist['Close'].iloc[0])
+        thay_doi = (gia_hien_tai - gia_cu) / gia_cu if gia_cu > 0 else 0
+        return gia_hien_tai, thay_doi, hist
     except Exception as e:
         logger.warning("lay_chi_so_yahoo(%s) failed: %s", ma, e)
         return None, None, 0
@@ -220,9 +247,8 @@ def lay_du_lieu_thi_truong_that():
 
 def lay_gia_co_phieu(ma):
     try:
-        ticker = yf.Ticker(ma + ".VN" if len(ma) <= 4 else ma)
-        hist = ticker.history(period="5d")
-        if not hist.empty:
+        hist = _yf_retry(ma + ".VN" if len(ma) <= 4 else ma, "5d", retries=2, delay=1)
+        if hist is not None and not hist.empty:
             return float(hist['Close'].iloc[-1])
     except Exception as e:
         logger.debug("lay_gia_co_phieu yahoo(%s): %s", ma, e)
