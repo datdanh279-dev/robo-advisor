@@ -6,6 +6,8 @@ import os
 
 logger = logging.getLogger(__name__)
 
+_CHAIRMAN_ATTEMPTED = False
+
 EXPERTS = [
     {
         "id": "buffett",
@@ -42,7 +44,7 @@ EXPERTS = [
         "id": "lynch",
         "name": "Peter Lynch",
         "title": "Nhà đầu tư Tăng trưởng",
-        "model": "qwen/qwq-32b",
+        "model": "openrouter/free",
         "backend": "openrouter",
         "color": "#FF9800",
         "prompt": (
@@ -58,7 +60,7 @@ EXPERTS = [
         "id": "dalio",
         "name": "Ray Dalio",
         "title": "Chiến lược gia Nguyên tắc",
-        "model": "deepseek/deepseek-chat",
+        "model": "openrouter/free",
         "backend": "openrouter",
         "color": "#9C27B0",
         "prompt": (
@@ -74,7 +76,7 @@ EXPERTS = [
         "id": "graham",
         "name": "Benjamin Graham",
         "title": "Cha đẻ Phân tích Cơ bản",
-        "model": "anthropic/claude-sonnet-4-20250514",
+        "model": "openrouter/free",
         "backend": "openrouter",
         "color": "#795548",
         "prompt": (
@@ -91,7 +93,7 @@ EXPERTS = [
         "id": "munger",
         "name": "Charlie Munger",
         "title": "Nhà tư duy Đa chiều",
-        "model": "cohere/command-r-plus-08-2024",
+        "model": "openrouter/free",
         "backend": "openrouter",
         "color": "#607D8B",
         "prompt": (
@@ -160,7 +162,7 @@ async def _call_gemini(session, prompt, question, api_key, model="gemini-2.0-fla
     return None
 
 
-async def _call_openrouter(session, prompt, question, api_key, model, timeout=45):
+async def _call_openrouter(session, prompt, question, api_key, model, timeout=60):
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
@@ -221,7 +223,10 @@ async def _call_expert(session, expert, question, api_keys):
     return result or f"⚠️ {expert['name']} không thể trả lời ngay lúc này."
 
 
-async def _call_chairman(session, question, expert_results, api_key):
+async def _call_chairman(session, question, expert_results, api_key, api_keys):
+    global _CHAIRMAN_ATTEMPTED
+    _CHAIRMAN_ATTEMPTED = False
+
     reviews = []
     for expert, result in zip(EXPERTS, expert_results):
         reviews.append(f"=== {expert['name']} ({expert['title']}) ===\n{result}\n")
@@ -230,20 +235,54 @@ async def _call_chairman(session, question, expert_results, api_key):
     prompt = f"{CHAIRMAN_SYSTEM_PROMPT}\n\nCÂU HỎI: {question}\n\nCÁC Ý KIẾN CHUYÊN GIA:\n{context}\n\nKẾT LUẬN CỦA CHỦ TỊCH:"
 
     messages = [{"role": "user", "content": prompt}]
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {"model": "gpt-4o", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
-    try:
-        async with session.post(
-            "https://api.openai.com/v1/chat/completions",
-            json=payload, headers=headers,
-            timeout=aiohttp.ClientTimeout(total=60)
-        ) as r:
-            if r.status == 200:
-                data = await r.json()
-                return data["choices"][0]["message"]["content"].strip()
-            logger.warning(f"Chairman status {r.status}")
-    except Exception as e:
-        logger.warning(f"Chairman error: {e}")
+
+    # Try OpenAI first (best for chairman role)
+    openai_key = api_key or api_keys.get("openai")
+    if openai_key:
+        headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
+        payload = {"model": "gpt-4o", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
+        try:
+            async with session.post(
+                "https://api.openai.com/v1/chat/completions",
+                json=payload, headers=headers,
+                timeout=aiohttp.ClientTimeout(total=60)
+            ) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    return data["choices"][0]["message"]["content"].strip()
+                logger.warning(f"Chairman OpenAI status {r.status}")
+        except Exception as e:
+            logger.warning(f"Chairman OpenAI error: {e}")
+        _CHAIRMAN_ATTEMPTED = True
+
+    # Fallback: try OpenRouter
+    or_key = api_keys.get("openrouter")
+    if or_key and _CHAIRMAN_ATTEMPTED:
+        or_headers = {
+            "Authorization": f"Bearer {or_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://robo-advisor.streamlit.app",
+            "X-Title": "Robo-Advisor Expert Panel",
+        }
+        or_payload = {
+            "model": "openrouter/free",
+            "messages": messages,
+            "temperature": 0.5,
+            "max_tokens": 1500,
+        }
+        try:
+            async with session.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                json=or_payload, headers=or_headers,
+                timeout=aiohttp.ClientTimeout(total=60)
+            ) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    return data["choices"][0]["message"]["content"].strip()
+                logger.warning(f"Chairman OpenRouter status {r.status}")
+        except Exception as e:
+            logger.warning(f"Chairman OpenRouter error: {e}")
+
     return None
 
 
@@ -268,14 +307,20 @@ def hoi_dong_chuyen_gia(cau_hoi):
 
 async def _run_expert_panel_async(question, api_keys):
     async with aiohttp.ClientSession() as session:
-        expert_tasks = [_call_expert(session, exp, question, api_keys) for exp in EXPERTS]
+        expert_tasks = []
+        for i, exp in enumerate(EXPERTS):
+            task = _call_expert(session, exp, question, api_keys)
+            expert_tasks.append(task)
+            if exp["backend"] == "openrouter":
+                await asyncio.sleep(1.5)
+
         expert_results = await asyncio.gather(*expert_tasks)
 
         chairman_result = None
         chairman_key = api_keys.get("openai")
         if chairman_key and any(r and "❌" not in r for r in expert_results):
             try:
-                chairman_result = await _call_chairman(session, question, expert_results, chairman_key)
+                chairman_result = await _call_chairman(session, question, expert_results, chairman_key, api_keys)
             except Exception as e:
                 logger.warning(f"Chairman failed: {e}")
 
