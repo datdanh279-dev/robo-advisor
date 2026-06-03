@@ -5,6 +5,8 @@ from .api_fetcher import (
     lay_gia_co_phieu_hang_loat,
     lay_gia_vang_sjc,
     lay_ty_gia_usd_vnd,
+    dang_trong_gio_giao_dich_vn,
+    gia_dong_cua_gan_nhat,
 )
 from .data_loader import DOCS
 
@@ -90,6 +92,9 @@ def cap_nhat_co_phieu_vn():
 _build_co_phieu_vn()
 
 def cap_nhat_toan_bo():
+    # Kiểm tra giờ giao dịch: nếu ngoài giờ VN, bỏ qua cập nhật giá cổ phiếu VN (tránh NaN)
+    trong_gio_vn = dang_trong_gio_giao_dich_vn()
+
     try:
         tt = lay_du_lieu_thi_truong_that()
         if tt:
@@ -145,13 +150,16 @@ def cap_nhat_toan_bo():
     except Exception as e:
         logger.warning("cap_nhat_toan_bo stock prices failed: %s", e)
 
-    try:
-        cp = lay_gia_co_phieu_hang_loat()
-        for ma, gia in cp.items():
-            if ma in CO_PHIEU_VN and gia and not (gia != gia):
-                CO_PHIEU_VN[ma]["gia"] = int(gia)
-    except Exception as e:
-        logger.warning("cap_nhat_toan_bo stock prices failed: %s", e)
+    if trong_gio_vn:
+        try:
+            cp = lay_gia_co_phieu_hang_loat()
+            for ma, gia in cp.items():
+                if ma in CO_PHIEU_VN and gia and not (gia != gia):
+                    CO_PHIEU_VN[ma]["gia"] = int(gia)
+        except Exception as e:
+            logger.warning("cap_nhat_toan_bo stock prices failed: %s", e)
+    else:
+        logger.info("Ngoài giờ giao dịch VN — giữ nguyên giá đóng cửa gần nhất.")
 
 def lay_thong_tin_thi_truong():
     return DU_LIEU_THI_TRUONG_VN

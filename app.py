@@ -505,6 +505,28 @@ st.markdown(
     background: rgba(255,215,0,0.1);
     color: var(--gold);
 }
+.disclaimer {
+    background: rgba(255, 152, 0, 0.08);
+    border: 1px solid rgba(255, 152, 0, 0.2);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.8rem;
+    color: #FFD700;
+    line-height: 1.6;
+}
+.disclaimer strong {
+    color: #FF9800;
+}
+.simple-explain {
+    background: rgba(0, 201, 167, 0.06);
+    border: 1px solid rgba(0, 201, 167, 0.12);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    color: #00C9A7;
+    margin-bottom: 0.5rem;
+}
 div[data-testid="stDataFrame"] th {
     background: rgba(255,215,0,0.05);
     color: var(--gold);
@@ -531,6 +553,12 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "da_phan_tich" not in st.session_state:
     st.session_state.da_phan_tich = False
+if "loai_nha_dau_tu" not in st.session_state:
+    st.session_state.loai_nha_dau_tu = ""
+if "danh_muc_de_xuat" not in st.session_state:
+    st.session_state.danh_muc_de_xuat = {}
+if "diem_rui_ro" not in st.session_state:
+    st.session_state.diem_rui_ro = 0
 
 
 sidebar = st.sidebar
@@ -554,7 +582,7 @@ with sidebar:
             st.info("💡 Bạn chưa làm khảo sát rủi ro. Trang sẽ hiện danh mục thực tế và đề xuất mặc định.")
         st.rerun()
 
-    if st.button("💬 Chat tư vấn", width='stretch'):
+    if st.button("💬 Chat phân tích", width='stretch'):
         st.session_state.trang_thai = "chat"
         st.rerun()
 
@@ -624,7 +652,7 @@ with sidebar:
         st.markdown(f"**Hồ sơ của bạn:** {loai}")
         st.markdown(f"**Điểm rủi ro:** {st.session_state.get('diem_rui_ro', 0)}/60")
 
-
+st.markdown('<div class="disclaimer"><strong>⚠️ TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM:</strong> Đây là <strong>công cụ mô phỏng & phân tích dữ liệu lịch sử</strong> phục vụ mục đích học thuật và nghiên cứu. Mọi nhận định, tín hiệu ("MUA", "BÁN", "GIỮ") đều dựa trên dữ liệu quá khứ, <strong>không phải khuyến nghị đầu tư</strong>. Tác giả không chịu trách nhiệm về bất kỳ tổn thất nào phát sinh từ việc sử dụng thông tin này. Cryptocurrency chưa được pháp luật Việt Nam công nhận là tài sản hợp pháp. Đầu tư có rủi ro, hãy cân nhắc kỹ trước khi quyết định.</div>', unsafe_allow_html=True)
 
 # Business Plan — đã ẩn, xem file business_plan.html riêng
 # @st.dialog("Business Plan", width="large")
@@ -737,6 +765,7 @@ def _render_tonghop():
             pass
 
         st.markdown("### 🎯 BẢNG ĐIỂM DANH MỤC")
+        st.markdown('<div class="simple-explain"><strong>📖 Giải thích nhanh:</strong> <b>% Lãi/Lỗ</b> = cổ phiếu đang lời hay lỗ bao nhiêu % so với giá mua; <b>ROE</b> = 1 đồng vốn tạo ra bao nhiêu lợi nhuận (càng cao càng tốt); <b>P/E</b> = giá hiện tại gấp mấy lần lợi nhuận mỗi cổ phần; <b>VaR</b> = mức giảm tối đa có thể xảy ra trong 1 ngày (mức "chịu nhiệt" của mã này); <b>Beta</b> = cổ phiếu này lắc lư gấp mấy lần thị trường chung (1 = theo kịp thị trường, &gt;1 = lắc lư mạnh hơn).</div>', unsafe_allow_html=True)
         st.markdown("Tất cả chỉ số KPI cho các mã đang nắm giữ — click **▶** để xem chi tiết từng mã:")
 
         kpi = {ma: info for ma, info in kpi.items() if ma != "NAN" and info.get("nganh", "") != "" and info.get("gia", 0) != 0}
@@ -1034,6 +1063,7 @@ def _render_tonghop():
 
     with tab_liquid:
         st.markdown("### 💧 Rủi ro thanh khoản — ADTV")
+        st.markdown('<div class="simple-explain"><strong>📖 Giải thích:</strong> <b>ADTV</b> = lượng cổ phiếu giao dịch trung bình mỗi ngày. ADTV cao = dễ mua/bán không lo kẹt hàng. ADTV thấp (<5,000) = khó bán khi cần tiền gấp.</div>', unsafe_allow_html=True)
         st.markdown("ADTV 20 phiên gần nhất, Số ngày thanh lý, cảnh báo kẹt hàng")
         liq = DOCS["liquid"]
         rows_liq = []
@@ -1071,6 +1101,7 @@ def _render_tonghop():
 
     with tab_esg:
         st.markdown("### 🌱 CHẤM ĐIỂM ESG THEO NGÀNH")
+        st.markdown('<div class="simple-explain"><strong>📖 Giải thích:</strong> <b>E</b> (Môi trường) — công ty có thải carbon, xử lý nước thải tốt không; <b>S</b> (Xã hội) — đối xử với nhân viên, cộng đồng ra sao; <b>G</b> (Quản trị) — ban lãnh đạo có minh bạch không. Tổng > 50% là khá tốt.</div>', unsafe_allow_html=True)
         st.markdown("Ma trận trọng số E·S·G — chuẩn MSCI/Sustainalytics")
         esg = DOCS["esg"]
         rows_esg = []
@@ -1122,6 +1153,7 @@ def _render_tonghop():
 
     with tab_stress:
         st.markdown("### 🌪️ KIỂM TRA KHỦNG HOẢNG VĨ MÔ")
+        st.markdown('<div class="simple-explain"><strong>📖 Giải thích:</strong> Mô phỏng nếu các yếu tố vĩ mô (lãi suất, tỷ giá, lạm phát) thay đổi mạnh, danh mục của bạn sẽ chịu tác động ra sao. Đây là bài tập "giả định" để đánh giá <b>khả năng chịu nhiệt</b> của danh mục.</div>', unsafe_allow_html=True)
         st.markdown("Kịch bản khủng hoảng — tác động lãi suất, tỷ giá, lạm phát, giá hàng hóa")
         stress_vars = DOCS["stress_vars"]
         col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
@@ -1174,6 +1206,7 @@ def _render_tonghop():
 
     with tab_perf:
         st.markdown("### 📊 PHÂN RÃ HIỆU SUẤT & CHUẨN")
+        st.markdown('<div class="simple-explain"><strong>📖 Giải thích nhanh:</strong> <b>Alpha</b> > 0 = danh mục đang "ăn" hơn thị trường (tài năng của nhà đầu tư); <b>Sharpe</b> > 1 = đang "ăn chắc mặc bền", < 0.5 = cần xem lại; <b>Rf</b> = lãi suất gửi ngân hàng (phi rủi ro); <b>Rm</b> = thị trường chung VN-Index tăng/giảm bao nhiêu; <b>Treynor</b> = lợi nhuận trên mỗi đơn vị rủi ro hệ thống.</div>', unsafe_allow_html=True)
         col_p1, col_p2, col_p3, col_p4 = st.columns(4)
         with col_p1:
             st.markdown(f"""<div class="metric-box"><h4>Rf (LS phi rủi ro)</h4><h3>{perf.get('Rf', 0)*100:.1f}%</h3></div>""", unsafe_allow_html=True)
@@ -1224,6 +1257,7 @@ def _render_tonghop():
 
     with tab_analytics:
         st.markdown("### 📈 Phân tích kỹ thuật & Rủi ro")
+        st.markdown('<div class="simple-explain"><strong>📖 Giải thích nhanh:</strong> <b>CAGR</b> = tốc độ tăng trưởng kép mỗi năm; <b>Sharpe</b> = "điểm sức khỏe" của tài sản (>1 là tốt); <b>Max DD</b> = mức giảm sâu nhất từ đỉnh đến đáy (càng thấp càng đỡ đau); <b>VaR 95%</b> = trong 95% trường hợp, bạn mất tối đa bao nhiêu % trong 1 ngày; <b>Sortino</b> = giống Sharpe nhưng chỉ phạt rủi ro xấu; <b>Dự báo 6 tháng</b> = mức giá kỳ vọng dựa trên đà tăng trưởng lịch sử (KHÔNG phải khuyến nghị mua/bán).</div>', unsafe_allow_html=True)
         cac_ma_pt = {"VN-Index (FUEVN100)": "FUEVN100.VN","S&P 500": "^GSPC","Vàng/XAU": "GC=F","Bitcoin": "BTC-USD","Dầu WTI": "CL=F"}
         ma_chon = st.selectbox("Chọn mã phân tích:", list(cac_ma_pt.keys()), key="an_ma")
         ma_yahoo = cac_ma_pt[ma_chon]
@@ -1820,12 +1854,14 @@ elif st.session_state.trang_thai == "chat":
             )
             submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
             if submitted and cau_hoi:
-                with st.status("🧠 Đang hỏi 6 chuyên gia...", expanded=True) as status:
-                    st.write("📡 Đang gọi các chuyên gia AI song song...")
+                with st.status("🧠 Đang hỏi các chuyên gia...", expanded=True) as status:
+                    st.write("📡 Bộ phân loại AI đang đánh giá độ phức tạp của câu hỏi...")
                     results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY)
                     if results:
                         st.session_state.expert_results = results
-                        st.write("✅ Đã nhận phản hồi từ tất cả chuyên gia.")
+                        mode = results.get("mode", "cao_cap")
+                        mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
+                        st.write(f"✅ Đã nhận phản hồi. Chế độ: {mode_labels.get(mode, mode)}")
                         if results.get("chairman"):
                             st.write("👑 Chủ tịch Hội đồng đang đưa ra kết luận...")
                         status.update(label="✅ Hoàn tất!", state="complete")
@@ -1850,6 +1886,8 @@ elif st.session_state.trang_thai == "chat":
                             st.error(expert["response"])
                         elif expert["response"].startswith("⚠️"):
                             st.warning(expert["response"])
+                        elif expert["response"].startswith("⏭️"):
+                            st.caption(expert["response"])
                         else:
                             st.markdown(
                                 f'<div style="border-left:4px solid {expert["color"]};'
@@ -1889,7 +1927,7 @@ if username and st.session_state.get("authenticated") and st.session_state.get("
 st.markdown("""<hr class="gold-divider">""", unsafe_allow_html=True)
 st.markdown(
     '<center style="color: #8892B0; font-size: 0.85rem; letter-spacing: 1px;">'
-    '🤖 Robo-Advisor — Tư vấn đầu tư thông minh cho người Việt<br>'
+    '🤖 Robo-Advisor — Công cụ mô phỏng &amp; phân tích thị trường cho người Việt<br>'
     '<span style="color: #FFD700;">© 2026 • Phiên bản Hoàng gia &amp; Thịnh vượng v3.0</span></center>',
     unsafe_allow_html=True,
 )

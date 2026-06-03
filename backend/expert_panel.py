@@ -8,6 +8,50 @@ logger = logging.getLogger(__name__)
 
 _CHAIRMAN_ATTEMPTED = False
 
+# Cache phân loại câu hỏi
+_PHAN_LOAI_CACHE = {}
+
+def _la_cau_chao(value):
+    """Câu chào / câu đơn giản — chỉ cần 1 chuyên gia"""
+    c = value.lower().strip()
+    tu_khoa_don_gian = ["xin chào", "chào bạn", "hello", "hi", "có ai không",
+                        "bạn là ai", "giới thiệu", "cảm ơn", "thank", "bye",
+                        "tạm biệt", "xin lỗi", "giúp tôi với"]
+    return any(t in c for t in tu_khoa_don_gian)
+
+def _la_cau_so_sanh(c):
+    c = c.lower().strip()
+    tu_khoa_trung_binh = ["so sánh", "vs", "hay", "nên mua", "nên đầu tư",
+                          "cổ phiếu nào", "mã nào", "đánh giá"]
+    return any(t in c for t in tu_khoa_trung_binh)
+
+def _la_cao_cap(c):
+    c = c.lower().strip()
+    tu_khoa_cao = ["danh mục", "phân bổ", "tái cơ cấu", "chiến lược",
+                   "dài hạn", "kế hoạch đầu tư", "quản trị rủi ro",
+                   "đa dạng hóa", "asset allocation", "portfolio",
+                   "kịch bản", "mô phỏng", "tối ưu"]
+    return any(t in c for t in tu_khoa_cao)
+
+def phan_loai_cau_hoi(cau_hoi):
+    """Phân loại câu hỏi: 'don_gian' | 'trung_binh' | 'cao_cap'"""
+    key = cau_hoi.strip().lower()[:60]
+    if key in _PHAN_LOAI_CACHE:
+        return _PHAN_LOAI_CACHE[key]
+
+    if _la_cau_chao(cau_hoi):
+        loai = "don_gian"
+    elif _la_cao_cap(cau_hoi):
+        loai = "cao_cap"
+    elif _la_cau_so_sanh(cau_hoi):
+        loai = "trung_binh"
+    else:
+        loai = "trung_binh"
+
+    _PHAN_LOAI_CACHE[key] = loai
+    logger.info(f"Phân loại câu hỏi: {loai}")
+    return loai
+
 EXPERTS = [
     {
         "id": "buffett",
@@ -22,7 +66,8 @@ EXPERTS = [
             "Bạn ưu tiên các công ty có lợi thế cạnh tranh bền vững (moat), quản trị tốt, dòng tiền mạnh, và định giá hợp lý. "
             "Phong cách trả lời: dùng ẩn dụ đơn giản, giọng điệu khôn ngoan, thực tế, đôi khi hài hước khô khan. "
             "Luôn nhấn mạnh tầm quan trọng của tính kiên nhẫn và tư duy dài hạn (10-20 năm). "
-            "Kết luận bằng khuyến nghị rõ ràng: CÓ MUA, KHÔNG MUA, hoặc CHỜ GIÁ TỐT HƠN."
+            "Đây là công cụ PHÂN TÍCH DỮ LIỆU THỊ TRƯỜNG, không phải khuyến nghị đầu tư. "
+            "Kết luận bằng nhận định từ dữ liệu: CÓ MUA, KHÔNG MUA, hoặc CHỜ GIÁ TỐT HƠN."
         ),
     },
     {
@@ -37,6 +82,7 @@ EXPERTS = [
             "Bạn nổi tiếng với lý thuyết 'tính phản thân' (reflexivity) — thị trường luôn bị bóp méo bởi nhận thức của người tham gia. "
             "Bạn phân tích dòng vốn toàn cầu, lãi suất, tỷ giá, chính sách tiền tệ, địa chính trị để tìm điểm mất cân bằng. "
             "Phong cách: sắc sảo, thực dụng, tập trung vào rủi ro hệ thống và điểm gãy (inflection point). "
+            "Đây là công cụ PHÂN TÍCH DỮ LIỆU THỊ TRƯỜNG, không phải khuyến nghị đầu tư. "
             "Luôn kết luận: GỌI ĐỈNH/ĐÁY, GIỮ/THOÁT, kèm kịch bản nếu phân tích sai."
         ),
     },
@@ -53,6 +99,7 @@ EXPERTS = [
             "tăng trưởng chậm, tăng trưởng bền vững, tăng trưởng nhanh, chu kỳ, phục hồi, và giá trị tài sản. "
             "Bạn thích các công ty có PEG < 1, dòng tiền mạnh, và câu chuyện tăng trưởng dễ hiểu. "
             "Phong cách: nhiệt tình, dễ hiểu, dùng ví dụ đời thường, tập trung vào 'lợi thế cạnh tranh địa phương' (local advantage). "
+            "Đây là công cụ PHÂN TÍCH DỮ LIỆU THỊ TRƯỜNG, không phải khuyến nghị đầu tư. "
             "Kết luận: MUA/THOÁT với lý do ngắn gọn từ 1-2 câu."
         ),
     },
@@ -109,17 +156,18 @@ EXPERTS = [
 ]
 
 CHAIRMAN_SYSTEM_PROMPT = (
-    "Bạn là CHỦ TỊCH HỘI ĐỒNG CỐ VẤN ĐẦU TƯ — một nhà đầu tư thiên tài với 50 năm kinh nghiệm, "
+    "Bạn là CHỦ TỊCH HỘI ĐỒNG PHÂN TÍCH ĐẦU TƯ — một nhà phân tích thiên tài với 50 năm kinh nghiệm, "
     "từng làm việc với Warren Buffett, George Soros, Peter Lynch, Ray Dalio, Benjamin Graham, và Charlie Munger. "
-    "Bạn có nhiệm vụ: lắng nghe ý kiến từ 6 chuyên gia hàng đầu thế giới, "
-    "phân tích điểm mạnh/yếu của từng ý kiến, và CHỌN RA CÂU TRẢ LỜI TỐT NHẤT. "
+    "Bạn có nhiệm vụ: lắng nghe ý kiến từ 6 chuyên gia phân tích hàng đầu thế giới, "
+    "phân tích điểm mạnh/yếu của từng ý kiến, và CHỌN RA NHẬN ĐỊNH TỐT NHẤT. "
     "\n\nQUY TẮC CHỦ TỌA:"
     "\n1. Đọc kỹ 6 ý kiến từ các chuyên gia"
     "\n2. Nhận xét ngắn gọn điểm mạnh của mỗi ý kiến (1 câu mỗi chuyên gia)"
-    "\n3. CHỌN RA 1 CÂU TRẢ LỜI XUẤT SẮC NHẤT từ các chuyên gia"
+    "\n3. CHỌN RA 1 NHẬN ĐỊNH XUẤT SẮC NHẤT từ các chuyên gia"
     "\n4. Giải thích lý do vì sao chọn ý kiến đó (ưu điểm vượt trội so với các ý kiến còn lại)"
-    "\n5. Đưa ra quyết định đầu tư CUỐI CÙNG, rõ ràng: MUA / BÁN / GIỮ / CHỜ, kèm lý do"
-    "\n\nPhong cách: uy nghiêm, quyết đoán, dùng giọng điệu của 'người đã thấy tất cả'. "
+    "\n5. Đưa ra quyết định CUỐI CÙNG dựa trên dữ liệu, rõ ràng: MUA / BÁN / GIỮ / CHỜ, kèm lý do"
+    "\n\nĐây là công cụ MÔ PHỎNG & PHÂN TÍCH DỮ LIỆU LỊCH SỬ, không phải khuyến nghị đầu tư. "
+    "Phong cách: uy nghiêm, quyết đoán, dùng giọng điệu của 'người đã thấy tất cả'. "
     "Kết luận phải ngắn gọn, tối đa 3 câu, dễ hiểu, thực tế."
 )
 
@@ -368,23 +416,46 @@ def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None):
 
 
 async def _run_expert_panel_async(question, api_keys):
-    async with aiohttp.ClientSession() as session:
-        expert_tasks = []
-        for exp in EXPERTS:
-            task = _call_expert(session, exp, question, api_keys)
-            expert_tasks.append(task)
+    loai = phan_loai_cau_hoi(question)
 
-        expert_results = await asyncio.gather(*expert_tasks)
+    if loai == "don_gian":
+        can_chon = {"buffett", "munger"}
+        logger.info("Chế độ TIẾT KIỆM: chỉ gọi 2 chuyên gia")
+    elif loai == "trung_binh":
+        can_chon = {"buffett", "lynch", "graham", "dalio"}
+        logger.info("Chế độ TIÊU CHUẨN: gọi 4 chuyên gia")
+    else:
+        can_chon = {e["id"] for e in EXPERTS}
+        logger.info("Chế độ TOÀN DIỆN: gọi cả 6 chuyên gia + Chủ tịch")
+
+    async with aiohttp.ClientSession() as session:
+        expert_tasks = {}
+        for exp in EXPERTS:
+            if exp["id"] in can_chon:
+                expert_tasks[exp["id"]] = _call_expert(session, exp, question, api_keys)
+
+        raw = {}
+        for eid, task in expert_tasks.items():
+            raw[eid] = await task
+
+        # Build full list: called experts get their result, others get placeholder
+        expert_results = []
+        for exp in EXPERTS:
+            if exp["id"] in raw:
+                expert_results.append(raw[exp["id"]])
+            else:
+                expert_results.append(f"⏭️ {exp['name']} — chuyên gia không cần thiết cho câu hỏi này.")
 
         chairman_result = None
         chairman_key = api_keys.get("groq") or api_keys.get("openai")
-        if chairman_key and any(r and "❌" not in r for r in expert_results):
+        if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
             try:
-                chairman_result = await _call_chairman(session, question, expert_results, chairman_key, api_keys)
+                chairman_result = await _call_chairman(session, question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
             except Exception as e:
                 logger.warning(f"Chairman failed: {e}")
 
     return {
         "experts": [{"id": e["id"], "name": e["name"], "title": e["title"], "color": e["color"], "response": r} for e, r in zip(EXPERTS, expert_results)],
         "chairman": chairman_result,
+        "mode": loai,
     }

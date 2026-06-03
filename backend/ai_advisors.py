@@ -112,5 +112,5 @@ def _format_combined(results):
             lines.append(content[:600])
             lines.append("")
     lines.append("---")
-    lines.append("*Kết hợp từ 4 chuyên gia AI — đây không phải lời khuyên tài chính cá nhân hóa.*")
+    lines.append("*Kết hợp từ 4 chuyên gia AI — công cụ mô phỏng & phân tích dữ liệu lịch sử, không phải khuyến nghị đầu tư.*")
     return "\n".join(lines)

@@ -2,6 +2,15 @@ import numpy as np
 import pandas as pd
 from .data_loader import DOCS
 
+# Lưu ý (GIGO fix): Các giá trị loi_nhuan_trung_binh dưới đây là
+# LỢI NHUẬN TRUNG BÌNH LỊCH SỬ của từng kênh (Historical Mean Returns),
+# KHÔNG phải dự báo hồi quy tuyến tính. Dùng historical mean returns
+# cho MPT (Modern Portfolio Theory) ổn định hơn forecast từ linear regression.
+#
+# Nguồn tham khảo: VN-Index CAGR 5 năm ~8-10%, lãi suất TK ~5%,
+# vàng ~8-10%/năm (dài hạn), crypto ~30-50%/năm (rủi ro cao).
+
+
 THONG_TIN_KENH = {
     "Tiền gửi/Ngân hàng": {
         "loi_nhuan_trung_binh": 0.05,

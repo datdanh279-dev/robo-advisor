@@ -255,11 +255,11 @@ def phan_tich_lich_su(ma_yahoo, ky_han="1y", benchmark="FUEVN100.VN"):
         bb_ma, bb_upper, bb_lower = tinh_bollinger(gia_dong, 20, 2)
 
         loi_nhuan_tb_ngay = loi_nhuan_tb_nam / 252
-        rui_ro_ngay_du_bao = rui_ro_nam / np.sqrt(252)
+        # Dự báo 6 tháng dùng CAGR (tốc độ tăng trưởng kép lịch sử)
+        # KHÔNG dùng hồi quy tuyến tính — CAGR là phương pháp ổn định hơn cho MPT
         so_ngay_du_bao = 126
-        nhiem_ngau_nhien = np.random.normal(loi_nhuan_tb_ngay, rui_ro_ngay_du_bao, so_ngay_du_bao)
-        gia_cuoi = gia_dong[-1] * np.cumprod(1 + nhiem_ngau_nhien)
-        du_bao_6m = float(np.median(gia_cuoi))
+        du_bao_6m = gia_dong[-1] * (1 + cagr) ** 0.5 if cagr > -0.9 else gia_dong[-1]
+        # CAGR-based projection: mở rộng đà tăng trưởng lịch sử, tránh nhiễu ngẫu nhiên
 
         loi_nhuan_tich_luy = np.cumprod(1 + loi_nhuan_ngay) - 1
 

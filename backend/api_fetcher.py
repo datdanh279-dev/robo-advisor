@@ -1,5 +1,5 @@
 import requests, re, json, os, sys, io, contextlib, logging, time
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 
@@ -8,6 +8,29 @@ logger = logging.getLogger(__name__)
 CACHE = {}
 CACHE_TTL = {}
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL", "300"))
+
+# Giờ giao dịch VN: 9:00 - 15:00, Thứ 2 - Thứ 6
+_TRADING_START = dt_time(9, 0)
+_TRADING_END = dt_time(15, 0)
+
+def dang_trong_gio_giao_dich_vn():
+    """Kiểm tra có đang trong giờ giao dịch chứng khoán VN không"""
+    now = datetime.now()
+    if now.weekday() >= 5:  # Thứ 7 (5), CN (6)
+        return False
+    return _TRADING_START <= now.time() <= _TRADING_END
+
+def gia_dong_cua_gan_nhat(ma, default=None):
+    """Lấy giá đóng cửa gần nhất (có thể là phiên trước)"""
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            ticker = yf.Ticker(ma)
+            hist = ticker.history(period="5d")
+            if not hist.empty:
+                return float(hist['Close'].iloc[-1])
+    except Exception:
+        pass
+    return default
 
 def _cache_get(key):
     if key in CACHE_TTL and (datetime.now() - CACHE_TTL[key]).seconds < CACHE_TTL_SECONDS:
