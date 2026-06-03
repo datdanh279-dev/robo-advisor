@@ -14,12 +14,12 @@ from backend.risk_profile import (
     danh_gia_rui_ro,
     phan_bo_danh_muc,
 )
+from backend.danh_muc_metrics import tinh_return_danh_muc
 from backend.portfolio import (
     THONG_TIN_KENH,
     mo_phong_monte_carlo,
     tinh_toan_danh_muc,
     tinh_toan_phan_bo_lai_lo,
-    tinh_return_danh_muc,
 )
 from backend.market_data import (
     lay_thong_tin_thi_truong,

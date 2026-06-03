@@ -11,23 +11,6 @@ def _chuan_hoa_ty_trong(w, decimals=8):
     return w
 
 
-def tinh_return_danh_muc(danh_muc: dict) -> tuple[float, float, float, float]:
-    """Tổng GT, vốn, lãi/lỗ và % return trên giá trị thị trường (khớp dashboard)."""
-    tong_gt = sum(
-        info.get("gia_thi_truong", 0) * info.get("so_luong", 0)
-        for info in danh_muc.values()
-    )
-    tong_von = sum(
-        info.get("gia_von", 0) * info.get("so_luong", 0)
-        for info in danh_muc.values()
-    )
-    tong_lai_lo = sum(
-        (info.get("gia_thi_truong", 0) - info.get("gia_von", 0)) * info.get("so_luong", 0)
-        for info in danh_muc.values()
-    )
-    return_pct = (tong_lai_lo / tong_gt * 100) if tong_gt else 0.0
-    return tong_gt, tong_von, tong_lai_lo, return_pct
-
 # Lưu ý (GIGO fix): Các giá trị loi_nhuan_trung_binh dưới đây là
 # LỢI NHUẬN TRUNG BÌNH LỊCH SỬ của từng kênh (Historical Mean Returns),
 # KHÔNG phải dự báo hồi quy tuyến tính. Dùng historical mean returns

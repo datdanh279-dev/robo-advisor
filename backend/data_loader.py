@@ -44,7 +44,7 @@ def _dong_bo_performance_tu_danh_muc():
     if not dm:
         return
     try:
-        from backend.portfolio import tinh_return_danh_muc
+        from backend.danh_muc_metrics import tinh_return_danh_muc
         _, _, _, return_pct = tinh_return_danh_muc(dm)
         perf = DOCS.setdefault("performance", {})
         perf["Rp"] = round(return_pct / 100, 4)
@@ -436,11 +436,7 @@ def load_all():
             _info["nganh"] = _chuong_hoa_tv_nganh(_info["nganh"])
         if _info.get("ket_luan"):
             _info["ket_luan"] = _chuong_hoa_tv_ket_luan(_info["ket_luan"])
-    try:
-        from backend.market_data import DANH_SACH_DANH_MUC
-        _fallback_portfolio = DANH_SACH_DANH_MUC
-    except Exception:
-        _fallback_portfolio = ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM", "VIX"]
+    _fallback_portfolio = ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM", "VIX"]
     DOCS["danh_sach_portfolio"] = sorted(
         [k for k in kpi.keys() if k != "NAN"],
         key=lambda x: kpi[x].get("ty_trong_ht", 0) if x in kpi else 0,
