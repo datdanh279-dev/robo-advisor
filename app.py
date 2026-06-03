@@ -36,7 +36,7 @@ from backend.calculations import (
     phan_tich_danh_muc_nang_cao,
     tinh_tuong_quan,
 )
-from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX, reset_password
+from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX, reset_password, _read
 _T1 = datetime.now(); print(f"[TRACE] backend imports: {(_T1-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
 
 st.set_page_config(
@@ -114,7 +114,9 @@ if "otp_expire" not in st.session_state:
     st.session_state.otp_expire = 0
 
 def kiem_tra_dang_nhap(username, password):
-    return bool(username) and len(username) >= 1
+    if not username or not password:
+        return False
+    return verify_user(username, password)
 
 def tao_ma_otp():
     return f"{random.randint(100000, 999999)}"
@@ -243,7 +245,7 @@ def hien_thi_login():
             submitted = st.form_submit_button("🔐 Đăng nhập", width='stretch')
             if submitted:
                 try:
-                    ok = kiem_tra_dang_nhap(username, password) or verify_user(username, password)
+                    ok = kiem_tra_dang_nhap(username, password)
                 except Exception:
                     ok = False
                 if ok:
@@ -254,23 +256,67 @@ def hien_thi_login():
                 else:
                     st.error("Sai tên đăng nhập hoặc mật khẩu!")
         with st.expander("Quên mật khẩu?", expanded=False):
-            with st.form("reset_form"):
-                reset_user = st.text_input("Tên đăng nhập", placeholder="Nhập username...", key="reset_user")
-                reset_pass = st.text_input("Mật khẩu mới", type="password", placeholder="Nhập mật khẩu mới...", key="reset_pass")
-                reset_submit = st.form_submit_button("🔄 Đặt lại mật khẩu")
-                if reset_submit:
-                    if len(reset_user) < 3:
-                        st.error("Tên đăng nhập ít nhất 3 ký tự")
-                    elif len(reset_pass) < 6:
-                        st.error("Mật khẩu ít nhất 6 ký tự")
-                    else:
-                        try:
-                            if reset_password(reset_user, reset_pass):
-                                st.success("✅ Đặt lại mật khẩu thành công! Đăng nhập với mật khẩu mới.")
-                            else:
-                                st.error("Tên đăng nhập không tồn tại trong hệ thống Beta")
-                        except Exception:
-                            st.error("Lỗi hệ thống, thử lại sau.")
+            if "reset_step" not in st.session_state:
+                st.session_state.reset_step = 0
+            if "reset_otp" not in st.session_state:
+                st.session_state.reset_otp = ""
+            if "reset_username" not in st.session_state:
+                st.session_state.reset_username = ""
+            if st.session_state.reset_step == 0:
+                with st.form("reset_user_form"):
+                    reset_user = st.text_input("Tên đăng nhập", placeholder="Nhập username...", key="reset_user")
+                    reset_submit = st.form_submit_button("📨 Gửi mã OTP")
+                    if reset_submit:
+                        if len(reset_user) < 3:
+                            st.error("Tên đăng nhập ít nhất 3 ký tự")
+                        else:
+                            try:
+                                db_data = _read()
+                                if not any(u["username"] == reset_user for u in db_data["users"]):
+                                    st.error("Tên đăng nhập không tồn tại trong hệ thống Beta")
+                                else:
+                                    st.session_state.reset_username = reset_user
+                                    st.session_state.reset_otp = tao_ma_otp()
+                                    st.session_state.reset_step = 1
+                                    st.rerun()
+                            except Exception:
+                                st.error("Lỗi hệ thống, thử lại sau.")
+            elif st.session_state.reset_step == 1:
+                st.info(f"Mã OTP xác thực: **{st.session_state.reset_otp}**")
+                st.markdown('<p style="color:#8892B0;font-size:0.8rem;">Mã OTP có hiệu lực trong 5 phút. Nhập mã trên để xác thực.</p>', unsafe_allow_html=True)
+                with st.form("reset_otp_form"):
+                    otp_input = st.text_input("Mã OTP", placeholder="000000", max_chars=6, key="reset_otp_input")
+                    otp_submit = st.form_submit_button("✅ Xác thực OTP")
+                    if otp_submit:
+                        if otp_input == st.session_state.reset_otp:
+                            st.session_state.reset_step = 2
+                            st.rerun()
+                        else:
+                            st.error("Sai mã OTP! Thử lại.")
+                            st.session_state.reset_otp = tao_ma_otp()
+                            st.rerun()
+                if st.button("⬅️ Quay lại", key="back_reset"):
+                    st.session_state.reset_step = 0
+                    st.rerun()
+            elif st.session_state.reset_step == 2:
+                with st.form("reset_pass_form"):
+                    reset_pass = st.text_input("Mật khẩu mới", type="password", placeholder="Ít nhất 6 ký tự", key="reset_pass")
+                    reset_confirm = st.form_submit_button("🔄 Đặt lại mật khẩu")
+                    if reset_confirm:
+                        if len(reset_pass) < 6:
+                            st.error("Mật khẩu ít nhất 6 ký tự")
+                        else:
+                            try:
+                                if reset_password(st.session_state.reset_username, reset_pass):
+                                    st.success("✅ Đặt lại mật khẩu thành công! Đăng nhập với mật khẩu mới.")
+                                    st.session_state.reset_step = 0
+                                    st.session_state.reset_otp = ""
+                                    st.session_state.reset_username = ""
+                                    st.rerun()
+                                else:
+                                    st.error("Lỗi hệ thống, thử lại sau.")
+                            except Exception:
+                                st.error("Lỗi hệ thống, thử lại sau.")
     with tab_reg:
         st.markdown(f'<div class="step-badge">🎯 Còn {remaining} suất</div>', unsafe_allow_html=True)
         st.markdown(
@@ -363,10 +409,7 @@ def hien_thi_otp():
 
 if not st.session_state.authenticated:
     if not st.session_state.password_ok:
-        st.session_state.password_ok = True
-        st.session_state.username = "user"
-        st.session_state.authenticated = True
-        st.rerun()
+        hien_thi_login()
     else:
         hien_thi_otp()
     _T5 = datetime.now(); print(f"[TRACE] login rendered: {(_T5-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
