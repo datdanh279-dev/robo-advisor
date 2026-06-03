@@ -4,8 +4,16 @@ import os
 from datetime import datetime
 
 _DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "users.db")
+_DB_INITIALIZED = False
 
 def _get_conn():
+    global _DB_INITIALIZED
+    if not _DB_INITIALIZED:
+        try:
+            init_db()
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning("lazy init_db failed", exc_info=True)
     os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
     conn = sqlite3.connect(_DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -15,8 +23,16 @@ def _get_conn():
 
 BETA_MAX = 100
 
+def _init_db_conn():
+    os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(_DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
 def init_db():
-    conn = _get_conn()
+    global _DB_INITIALIZED
+    conn = _init_db_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,6 +66,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+    _DB_INITIALIZED = True
 
 def count_users():
     conn = _get_conn()
@@ -138,4 +155,8 @@ def ensure_user(username):
     conn.commit()
     conn.close()
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    import logging
+    logging.getLogger(__name__).warning("init_db failed: %s", e)
