@@ -39,7 +39,8 @@ try:
 except Exception:
     import logging
     logging.getLogger("backend.database").warning("import failed", exc_info=True)
-    save_state = load_state = save_chat = load_chat = ensure_user = lambda *a, **kw: None
+    save_state = ensure_user = lambda *a, **kw: None
+    load_state = lambda *a, **kw: {}
     count_users = lambda: 0
     register_beta_user = lambda u, p="": (True, 1)
     verify_user = lambda u, p: False
@@ -291,10 +292,11 @@ def hien_thi_otp():
                     else:
                         st.session_state.slot_beta = 0
                 ensure_user(username)
-                saved = load_state(username)
-                for k, v in saved.items():
-                    if k not in ("authenticated", "password_ok", "ma_otp", "otp_expire"):
-                        st.session_state[k] = v
+                saved = load_state(username) or {}
+                if isinstance(saved, dict):
+                    for k, v in saved.items():
+                        if k not in ("authenticated", "password_ok", "ma_otp", "otp_expire"):
+                            st.session_state[k] = v
                 st.rerun()
             else:
                 st.error("Sai mã OTP! Thử lại.")

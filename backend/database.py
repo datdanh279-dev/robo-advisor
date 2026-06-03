@@ -4,7 +4,8 @@ import os
 import tempfile
 from datetime import datetime
 
-_DB_DIR = os.path.join(tempfile.gettempdir(), "robo-advisor-data")
+_TMP = os.environ.get("ROBO_DB_DIR") or os.environ.get("STREAMLIT_TMP_PATH") or tempfile.gettempdir()
+_DB_DIR = os.path.join(_TMP, "robo-advisor-data")
 _DB_PATH = os.path.join(_DB_DIR, "users.db")
 _DB_INITIALIZED = False
 
