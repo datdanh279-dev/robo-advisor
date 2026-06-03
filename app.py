@@ -532,7 +532,7 @@ with sidebar:
     st.markdown("## 🤖 Robo-Advisor")
     st.markdown("---")
 
-    if st.button("🏠 Homepage", width='stretch'):
+    if st.button("🏠 Trang chủ", width='stretch'):
         st.session_state.trang_thai = "dashboard"
         st.rerun()
 
@@ -714,12 +714,12 @@ def _render_tonghop():
         st.markdown(f"""<div class="metric-box"><h4>% Return DM</h4><h2 style="color:{return_color};">{return_sign}{return_pct:.1f}%</h2></div>""", unsafe_allow_html=True)
     with col_d4:
         st.markdown(f"""<div class="metric-box"><h4>Số mã theo dõi</h4><h2>{len(kpi)}</h2></div>""", unsafe_allow_html=True)
-    tab_kpi, tab_vn, tab_tg, tab_port, tab_liquid, tab_esg, tab_stress, tab_perf, tab_analytics = st.tabs(["📈 KPI Scorecard", "🇻🇳 Cổ phiếu VN", "🌐 Cổ phiếu TG","📊 Danh mục","💧 Thanh khoản","🌱 ESG","🌪️ Stress Test","📊 Performance","📈 Phân tích nâng cao"])
+    tab_kpi, tab_vn, tab_tg, tab_port, tab_liquid, tab_esg, tab_stress, tab_perf, tab_analytics = st.tabs(["📈 Bảng điểm KPI", "🇻🇳 Cổ phiếu VN", "🌐 Cổ phiếu TG","📊 Danh mục","💧 Thanh khoản","🌱 ESG","🌪️ Kiểm tra khủng hoảng","📊 Hiệu suất","📈 Phân tích nâng cao"])
 
     with tab_kpi:
         col_save_kpi, col_csv_kpi = st.columns([1, 1])
         with col_save_kpi:
-            if st.button("💾 Lưu session", key="save_kpi"):
+            if st.button("💾 Lưu phiên", key="save_kpi"):
                 import json, os
                 path = os.path.join(os.path.dirname(__file__), "data", "session_kpi.json")
                 os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -729,7 +729,7 @@ def _render_tonghop():
         with col_csv_kpi:
             pass
 
-        st.markdown("### 🎯 SCORECARD DANH MỤC")
+        st.markdown("### 🎯 BẢNG ĐIỂM DANH MỤC")
         st.markdown("Tất cả chỉ số KPI cho các mã đang nắm giữ — click **▶** để xem chi tiết từng mã:")
 
         kpi = {ma: info for ma, info in kpi.items() if ma != "NAN" and info.get("nganh", "") != "" and info.get("gia", 0) != 0}
@@ -794,7 +794,7 @@ def _render_tonghop():
         if not df_kpi.empty:
             st.dataframe(df_kpi, width='stretch', hide_index=True)
             csv_kpi = df_kpi.to_csv(index=False, encoding="utf-8-sig")
-            st.download_button("📥 Export CSV", data=csv_kpi, file_name="kpi_scorecard.csv", mime="text/csv", width='stretch')
+            st.download_button("📥 Xuất CSV", data=csv_kpi, file_name="kpi_scorecard.csv", mime="text/csv", width='stretch')
 
         st.markdown("### 📈 Lãi/Lỗ từng mã")
         ma_list = list(kpi.keys())
@@ -808,7 +808,7 @@ def _render_tonghop():
 
     with tab_vn:
         st.markdown(f"### 🇻🇳 Cơ sở dữ liệu cổ phiếu Việt Nam ({len(DOCS['co_phieu_vn'])} mã)")
-        st.markdown("Nguồn: **TONG_HOP_v44** — snapshot 29/05/2026 | BCTC Q1/2026")
+        st.markdown("Nguồn: **TONG_HOP_v44** — dữ liệu 29/05/2026 | BCTC Q1/2026")
 
         col_f1, col_f2 = st.columns([1, 1])
         with col_f1:
@@ -921,13 +921,13 @@ def _render_tonghop():
             st.dataframe(df_vn, width='stretch', hide_index=True)
             st.markdown(f"Hiển thị **{len(rows_vn)}** / {len(db_vn)} mã")
             csv_vn = df_vn.to_csv(index=False, encoding="utf-8-sig")
-            st.download_button("📥 Export CSV", data=csv_vn, file_name="co_phieu_vn.csv", mime="text/csv", width='stretch')
+            st.download_button("📥 Xuất CSV", data=csv_vn, file_name="co_phieu_vn.csv", mime="text/csv", width='stretch')
         else:
             st.info("Không tìm thấy mã nào phù hợp.")
 
     with tab_tg:
         st.markdown(f"### 🌐 Cổ phiếu thế giới ({len(DOCS['co_phieu_tg'])} mã)")
-        st.markdown("Nguồn: **TONG_HOP_v44** — yfinance snapshot")
+        st.markdown("Nguồn: **TONG_HOP_v44** — dữ liệu yfinance")
         rows_tg = []
         for ma, info in DOCS["co_phieu_tg"].items():
             rows_tg.append({
@@ -944,7 +944,7 @@ def _render_tonghop():
             df_tg = pd.DataFrame(rows_tg)
             st.dataframe(df_tg, width='stretch', hide_index=True)
             csv_tg = df_tg.to_csv(index=False, encoding="utf-8-sig")
-            st.download_button("📥 Export CSV", data=csv_tg, file_name="co_phieu_tg.csv", mime="text/csv", width='stretch')
+            st.download_button("📥 Xuất CSV", data=csv_tg, file_name="co_phieu_tg.csv", mime="text/csv", width='stretch')
 
     with tab_port:
         st.markdown("### 📊 Hệ thống quản lý danh mục")
@@ -989,7 +989,7 @@ def _render_tonghop():
             df_dm = pd.DataFrame(rows_dm)
             st.dataframe(df_dm, width='stretch', hide_index=True)
             csv_dm = df_dm.to_csv(index=False, encoding="utf-8-sig")
-            st.download_button("📥 Export CSV", data=csv_dm, file_name="danh_muc.csv", mime="text/csv", width='stretch')
+            st.download_button("📥 Xuất CSV", data=csv_dm, file_name="danh_muc.csv", mime="text/csv", width='stretch')
 
         st.markdown("### 📈 Biểu đồ phân bổ danh mục")
         labels_dm = list(dm.keys())
@@ -999,7 +999,7 @@ def _render_tonghop():
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
         st.plotly_chart(fig_dm, width='stretch')
 
-        st.markdown("### 🔥 Heatmap tương quan")
+        st.markdown("### 🔥 Bản đồ tương quan")
         try:
             import yfinance as yf, contextlib, io
             ma_heat = [m for m in dm.keys() if m in DOCS["live"]]
@@ -1021,13 +1021,13 @@ def _render_tonghop():
                 else:
                     st.info("Không đủ dữ liệu giá để tính tương quan.")
             else:
-                st.info("Cần ít nhất 2 mã để vẽ heatmap.")
+                st.info("Cần ít nhất 2 mã để vẽ bản đồ tương quan.")
         except Exception:
             st.info("Không thể tải dữ liệu tương quan.")
 
     with tab_liquid:
         st.markdown("### 💧 Rủi ro thanh khoản — ADTV")
-        st.markdown("ADTV 20 phiên gần nhất, Days to Liquidate, cảnh báo kẹt hàng")
+        st.markdown("ADTV 20 phiên gần nhất, Số ngày thanh lý, cảnh báo kẹt hàng")
         liq = DOCS["liquid"]
         rows_liq = []
         for ma, info in sorted(liq.items(), key=lambda x: x[1].get("adtv", 0), reverse=True):
@@ -1043,7 +1043,7 @@ def _render_tonghop():
             df_liq = pd.DataFrame(rows_liq)
             st.dataframe(df_liq, width='stretch', hide_index=True)
             csv_liq = df_liq.to_csv(index=False, encoding="utf-8-sig")
-            st.download_button("📥 Export CSV", data=csv_liq, file_name="thanh_khoan.csv", mime="text/csv", width='stretch')
+            st.download_button("📥 Xuất CSV", data=csv_liq, file_name="thanh_khoan.csv", mime="text/csv", width='stretch')
 
         st.markdown("### ⚠️ Cảnh báo thanh khoản")
         any_warn = False
@@ -1083,7 +1083,7 @@ def _render_tonghop():
             df_esg = pd.DataFrame(rows_esg)
             st.dataframe(df_esg, width='stretch', hide_index=True)
             csv_esg = df_esg.to_csv(index=False, encoding="utf-8-sig")
-            st.download_button("📥 Export CSV", data=csv_esg, file_name="esg_scoring.csv", mime="text/csv", width='stretch')
+            st.download_button("📥 Xuất CSV", data=csv_esg, file_name="esg_scoring.csv", mime="text/csv", width='stretch')
 
         st.markdown("### 📊 Phân bổ điểm ESG")
         esg_names = [n for n in esg.keys() if n != "nan"]
@@ -1114,7 +1114,7 @@ def _render_tonghop():
                 </div><small>Tổng: {total}%</small></div>""", unsafe_allow_html=True)
 
     with tab_stress:
-        st.markdown("### 🌪️ STRESS TEST VĨ MÔ")
+        st.markdown("### 🌪️ KIỂM TRA KHỦNG HOẢNG VĨ MÔ")
         st.markdown("Kịch bản khủng hoảng — tác động lãi suất, tỷ giá, lạm phát, giá hàng hóa")
         stress_vars = DOCS["stress_vars"]
         col_s1, col_s2, col_s3, col_s4, col_s5 = st.columns(5)
@@ -1166,7 +1166,7 @@ def _render_tonghop():
             st.plotly_chart(fig_st, width='stretch')
 
     with tab_perf:
-        st.markdown("### 📊 PHÂN RÃ HIỆU SUẤT & BENCHMARK")
+        st.markdown("### 📊 PHÂN RÃ HIỆU SUẤT & CHUẨN")
         col_p1, col_p2, col_p3, col_p4 = st.columns(4)
         with col_p1:
             st.markdown(f"""<div class="metric-box"><h4>Rf (LS phi rủi ro)</h4><h3>{perf.get('Rf', 0)*100:.1f}%</h3></div>""", unsafe_allow_html=True)
@@ -1203,7 +1203,7 @@ def _render_tonghop():
 
         col_save1, col_save2 = st.columns(2)
         with col_save1:
-            if st.button("💾 Lưu session (JSON)", key="save_perf"):
+            if st.button("💾 Lưu phiên (JSON)", key="save_perf"):
                 import json, os
                 session_data = {
                     "kpi": kpi, "danh_muc": dm, "performance": perf,
@@ -1237,7 +1237,7 @@ def _render_tonghop():
                     with col4:
                         st.metric("VaR 95%", f"{(pt.get('var_95') or 0)*100:.1f}%", delta_color="inverse")
                     st.markdown("---")
-                    st.markdown("### 📊 Drawdown history")
+                    st.markdown("### 📊 Lịch sử Drawdown")
                     dd = pt.get("drawdown_series", np.array([]))
                     if hasattr(dd, 'empty') and not dd.empty or isinstance(dd, np.ndarray) and dd.size > 0:
                         fig_dd = go.Figure()
@@ -1503,10 +1503,10 @@ elif st.session_state.trang_thai == "dashboard":
     with col3:
         ma_pt = st.session_state.get("ma_phan_tich", "")
         st.metric("📈 Đang theo dõi", f"{len(kpi)} mã",
-                  help="Portfolio đang quản lý")
+                  help="Danh mục đang quản lý")
     with col4:
         st.metric("🔄 Cập nhật", DOCS.get("ngay_cap_nhat", "N/A"),
-                  help="Dữ liệu Excel mới nhất")
+                  help="Dữ liệu mới nhất")
 
     st.markdown("---")
     st.subheader("📂 Danh mục đầu tư hiện tại")
