@@ -52,9 +52,14 @@ _T2 = datetime.now(); print(f"[TRACE] set_page_config: {(_T2-_T1).total_seconds(
 import random
 import json
 import os
+import html as html_module
 from dotenv import load_dotenv
 load_dotenv()
-import streamlit.components.v1 as components
+
+
+def _safe_html(text):
+    """Escape user/AI text trước khi nhúng HTML — tránh DOM lỗi trên Streamlit."""
+    return html_module.escape(str(text or "")).replace("\n", "<br>")
 _GROQ_KEY = os.getenv("GROQ_API_KEY", "")
 if not _GROQ_KEY:
     try:
@@ -213,6 +218,15 @@ header[data-testid="stHeader"] { display: none; }
     box-shadow: 0 8px 40px rgba(255,215,0,0.35) !important;
     transform: translateY(-1px);
 }
+section.main [data-testid="stTabs"] {
+    background: rgba(8,14,26,0.7);
+    border: 1px solid rgba(255,215,0,0.1);
+    border-radius: 24px;
+    padding: 1.25rem 1.5rem 1.5rem;
+    max-width: 420px;
+    margin: 0 auto;
+    backdrop-filter: blur(24px);
+}
 </style>
 """
 
@@ -233,9 +247,8 @@ def hien_thi_login():
         f'<span>🎯 Beta {registered_count}/{max_slots}</span>'
         f'<span>{remaining} chỗ trống</span></div>'
         f'<div style="height:4px;background:rgba(255,215,0,0.1);border-radius:4px;overflow:hidden;">'
-        f'<div style="height:100%;width:{pct}%;background:linear-gradient(90deg,#FFD700,#C9A84C);border-radius:4px;transition:width 0.5s;"></div></div>'
-        f'</div>'
-        '<div class="login-box">',
+        f'<div style="height:100%;width:{pct}%;background:linear-gradient(90deg,#FFD700,#C9A84C);border-radius:4px;"></div></div>'
+        f'</div></div>',
         unsafe_allow_html=True,
     )
     tab_log, tab_reg = st.tabs(["🔐 Đăng nhập", "📝 Đăng ký Beta"])
@@ -352,7 +365,6 @@ def hien_thi_login():
                             st.rerun()
                         else:
                             st.error(f"Đăng ký thất bại (tên đã tồn tại hoặc beta đã đầy). Còn {remaining} chỗ.")
-    st.markdown("</div></div>", unsafe_allow_html=True)
 
 def hien_thi_otp():
     st.markdown(LOGIN_CSS, unsafe_allow_html=True)
@@ -360,7 +372,7 @@ def hien_thi_otp():
         '<div class="login-container">'
         f'<div class="login-title">🔐 Xác thực 2 lớp</div>'
         f'<div class="login-subtitle">Mã OTP đã gửi đến số điện thoại của bạn</div>'
-        f'<div class="login-box">',
+        f'</div>',
         unsafe_allow_html=True,
     )
     st.markdown('<div class="step-badge">Bước 2/2</div>', unsafe_allow_html=True)
@@ -407,7 +419,6 @@ def hien_thi_otp():
     if st.button("⬅️ Quay lại đăng nhập", width='stretch'):
         st.session_state.password_ok = False
         st.rerun()
-    st.markdown("</div></div>", unsafe_allow_html=True)
 
 if not st.session_state.authenticated:
     if not st.session_state.password_ok:
@@ -710,12 +721,9 @@ with sidebar:
         st.markdown(f"**Điểm rủi ro:** {st.session_state.get('diem_rui_ro', 0)}/60")
 
     st.markdown("---")
-    st.markdown(
-        '<div class="disclaimer"><strong>⚠️ TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM:</strong> '
-        'Đây là <strong>công cụ mô phỏng & phân tích dữ liệu lịch sử</strong> phục vụ mục đích học thuật. '
-        'Mọi tín hiệu ("MUA", "BÁN", "GIỮ") dựa trên dữ liệu quá khứ, <strong>không phải khuyến nghị đầu tư</strong>. '
-        'Crypto chưa được pháp luật VN công nhận. Đầu tư có rủi ro.</div>',
-        unsafe_allow_html=True,
+    st.caption(
+        "⚠️ **Tuyên bố miễn trừ:** Công cụ mô phỏng & phân tích dữ liệu lịch sử, "
+        "không phải khuyến nghị đầu tư. Crypto chưa được pháp luật VN công nhận. Đầu tư có rủi ro."
     )
 
 # Business Plan — đã ẩn, xem file business_plan.html riêng
@@ -785,16 +793,10 @@ def _render_tonghop():
     st.markdown(f"Cập nhật từ **TONG_HOP_v44** — {DOCS.get('ngay_cap_nhat', 'N/A')} | {len(DOCS.get('co_phieu_vn', {}))} mã VN · {len(DOCS.get('co_phieu_tg', {}))} mã TG · {len(DOCS.get('danh_sach_portfolio', []))} mã trong danh mục")
     col_ref = st.columns([3, 1])
     with col_ref[1]:
-        auto_refresh = st.checkbox("🔄 Tự động cập nhật (60s)", value=False, key="th_auto")
-        if auto_refresh:
-            if "refresh_time" not in st.session_state:
-                st.session_state.refresh_time = datetime.now()
-            elapsed = (datetime.now() - st.session_state.refresh_time).total_seconds()
-            remaining = max(0, 60 - int(elapsed))
-            st.caption(f"⏳ Tự động làm mới sau {remaining}s")
-            if elapsed >= 60:
-                st.session_state.refresh_time = datetime.now()
-                st.rerun()
+        if st.button("🔄 Làm mới", key="th_refresh", help="Tải lại dữ liệu JSON/KPI"):
+            _load_data_cached.clear()
+            st.session_state.docs_loaded = False
+            st.rerun()
     st.markdown("---")
     kpi = DOCS["kpi"]
     dm = DOCS["danh_muc"]
@@ -1065,12 +1067,11 @@ def _render_tonghop():
                     st.markdown(f"""<div class="card-blue" style="padding:0.8rem;"><h4>Lãi/Lỗ</h4><h3 style="color:{lc};">{lai_lo:+,.0f}₫</h3></div>""", unsafe_allow_html=True)
                 with col_m4:
                     st.markdown(f"""<div class="card-blue" style="padding:0.8rem;"><h4>Nợ ký quỹ</h4><h3>{info.get('no_ky_quy', 0):,.0f}₫</h3></div>""", unsafe_allow_html=True)
-
-            wt_mt = info.get("ty_trong_muc_tieu", 0) * 100
-            st.markdown(f"""<div class="card" style="padding:0.8rem;"><h4>Tỷ trọng mục tiêu: {wt_mt:.1f}%</h4>
-            <div style="background:#0D2137;border-radius:8px;height:20px;overflow:hidden;">
-            <div style="background:linear-gradient(90deg,#FFD700,#FFE55C);width:{min(wt_mt,100)}%;height:100%;border-radius:8px;"></div></div>
-            <small>SL: {info.get('so_luong', 0):,.0f} CP | VH: {info.get('von_hoa', 0):,.0f}</small></div>""", unsafe_allow_html=True)
+                wt_mt = info.get("ty_trong_muc_tieu", 0) * 100
+                st.markdown(f"""<div class="card" style="padding:0.8rem;"><h4>Tỷ trọng mục tiêu: {wt_mt:.1f}%</h4>
+                <div style="background:#0D2137;border-radius:8px;height:20px;overflow:hidden;">
+                <div style="background:linear-gradient(90deg,#FFD700,#FFE55C);width:{min(wt_mt,100)}%;height:100%;border-radius:8px;"></div></div>
+                <small>SL: {info.get('so_luong', 0):,.0f} CP | VH: {info.get('von_hoa', 0):,.0f}</small></div>""", unsafe_allow_html=True)
 
         rows_dm = []
         for ma, info in dm.items():
@@ -1751,48 +1752,18 @@ elif st.session_state.trang_thai == "chat":
         for i, msg in enumerate(st.session_state.chat_history):
             if msg["role"] == "bot":
                 st.markdown(
-                    f'<div class="chat-message bot-message">🤖 <strong>Robo-Advisor:</strong><br>{msg["content"]}</div>',
+                    f'<div class="chat-message bot-message">🤖 <strong>Robo-Advisor:</strong><br>{_safe_html(msg["content"])}</div>',
                     unsafe_allow_html=True,
                 )
-                if st.button("🔊 Đọc", key=f"tts_{i}", use_container_width=True):
-                    st.session_state.tts_msg = msg["content"]
-                    st.rerun()
             else:
                 st.markdown(
-                    f'<div class="chat-message user-message">👤 <strong>Bạn:</strong><br>{msg["content"]}</div>',
+                    f'<div class="chat-message user-message">👤 <strong>Bạn:</strong><br>{_safe_html(msg["content"])}</div>',
                     unsafe_allow_html=True,
                 )
-
-        def _exec_js(js_code, height=1):
-            html = f"<script>{js_code}</script>"
-            try:
-                components.html(html, height=height)
-            except Exception:
-                import html as _h
-                st.markdown(
-                    f'<iframe srcdoc="{_h.escape(html)}" '
-                    f'style="width:0;height:1px;border:none;overflow:hidden;" '
-                    f'sandbox="allow-scripts"></iframe>',
-                    unsafe_allow_html=True,
-                )
-
-        if tts_text := st.session_state.pop("tts_msg", None):
-            safe = json.dumps(tts_text, ensure_ascii=False)
-            _exec_js(
-                f"window.speechSynthesis.cancel();"
-                f"var u=new SpeechSynthesisUtterance({safe});"
-                f"u.lang='vi-VN';u.rate=1.0;u.pitch=1.0;u.volume=1.0;"
-                f"window.speechSynthesis.speak(u);"
-            )
-
-        if "show_mic" not in st.session_state:
-            st.session_state.show_mic = False
 
         col1, col2, col3 = st.columns([1, 6, 4])
         with col1:
-            if st.button("🎤", use_container_width=True, help="Nhập bằng giọng nói"):
-                st.session_state.show_mic = not st.session_state.show_mic
-                st.rerun()
+            st.caption("💬")
         with col2:
             with st.form(key="chat_form", clear_on_submit=True):
                 cau_hoi = st.text_input(
@@ -1818,70 +1789,6 @@ elif st.session_state.trang_thai == "chat":
             if st.session_state.chat_history and st.button("🗑️", use_container_width=True, help="Xóa lịch sử"):
                 st.session_state.chat_history = []
                 st.rerun()
-
-        if st.session_state.show_mic:
-            mic_html = """
-                <div style="text-align:center;padding:12px;background:linear-gradient(135deg,#0a0e27,#1a1040);border-radius:12px;border:1px solid #FFD70044;">
-                    <div style="color:#8892B0;font-size:13px;margin-bottom:6px;">Bam micro, noi xong tu dong gui</div>
-                    <div id="mic_status" style="color:#8892B0;font-size:12px;margin-bottom:6px;">Bam vao micro de bat dau</div>
-                    <button id="mic_btn"
-                        style="font-size:30px;padding:10px 20px;border-radius:50%;border:2px solid #FFD700;background:#FFD70011;color:#FFD700;cursor:pointer;">
-                        🎤
-                    </button>
-                </div>
-                <script>
-                document.getElementById('mic_btn').onclick = function() {
-                    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                    if (!SR) { alert('Trinh duyet khong ho tro'); return; }
-                    var r = new SR();
-                    r.lang = 'vi-VN';
-                    r.continuous = false;
-                    r.interimResults = false;
-                    document.getElementById('mic_status').innerText = 'Dang nghe...';
-                    this.style.background = '#FFD700';
-                    this.style.color = '#02050E';
-                    r.onresult = function(e) {
-                        var text = e.results[0][0].transcript;
-                        document.getElementById('mic_status').innerText = 'Da nhan: ' + text;
-                        try {
-                            var doc = window.parent.document;
-                            var inp = doc.querySelector('input[type="text"]');
-                            if (inp) {
-                                var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                                setter.call(inp, text);
-                                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                                inp.dispatchEvent(new Event('change', { bubbles: true }));
-                                setTimeout(function() {
-                                    var btns = doc.querySelectorAll('button');
-                                    for (var b of btns) {
-                                        if (b.textContent.trim() === 'Gui' || b.textContent.trim() === 'Gửi') {
-                                            b.click();
-                                            break;
-                                        }
-                                    }
-                                }, 400);
-                            }
-                        } catch(e) { alert('Loi: ' + e.message); }
-                    };
-                    r.onerror = function(e) {
-                        document.getElementById('mic_status').innerText = 'Loi: ' + e.error;
-                        this.style.background = '#FFD70011';
-                        this.style.color = '#FFD700';
-                    };
-                    r.start();
-                };
-                </script>
-            """
-            try:
-                components.html(mic_html, height=130)
-            except Exception:
-                import html as _h
-                st.markdown(
-                    f'<iframe srcdoc="{_h.escape(mic_html)}" '
-                    f'style="width:100%;height:130px;border:none;border-radius:12px;" '
-                    f'sandbox="allow-scripts allow-same-origin allow-microphone"></iframe>',
-                    unsafe_allow_html=True,
-                )
 
     with tab_expert:
         st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
@@ -1957,24 +1864,12 @@ elif st.session_state.trang_thai == "chat":
                         elif expert["response"].startswith("⏭️"):
                             st.caption(expert["response"])
                         else:
-                            st.markdown(
-                                f'<div style="border-left:4px solid {expert["color"]};'
-                                f'padding:0.8rem 1rem;background:{expert["color"]}08;'
-                                f'border-radius:8px;font-size:0.9rem;line-height:1.6;">'
-                                f'{expert["response"]}</div>',
-                                unsafe_allow_html=True,
-                            )
+                            st.markdown(expert["response"])
 
             if results.get("chairman"):
                 st.markdown("---")
-                st.markdown(
-                    '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(255,215,0,0.02));'
-                    'border:2px solid #FFD700;border-radius:16px;padding:1.5rem;margin:1rem 0;">'
-                    '<h3 style="color:#FFD700;margin:0 0 0.5rem;">👑 Kết luận của Chủ tịch Hội đồng</h3>'
-                    f'<div style="color:#ECE8E1;font-size:0.95rem;line-height:1.7;">'
-                    f'{results["chairman"]}</div></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown("#### 👑 Kết luận của Chủ tịch Hội đồng")
+                st.markdown(results["chairman"])
 
             if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
                 st.session_state.expert_results = None
