@@ -48,7 +48,18 @@ import os as os_mod
 from dotenv import load_dotenv
 load_dotenv()
 import streamlit.components.v1 as components
-from backend.data_loader import DOCS, load_all
+import sys, traceback
+try:
+    from backend.data_loader import DOCS, load_all
+except Exception:
+    print("=" * 60, file=sys.stderr)
+    print("ERROR importing backend.data_loader:", file=sys.stderr)
+    traceback.print_exc()
+    print("=" * 60, file=sys.stderr)
+    # Degrade gracefully: provide empty fallbacks
+    DOCS = {}
+    def load_all():
+        pass
 
 @st.cache_data(ttl=3600, show_spinner="Đang tải dữ liệu thị trường...")
 def _khoi_tao_dulieu():
