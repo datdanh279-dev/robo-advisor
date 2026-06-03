@@ -1330,45 +1330,46 @@ if st.session_state.trang_thai == "home":
     st.rerun()
 
 if st.session_state.trang_thai == "survey":
-    st.markdown('<p class="main-header">📝 Khảo sát khẩu vị rủi ro</p>', unsafe_allow_html=True)
-    st.markdown(
-        "Trả lời 12 câu hỏi để chúng tôi đánh giá mức độ chấp nhận rủi ro và mục tiêu tài chính của bạn!"
-    )
-    st.markdown("---")
 
-    with st.form("survey_form", clear_on_submit=False):
-        for idx, cau in enumerate(CAU_HOI_KHAO_SAT):
-            st.markdown(f"**{idx+1}. {cau['cau_hoi']}**")
-            lua_chon_nhan = [opt["nhan"] for opt in cau["lua_chon"]]
-            lua_chon_diem = {opt["nhan"]: opt["diem"] for opt in cau["lua_chon"]}
-            selected = st.radio(
-                "Chọn:",
-                lua_chon_nhan,
-                key=f"survey_q_{idx}",
-                index=None,
-                label_visibility="collapsed",
-            )
-            st.session_state._survey_opts[idx] = (cau["y"], lua_chon_diem, selected)
-            st.markdown("---")
+    if not st.session_state.get("cau_tra_loi"):
+        st.markdown('<p class="main-header">📝 Khảo sát khẩu vị rủi ro</p>', unsafe_allow_html=True)
+        st.markdown(
+            "Trả lời 12 câu hỏi để chúng tôi đánh giá mức độ chấp nhận rủi ro và mục tiêu tài chính của bạn!"
+        )
+        st.markdown("---")
 
-        submitted = st.form_submit_button("✅ Hoàn thành khảo sát", use_container_width=True, type="primary")
+        with st.form("survey_form", clear_on_submit=True):
+            for idx, cau in enumerate(CAU_HOI_KHAO_SAT):
+                st.markdown(f"**{idx+1}. {cau['cau_hoi']}**")
+                lua_chon_nhan = [opt["nhan"] for opt in cau["lua_chon"]]
+                lua_chon_diem = {opt["nhan"]: opt["diem"] for opt in cau["lua_chon"]}
+                selected = st.radio(
+                    "Chọn:",
+                    lua_chon_nhan,
+                    key=f"survey_q_{idx}",
+                    index=None,
+                    label_visibility="collapsed",
+                )
+                st.session_state._survey_opts[idx] = (cau["y"], lua_chon_diem, selected)
+                st.markdown("---")
 
-    if submitted:
-        cau_tra_loi = {}
-        missing = False
-        for idx in range(len(CAU_HOI_KHAO_SAT)):
-            y, lua_chon_diem, selected = st.session_state._survey_opts.get(idx, (None, {}, None))
-            if selected is None or y is None:
-                missing = True
-                continue
-            cau_tra_loi[y] = lua_chon_diem[selected]
+            submitted = st.form_submit_button("✅ Hoàn thành khảo sát", use_container_width=True, type="primary")
 
-        if missing:
-            st.warning("Vui lòng trả lời tất cả 12 câu hỏi trước khi hoàn thành.")
-        else:
-            st.session_state.cau_tra_loi = cau_tra_loi
-            st.session_state.loai_nha_dau_tu = None
-            st.rerun()
+        if submitted:
+            cau_tra_loi = {}
+            missing = False
+            for idx in range(len(CAU_HOI_KHAO_SAT)):
+                y, lua_chon_diem, selected = st.session_state._survey_opts.get(idx, (None, {}, None))
+                if selected is None or y is None:
+                    missing = True
+                    continue
+                cau_tra_loi[y] = lua_chon_diem[selected]
+
+            if missing:
+                st.warning("Vui lòng trả lời tất cả 12 câu hỏi trước khi hoàn thành.")
+            else:
+                st.session_state.cau_tra_loi = cau_tra_loi
+                st.session_state.loai_nha_dau_tu = None
 
     if st.session_state.get("cau_tra_loi"):
         loai, diem, mo_ta, danh_muc = danh_gia_rui_ro(st.session_state.cau_tra_loi)
