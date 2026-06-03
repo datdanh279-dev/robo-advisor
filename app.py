@@ -1597,3 +1597,5 @@ st.markdown(
     '<span style="color: #FFD700;">© 2026 • Phiên bản Hoàng gia &amp; Thịnh vượng v3.0</span></center>',
     unsafe_allow_html=True,
 )
+
+# # Auto-deploy trigger 2026-06-03 13:55:55
