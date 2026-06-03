@@ -13,8 +13,8 @@ EXPERTS = [
         "id": "buffett",
         "name": "Warren Buffett",
         "title": "Huyền thoại Đầu tư Giá trị",
-        "model": "gpt-4o",
-        "backend": "openai",
+        "model": "llama-3.3-70b-versatile",
+        "backend": "groq",
         "color": "#4CAF50",
         "prompt": (
             "Bạn là Warren Buffett, huyền thoại đầu tư giá trị 94 tuổi, được mệnh danh là 'Nhà hiền triết xứ Omaha'. "
@@ -44,8 +44,8 @@ EXPERTS = [
         "id": "lynch",
         "name": "Peter Lynch",
         "title": "Nhà đầu tư Tăng trưởng",
-        "model": "openrouter/free",
-        "backend": "openrouter",
+        "model": "llama-3.3-70b-versatile",
+        "backend": "groq",
         "color": "#FF9800",
         "prompt": (
             "Bạn là Peter Lynch, huyền thoại quản lý quỹ Fidelity Magellan, người đạt lợi nhuận 29% mỗi năm trong 13 năm. "
@@ -60,8 +60,8 @@ EXPERTS = [
         "id": "dalio",
         "name": "Ray Dalio",
         "title": "Chiến lược gia Nguyên tắc",
-        "model": "openrouter/free",
-        "backend": "openrouter",
+        "model": "llama-3.3-70b-versatile",
+        "backend": "groq",
         "color": "#9C27B0",
         "prompt": (
             "Bạn là Ray Dalio, nhà sáng lập Bridgewater Associates (quỹ hedge fund lớn nhất thế giới), "
@@ -76,8 +76,8 @@ EXPERTS = [
         "id": "graham",
         "name": "Benjamin Graham",
         "title": "Cha đẻ Phân tích Cơ bản",
-        "model": "openrouter/free",
-        "backend": "openrouter",
+        "model": "llama-3.3-70b-versatile",
+        "backend": "groq",
         "color": "#795548",
         "prompt": (
             "Bạn là Benjamin Graham, cha đẻ của ngành phân tích cơ bản và đầu tư giá trị, "
@@ -93,8 +93,8 @@ EXPERTS = [
         "id": "munger",
         "name": "Charlie Munger",
         "title": "Nhà tư duy Đa chiều",
-        "model": "openrouter/free",
-        "backend": "openrouter",
+        "model": "llama-3.3-70b-versatile",
+        "backend": "groq",
         "color": "#607D8B",
         "prompt": (
             "Bạn là Charlie Munger, phó chủ tịch Berkshire Hathaway và là một trong những nhà tư duy sắc sảo nhất Phố Wall. "
@@ -143,6 +143,28 @@ async def _call_openai(session, prompt, question, api_key, model="gpt-4o", timeo
             logger.warning(f"OpenAI {model} status {r.status}")
     except Exception as e:
         logger.warning(f"OpenAI {model} error: {e}")
+    return None
+
+
+async def _call_groq(session, prompt, question, api_key, model="llama-3.3-70b-versatile", timeout=45):
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": question},
+    ]
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
+    try:
+        async with session.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json=payload, headers=headers,
+            timeout=aiohttp.ClientTimeout(total=timeout)
+        ) as r:
+            if r.status == 200:
+                data = await r.json()
+                return data["choices"][0]["message"]["content"].strip()
+            logger.warning(f"Groq {model} status {r.status}")
+    except Exception as e:
+        logger.warning(f"Groq {model} error: {e}")
     return None
 
 
@@ -201,6 +223,14 @@ async def _call_expert(session, expert, question, api_keys):
         kwargs["model"] = expert["model"]
         result = await _call_openai(session, **kwargs)
 
+    elif expert["backend"] == "groq":
+        api_key = api_keys.get("groq")
+        if not api_key:
+            return "❌ GROQ_API_KEY chưa được cấu hình.\n\nLấy key miễn phí tại https://console.groq.com/keys (không cần thẻ tín dụng)."
+        kwargs["api_key"] = api_key
+        kwargs["model"] = expert["model"]
+        result = await _call_groq(session, **kwargs)
+
     elif expert["backend"] == "gemini":
         api_key = api_keys.get("gemini")
         if not api_key:
@@ -235,6 +265,25 @@ async def _call_chairman(session, question, expert_results, api_key, api_keys):
     prompt = f"{CHAIRMAN_SYSTEM_PROMPT}\n\nCÂU HỎI: {question}\n\nCÁC Ý KIẾN CHUYÊN GIA:\n{context}\n\nKẾT LUẬN CỦA CHỦ TỊCH:"
 
     messages = [{"role": "user", "content": prompt}]
+
+    # Try Groq first (free, Llama 3.3 70B)
+    groq_key = api_keys.get("groq")
+    if groq_key:
+        groq_headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+        groq_payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
+        try:
+            async with session.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json=groq_payload, headers=groq_headers,
+                timeout=aiohttp.ClientTimeout(total=60)
+            ) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    return data["choices"][0]["message"]["content"].strip()
+                logger.warning(f"Chairman Groq status {r.status}")
+        except Exception as e:
+            logger.warning(f"Chairman Groq error: {e}")
+        _CHAIRMAN_ATTEMPTED = True
 
     # Try OpenAI first (best for chairman role)
     openai_key = api_key or api_keys.get("openai")
@@ -290,11 +339,13 @@ def hoi_dong_chuyen_gia(cau_hoi):
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
     openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+    groq_key = os.environ.get("GROQ_API_KEY", "")
 
     api_keys = {
         "openai": openai_key,
         "gemini": gemini_key,
         "openrouter": openrouter_key,
+        "groq": groq_key,
     }
 
     try:
@@ -308,16 +359,14 @@ def hoi_dong_chuyen_gia(cau_hoi):
 async def _run_expert_panel_async(question, api_keys):
     async with aiohttp.ClientSession() as session:
         expert_tasks = []
-        for i, exp in enumerate(EXPERTS):
+        for exp in EXPERTS:
             task = _call_expert(session, exp, question, api_keys)
             expert_tasks.append(task)
-            if exp["backend"] == "openrouter":
-                await asyncio.sleep(1.5)
 
         expert_results = await asyncio.gather(*expert_tasks)
 
         chairman_result = None
-        chairman_key = api_keys.get("openai")
+        chairman_key = api_keys.get("groq") or api_keys.get("openai")
         if chairman_key and any(r and "❌" not in r for r in expert_results):
             try:
                 chairman_result = await _call_chairman(session, question, expert_results, chairman_key, api_keys)
