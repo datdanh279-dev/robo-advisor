@@ -28,7 +28,6 @@ from backend.market_data import (
     cap_nhat_toan_bo,
 )
 from backend.chat_advisor import tim_cau_tra_loi
-from backend.data_loader import DOCS
 from backend.calculations import (
     phan_tich_lich_su,
     phan_tich_danh_muc_nang_cao,
@@ -49,14 +48,12 @@ import os as os_mod
 from dotenv import load_dotenv
 load_dotenv()
 import streamlit.components.v1 as components
-from backend.data_loader import load_all, DOCS
+from backend.data_loader import DOCS, load_all
 
 @st.cache_data(ttl=3600, show_spinner="Đang tải dữ liệu thị trường...")
 def _khoi_tao_dulieu():
     load_all()
     return True
-
-_khoi_tao_dulieu()
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -325,6 +322,9 @@ if not st.session_state.authenticated:
     else:
         hien_thi_otp()
     st.stop()
+
+
+_khoi_tao_dulieu()
 
 
 @st.cache_data(show_spinner=False)
