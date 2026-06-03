@@ -6,6 +6,52 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+_NGANH_TV = {
+    "cong nghe": "Công nghệ",
+    "ngan hang": "Ngân hàng",
+    "ha tang so": "Hạ tầng số",
+    "ban le": "Bán lẻ",
+    "thep": "Thép",
+    "tieu dung": "Tiêu dùng",
+    "chung khoan": "Chứng khoán",
+}
+
+_KET_LUAN_TV = {
+    "MUA": "MUA MẠNH",
+    "MUA MANH": "MUA MẠNH",
+    "GIU": "GIỮ",
+    "GIU LAI": "GIỮ LẠI",
+    "BAN 1 PHAN": "BÁN 1 PHẦN",
+}
+
+
+def _chuong_hoa_tv_nganh(nganh: str) -> str:
+    if not nganh:
+        return nganh
+    key = nganh.strip().lower()
+    return _NGANH_TV.get(key, nganh.strip())
+
+
+def _chuong_hoa_tv_ket_luan(ket_luan: str) -> str:
+    if not ket_luan:
+        return ket_luan
+    key = ket_luan.strip().upper()
+    return _KET_LUAN_TV.get(key, ket_luan.strip())
+
+
+def _dong_bo_performance_tu_danh_muc():
+    dm = DOCS.get("danh_muc") or {}
+    if not dm:
+        return
+    try:
+        from backend.portfolio import tinh_return_danh_muc
+        _, _, _, return_pct = tinh_return_danh_muc(dm)
+        perf = DOCS.setdefault("performance", {})
+        perf["Rp"] = round(return_pct / 100, 4)
+    except Exception as e:
+        logger.warning("Sync Rp from danh_muc failed: %s", e)
+
+
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)
 
@@ -178,7 +224,7 @@ def doc_kpi():
                 continue
             try:
                 portfolio[ma] = {
-                        "nganh": str(r.iloc[1]).strip()[:30] if pd.notna(r.iloc[1]) else "",
+                        "nganh": _chuong_hoa_tv_nganh(str(r.iloc[1]).strip()[:30] if pd.notna(r.iloc[1]) else ""),
                     "gia": float(r.iloc[2]) if pd.notna(r.iloc[2]) else 0,
                     "lai_lo_pct": float(r.iloc[3]) if pd.notna(r.iloc[3]) else 0,
                     "roe": float(r.iloc[4]) if pd.notna(r.iloc[4]) else 0,
@@ -186,7 +232,7 @@ def doc_kpi():
                     "upside": float(r.iloc[6]) if pd.notna(r.iloc[6]) else 0,
                     "diem_mua": float(r.iloc[7]) if pd.notna(r.iloc[7]) else 0,
                     "diem_ban": float(r.iloc[8]) if pd.notna(r.iloc[8]) else 0,
-                    "ket_luan": str(r.iloc[9]).strip()[:30] if pd.notna(r.iloc[9]) else "",
+                    "ket_luan": _chuong_hoa_tv_ket_luan(str(r.iloc[9]).strip()[:30] if pd.notna(r.iloc[9]) else ""),
                     "hanh_dong": str(r.iloc[10]).strip()[:30] if pd.notna(r.iloc[10]) else "",
                     "ty_trong_ht": float(r.iloc[11]) if pd.notna(r.iloc[11]) else 0,
                     "ty_trong_mt": float(r.iloc[12]) if pd.notna(r.iloc[12]) else 0,
@@ -385,18 +431,29 @@ def load_all():
     DOCS["stress_vars"], DOCS["stress"] = sv, s
     DOCS["ngay_cap_nhat"] = _NGAY_FILE
     kpi = DOCS.get("kpi", {})
+    for _ma, _info in DOCS.get("kpi", {}).items():
+        if _info.get("nganh"):
+            _info["nganh"] = _chuong_hoa_tv_nganh(_info["nganh"])
+        if _info.get("ket_luan"):
+            _info["ket_luan"] = _chuong_hoa_tv_ket_luan(_info["ket_luan"])
+    try:
+        from backend.market_data import DANH_SACH_DANH_MUC
+        _fallback_portfolio = DANH_SACH_DANH_MUC
+    except Exception:
+        _fallback_portfolio = ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM", "VIX"]
     DOCS["danh_sach_portfolio"] = sorted(
         [k for k in kpi.keys() if k != "NAN"],
         key=lambda x: kpi[x].get("ty_trong_ht", 0) if x in kpi else 0,
-        reverse=True
-    ) or ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM"]
+        reverse=True,
+    ) or _fallback_portfolio
+    _dong_bo_performance_tu_danh_muc()
     _LOADED = True
 
 DOCS = {
     "live": {}, "co_phieu_vn": {}, "co_phieu_tg": {}, "danh_muc": {},
     "kpi": {}, "liquid": {}, "esg": {}, "performance": {},
     "stress_vars": {}, "stress": {}, "ngay_cap_nhat": _NGAY_FILE,
-    "danh_sach_portfolio": ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM"],
+    "danh_sach_portfolio": ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM", "VIX"],
 }
 
 import threading

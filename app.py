@@ -19,6 +19,7 @@ from backend.portfolio import (
     mo_phong_monte_carlo,
     tinh_toan_danh_muc,
     tinh_toan_phan_bo_lai_lo,
+    tinh_return_danh_muc,
 )
 from backend.market_data import (
     lay_thong_tin_thi_truong,
@@ -29,6 +30,7 @@ from backend.market_data import (
     DANH_SACH_NGANH,
     cap_nhat_toan_bo,
     cap_nhat_co_phieu_vn,
+    dinh_dang_gia_quoc_te,
 )
 from backend.chat_advisor import tim_cau_tra_loi
 from backend.calculations import (
@@ -707,7 +709,14 @@ with sidebar:
         st.markdown(f"**Hồ sơ của bạn:** {loai}")
         st.markdown(f"**Điểm rủi ro:** {st.session_state.get('diem_rui_ro', 0)}/60")
 
-st.markdown('<div class="disclaimer"><strong>⚠️ TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM:</strong> Đây là <strong>công cụ mô phỏng & phân tích dữ liệu lịch sử</strong> phục vụ mục đích học thuật và nghiên cứu. Mọi nhận định, tín hiệu ("MUA", "BÁN", "GIỮ") đều dựa trên dữ liệu quá khứ, <strong>không phải khuyến nghị đầu tư</strong>. Tác giả không chịu trách nhiệm về bất kỳ tổn thất nào phát sinh từ việc sử dụng thông tin này. Cryptocurrency chưa được pháp luật Việt Nam công nhận là tài sản hợp pháp. Đầu tư có rủi ro, hãy cân nhắc kỹ trước khi quyết định.</div>', unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown(
+        '<div class="disclaimer"><strong>⚠️ TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM:</strong> '
+        'Đây là <strong>công cụ mô phỏng & phân tích dữ liệu lịch sử</strong> phục vụ mục đích học thuật. '
+        'Mọi tín hiệu ("MUA", "BÁN", "GIỮ") dựa trên dữ liệu quá khứ, <strong>không phải khuyến nghị đầu tư</strong>. '
+        'Crypto chưa được pháp luật VN công nhận. Đầu tư có rủi ro.</div>',
+        unsafe_allow_html=True,
+    )
 
 # Business Plan — đã ẩn, xem file business_plan.html riêng
 # @st.dialog("Business Plan", width="large")
@@ -760,8 +769,10 @@ def _render_quoc_te():
             change_color = "green" if info.get("thay_doi_1nam", 0) > 0 else "red"
             change_sign = "+" if info.get("thay_doi_1nam", 0) > 0 else ""
             gia = info.get("gia_hien_tai", 0)
-            gia_str = f"{gia:,.2f}" if isinstance(gia, (int, float)) and gia > 100 else f"{gia:.2f}"
-            st.markdown(f'<div class="card" style="text-align:center;padding:1rem;"><h4 style="color:var(--gold);margin:0;">{ten}</h4><h2 style="margin:0.5rem 0;">{gia_str}</h2><h4 style="color:{change_color};margin:0;">{change_sign}{info.get("thay_doi_1nam",0)*100:.1f}%</h4><small style="color:var(--text-muted);">{info.get("mieu_ta","")[:60]}</small></div>', unsafe_allow_html=True)
+            gia_str = dinh_dang_gia_quoc_te(ten, gia) if isinstance(gia, (int, float)) else str(gia)
+            don_vi = info.get("don_vi", "")
+            don_vi_hint = f" · {don_vi}" if don_vi and don_vi not in gia_str else ""
+            st.markdown(f'<div class="card" style="text-align:center;padding:1rem;"><h4 style="color:var(--gold);margin:0;">{ten}</h4><h2 style="margin:0.5rem 0;">{gia_str}</h2><h4 style="color:{change_color};margin:0;">{change_sign}{info.get("thay_doi_1nam",0)*100:.1f}%</h4><small style="color:var(--text-muted);">{info.get("mieu_ta","")[:60]}{don_vi_hint}</small></div>', unsafe_allow_html=True)
     st.markdown("### So sánh hiệu suất")
     labels = list(tt_qt.keys())
     values = [info.get("thay_doi_1nam", 0) * 100 for info in tt_qt.values()]
@@ -788,10 +799,9 @@ def _render_tonghop():
     kpi = DOCS["kpi"]
     dm = DOCS["danh_muc"]
     perf = DOCS["performance"]
-    tong_gt = sum(dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0) for ma in dm)
-    tong_von = sum(dm[ma].get("gia_von", 0) * dm[ma].get("so_luong", 0) for ma in dm)
-    tong_lai_lo = sum((dm[ma].get("gia_thi_truong", 0) - dm[ma].get("gia_von", 0)) * dm[ma].get("so_luong", 0) for ma in dm)
-    return_pct = (perf.get("Rp", 0) * 100) or (tong_lai_lo / tong_von * 100 if tong_von else 0)
+    tong_gt, tong_von, tong_lai_lo, return_pct = tinh_return_danh_muc(dm)
+    perf = dict(perf)
+    perf["Rp"] = return_pct / 100
     col_d1, col_d2, col_d3, col_d4 = st.columns(4)
     with col_d1:
         st.markdown(f"""<div class="metric-box"><h4>Tổng GT Danh mục</h4><h2 style="color:#FFD700;">{tong_gt:,.0f} ₫</h2></div>""", unsafe_allow_html=True)
@@ -1275,7 +1285,7 @@ def _render_tonghop():
         rf = perf.get("Rf", 0.045)
         rm = perf.get("Rm", 0.082)
         beta = perf.get("Beta", 1.0)
-        rp = perf.get("Rp", 0.168)
+        rp = perf.get("Rp", return_pct / 100)
         alpha = rp - (rf + beta * (rm - rf))
         sharpe = (rp - rf) / 0.15 if rp > 0 else 0
         phi = perf.get("phi_gd", 0.0015)
@@ -1555,18 +1565,16 @@ elif st.session_state.trang_thai == "portfolio":
     st.markdown("---")
     dm = DOCS.get("danh_muc", {})
     kpi = DOCS.get("kpi", {})
-    tong_gt = sum(dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0) for ma in dm)
-    tong_phi = sum(abs(dm[ma].get("gia_thi_truong", 0) - dm[ma].get("gia_von", 0)) * dm[ma].get("so_luong", 0) for ma in dm)
-    tong_lai_lo = sum((dm[ma].get("gia_thi_truong", 0) - dm[ma].get("gia_von", 0)) * dm[ma].get("so_luong", 0) for ma in dm)
+    tong_gt, tong_von_port, tong_lai_lo, return_pct_port = tinh_return_danh_muc(dm)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Tổng giá trị", f"{tong_gt:,.0f}₫")
     with col2:
-        st.metric("Tổng lãi/lỗ", f"{tong_lai_lo:+,.0f}₫", delta=f"{tong_lai_lo/tong_gt*100 if tong_gt else 0:.1f}%")
+        st.metric("Tổng lãi/lỗ", f"{tong_lai_lo:+,.0f}₫", delta=f"{return_pct_port:.1f}%")
     with col3:
         st.metric("Số mã", f"{len(dm)}")
     with col4:
-        st.metric("Tỷ suất", f"{tong_lai_lo/tong_gt*100 if tong_gt else 0:+.1f}%")
+        st.metric("Tỷ suất", f"{return_pct_port:+.1f}%")
 
     rows = []
     for ma, info in dm.items():

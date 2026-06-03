@@ -11,6 +11,12 @@ _CHAIRMAN_ATTEMPTED = False
 # Cache phân loại câu hỏi
 _PHAN_LOAI_CACHE = {}
 
+_ESG_DAO_DUC_RULE = (
+    " Yếu tố ESG (Môi trường — Xã hội — Quản trị) và đạo đức kinh doanh là tiêu chí bắt buộc: "
+    "ưu tiên doanh nghiệp minh bạch, tránh khuyến khích ngành/công ty có rủi ro đạo đức hoặc ESG thấp "
+    "trừ khi số liệu chứng minh rõ. Mọi phân tích cổ phiếu VN phải nhắc ngắn gọn tác động ESG nếu liên quan."
+)
+
 def _la_cau_chao(value):
     """Câu chào / câu đơn giản — chỉ cần 1 chuyên gia"""
     c = value.lower().strip()
@@ -164,6 +170,10 @@ EXPERTS = [
     },
 ]
 
+for _exp in EXPERTS:
+    if _ESG_DAO_DUC_RULE not in _exp["prompt"]:
+        _exp["prompt"] += _ESG_DAO_DUC_RULE
+
 CHAIRMAN_SYSTEM_PROMPT = (
     "Bạn là CHỦ TỊCH HỘI ĐỒNG PHÂN TÍCH ĐẦU TƯ — một nhà phân tích thiên tài với 50 năm kinh nghiệm, "
     "từng làm việc với Warren Buffett, George Soros, Peter Lynch, Ray Dalio, Benjamin Graham, và Charlie Munger. "
@@ -179,6 +189,7 @@ CHAIRMAN_SYSTEM_PROMPT = (
     "\n\nĐây là công cụ MÔ PHỎNG & PHÂN TÍCH DỮ LIỆU LỊCH SỬ, không phải khuyến nghị đầu tư. "
     "Phong cách: uy nghiêm, quyết đoán, dùng giọng điệu của 'người đã thấy tất cả'. "
     "Kết luận phải ngắn gọn, tối đa 3 câu, dễ hiểu, thực tế."
+    + _ESG_DAO_DUC_RULE
 )
 
 
@@ -446,6 +457,18 @@ def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None):
                 lines.extend(items)
         if lines:
             thi_truong_context = "\n".join(lines)
+
+        esg = docs.get("esg", {})
+        if esg:
+            esg_lines = ["**Điểm ESG theo ngành (E·S·G %):**"]
+            for nganh, info in list(esg.items())[:12]:
+                if str(nganh).lower() == "nan":
+                    continue
+                esg_lines.append(
+                    f"- {nganh}: E={info.get('e', 'N/A')}, S={info.get('s', 'N/A')}, "
+                    f"G={info.get('g', 'N/A')} — {info.get('mo_ta', '')[:80]}"
+                )
+            thi_truong_context = (thi_truong_context + "\n\n" if thi_truong_context else "") + "\n".join(esg_lines)
 
     try:
         results = asyncio.run(_run_expert_panel_async(cau_hoi, api_keys, thi_truong_context))

@@ -12,6 +12,21 @@ from .data_loader import DOCS
 
 logger = logging.getLogger(__name__)
 
+# 8 mã danh mục mẫu (đồng bộ TONG_HOP_v44 / danh_muc.json)
+DANH_SACH_DANH_MUC = ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM", "VIX"]
+
+_DON_VI_QUOC_TE = {
+    "S&P 500": "điểm",
+    "Dow Jones": "điểm",
+    "Nasdaq": "điểm",
+    "Nikkei 225": "điểm",
+    "HSI": "điểm",
+    "Vàng/XAU": "USD/oz",
+    "Dầu WTI": "USD/thùng",
+    "Bitcoin": "USD",
+    "Ethereum": "USD",
+}
+
 DU_LIEU_THI_TRUONG_VN = {
     "VN-Index": {"mo_ta": "Sàn HOSE - TP.HCM", "gia_hien_tai": 1280, "thay_doi_1nam": 0.118, "bang_xep_hang": "Đang tải...", "don_vi": "điểm"},
     "HNX-Index": {"mo_ta": "Sàn HNX - Hà Nội", "gia_hien_tai": 240, "thay_doi_1nam": 0.075, "bang_xep_hang": "Đang tải...", "don_vi": "điểm"},
@@ -20,17 +35,42 @@ DU_LIEU_THI_TRUONG_VN = {
     "Lãi suất tiết kiệm": {"mo_ta": "Lãi suất VCB kỳ hạn 12 tháng", "gia_hien_tai": DOCS.get("performance", {}).get("Rf", 0.048), "thay_doi_1nam": -0.02, "bang_xep_hang": "Đang tải...", "don_vi": "%"},
     "Trái phiếu chính phủ": {"mo_ta": "Lợi suất TPCP kỳ hạn 10 năm", "gia_hien_tai": 0.0705, "thay_doi_1nam": 0.005, "bang_xep_hang": "Đang tải...", "don_vi": "%"},
 }
+def _qt_entry(mieu_ta, gia, thay_doi, ma_yahoo, don_vi):
+    return {
+        "mieu_ta": mieu_ta,
+        "gia_hien_tai": gia,
+        "thay_doi_1nam": thay_doi,
+        "ma_yahoo": ma_yahoo,
+        "don_vi": don_vi,
+    }
+
+
 DU_LIEU_QUOC_TE = {
-    "S&P 500": {"mieu_ta": "Chỉ số 500 công ty lớn nhất Mỹ", "gia_hien_tai": 5430, "thay_doi_1nam": 0.12, "ma_yahoo": "^GSPC"},
-    "Dow Jones": {"mieu_ta": "Chỉ số 30 công ty công nghiệp Mỹ", "gia_hien_tai": 38800, "thay_doi_1nam": 0.08, "ma_yahoo": "^DJI"},
-    "Nasdaq": {"mieu_ta": "Chỉ số công ty công nghệ Mỹ", "gia_hien_tai": 17600, "thay_doi_1nam": 0.18, "ma_yahoo": "^IXIC"},
-    "Nikkei 225": {"mieu_ta": "Chỉ số chính của Nhật Bản", "gia_hien_tai": 38500, "thay_doi_1nam": 0.14, "ma_yahoo": "^N225"},
-    "HSI": {"mieu_ta": "Hang Seng Index - Hong Kong", "gia_hien_tai": 17800, "thay_doi_1nam": -0.05, "ma_yahoo": "^HSI"},
-    "Vàng/XAU": {"mieu_ta": "Giá vàng thế giới (USD/oz)", "gia_hien_tai": 2350, "thay_doi_1nam": 0.22, "ma_yahoo": "GC=F"},
-    "Dầu WTI": {"mieu_ta": "Dầu thô WTI (USD/thùng)", "gia_hien_tai": 78, "thay_doi_1nam": 0.06, "ma_yahoo": "CL=F"},
-    "Bitcoin": {"mieu_ta": "Tiền điện tử lớn nhất thế giới", "gia_hien_tai": 67000, "thay_doi_1nam": 0.85, "ma_yahoo": "BTC-USD"},
-    "Ethereum": {"mieu_ta": "Tiền điện tử lớn thứ 2 thế giới", "gia_hien_tai": 3500, "thay_doi_1nam": 0.65, "ma_yahoo": "ETH-USD"},
+    "S&P 500": _qt_entry("Chỉ số 500 công ty lớn nhất Mỹ", 5430, 0.12, "^GSPC", _DON_VI_QUOC_TE["S&P 500"]),
+    "Dow Jones": _qt_entry("Chỉ số 30 công ty công nghiệp Mỹ", 38800, 0.08, "^DJI", _DON_VI_QUOC_TE["Dow Jones"]),
+    "Nasdaq": _qt_entry("Chỉ số công ty công nghệ Mỹ", 17600, 0.18, "^IXIC", _DON_VI_QUOC_TE["Nasdaq"]),
+    "Nikkei 225": _qt_entry("Chỉ số chính của Nhật Bản", 38500, 0.14, "^N225", _DON_VI_QUOC_TE["Nikkei 225"]),
+    "HSI": _qt_entry("Hang Seng Index - Hong Kong", 17800, -0.05, "^HSI", _DON_VI_QUOC_TE["HSI"]),
+    "Vàng/XAU": _qt_entry("Giá vàng thế giới (USD/oz)", 2350, 0.22, "GC=F", _DON_VI_QUOC_TE["Vàng/XAU"]),
+    "Dầu WTI": _qt_entry("Dầu thô WTI (USD/thùng)", 78, 0.06, "CL=F", _DON_VI_QUOC_TE["Dầu WTI"]),
+    "Bitcoin": _qt_entry("Tiền điện tử lớn nhất thế giới", 67000, 0.85, "BTC-USD", _DON_VI_QUOC_TE["Bitcoin"]),
+    "Ethereum": _qt_entry("Tiền điện tử lớn thứ 2 thế giới", 3500, 0.65, "ETH-USD", _DON_VI_QUOC_TE["Ethereum"]),
 }
+
+
+def dinh_dang_gia_quoc_te(ten: str, gia) -> str:
+    """Hiển thị giá chỉ số quốc tế kèm đơn vị tiền tệ."""
+    if not isinstance(gia, (int, float)):
+        return str(gia)
+    don_vi = _DON_VI_QUOC_TE.get(ten, DU_LIEU_QUOC_TE.get(ten, {}).get("don_vi", ""))
+    if don_vi in ("USD", "USD/oz", "USD/thùng"):
+        prefix = "$" if don_vi == "USD" else ""
+        suffix = {"USD/oz": " USD/oz", "USD/thùng": " USD/thùng"}.get(don_vi, "")
+        val = f"{gia:,.2f}" if gia < 10000 else f"{gia:,.0f}"
+        return f"{prefix}{val}{suffix}".strip()
+    if gia >= 1000:
+        return f"{gia:,.0f} điểm"
+    return f"{gia:,.2f} điểm"
 CO_PHIEU_VN = {}
 
 def _build_co_phieu_vn():
@@ -146,6 +186,7 @@ def cap_nhat_toan_bo():
                         "gia_hien_tai": tt[ten].get("gia_hien_tai", 0),
                         "thay_doi_1nam": tt[ten].get("thay_doi_1nam", 0),
                         "ma_yahoo": tt[ten].get("ma", ""),
+                        "don_vi": _DON_VI_QUOC_TE.get(ten, "điểm"),
                     }
     except Exception as e:
         logger.warning("cap_nhat_toan_bo stock prices failed: %s", e)
