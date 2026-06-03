@@ -1,176 +1,116 @@
-import sqlite3
 import json
 import os
 import tempfile
 from datetime import datetime
+from threading import Lock
 
-_TMP = os.environ.get("ROBO_DB_DIR") or os.environ.get("STREAMLIT_TMP_PATH") or tempfile.gettempdir()
-_DB_DIR = os.path.join(_TMP, "robo-advisor-data")
-_DB_PATH = os.path.join(_DB_DIR, "users.db")
-_DB_INITIALIZED = False
-
-def _get_conn():
-    global _DB_INITIALIZED
-    if not _DB_INITIALIZED:
-        try:
-            init_db()
-        except Exception:
-            import logging
-            logging.getLogger(__name__).warning("lazy init_db failed", exc_info=True)
-    os.makedirs(_DB_DIR, exist_ok=True)
-    conn = sqlite3.connect(_DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+_DB_DIR = os.environ.get("ROBO_DB_DIR") or os.environ.get("STREAMLIT_TMP_PATH") or tempfile.gettempdir()
+_DB_DIR = os.path.join(_DB_DIR, "robo-advisor-data")
+_DB_PATH = os.path.join(_DB_DIR, "data.json")
+_WRITE_LOCK = Lock()
 
 BETA_MAX = 1000
 
-def _init_db_conn():
-    os.makedirs(_DB_DIR, exist_ok=True)
-    conn = sqlite3.connect(_DB_PATH)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
-
-def init_db():
-    global _DB_INITIALIZED
-    conn = _init_db_conn()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            beta_slot INTEGER,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
+def _read():
     try:
-        conn.execute("ALTER TABLE users ADD COLUMN beta_slot INTEGER")
-    except:
-        pass
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            key TEXT NOT NULL,
-            value TEXT,
-            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-            UNIQUE(username, key)
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS chat_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.commit()
-    conn.close()
-    _DB_INITIALIZED = True
+        with open(_DB_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"users": [], "sessions": {}, "chats": {}}
+
+def _write(data):
+    os.makedirs(_DB_DIR, exist_ok=True)
+    with _WRITE_LOCK:
+        with open(_DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+def _next_id(users):
+    return max((u["id"] for u in users), default=0) + 1
+
+def _now():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def count_users():
-    conn = _get_conn()
-    c = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    conn.close()
-    return c
+    data = _read()
+    return len(data["users"])
 
 def register_beta_user(username, password=""):
-    conn = _get_conn()
-    c = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if c >= BETA_MAX:
-        conn.close()
+    data = _read()
+    users = data["users"]
+    if len(users) >= BETA_MAX:
         return False, 0
-    slot = c + 1
-    conn.execute("INSERT OR IGNORE INTO users (username, beta_slot) VALUES (?, ?)", (username, slot))
-    if conn.total_changes == 0:
-        conn.close()
-        return False, slot
-    conn.execute("INSERT OR REPLACE INTO sessions (username, key, value) VALUES (?, 'password', ?)", (username, password))
-    conn.commit()
-    conn.close()
+    if any(u["username"] == username for u in users):
+        return False, len(users) + 1
+    slot = len(users) + 1
+    users.append({
+        "id": _next_id(users),
+        "username": username,
+        "beta_slot": slot,
+        "created_at": _now()
+    })
+    data["sessions"].setdefault(username, {})["password"] = password
+    _write(data)
     return True, slot
 
 def verify_user(username, password):
-    conn = _get_conn()
-    row = conn.execute("SELECT value FROM sessions WHERE username=? AND key='password'", (username,)).fetchone()
-    conn.close()
-    if row:
-        return row[0] == password
-    return False
+    data = _read()
+    pw = data.get("sessions", {}).get(username, {}).get("password")
+    return pw == password
 
 def is_founding_member(username):
-    conn = _get_conn()
-    row = conn.execute("SELECT beta_slot FROM users WHERE username=?", (username,)).fetchone()
-    conn.close()
-    return row and row[0] is not None and 1 <= row[0] <= BETA_MAX
+    data = _read()
+    for u in data["users"]:
+        if u["username"] == username:
+            slot = u.get("beta_slot")
+            return slot is not None and 1 <= slot <= BETA_MAX
+    return False
 
 def get_beta_progress():
-    conn = _get_conn()
-    c = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    conn.close()
-    return c, BETA_MAX
+    data = _read()
+    return len(data["users"]), BETA_MAX
 
-def save_state(username, data):
-    conn = _get_conn()
-    for k, v in data.items():
-        val = json.dumps(v, ensure_ascii=False) if not isinstance(v, str) else v
-        conn.execute("""
-            INSERT INTO sessions (username, key, value, updated_at)
-            VALUES (?, ?, ?, datetime('now'))
-            ON CONFLICT(username, key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at
-        """, (username, k, val))
-    conn.commit()
-    conn.close()
+def save_state(username, data_dict):
+    data = _read()
+    sessions = data["sessions"].setdefault(username, {})
+    for k, v in data_dict.items():
+        sessions[k] = v
+    _write(data)
 
 def load_state(username):
-    conn = _get_conn()
-    rows = conn.execute("SELECT key, value FROM sessions WHERE username=?", (username,)).fetchall()
-    conn.close()
-    data = {}
-    for row in rows:
-        try:
-            data[row["key"]] = json.loads(row["value"])
-        except (json.JSONDecodeError, TypeError):
-            data[row["key"]] = row["value"]
-    return data
+    data = _read()
+    return dict(data.get("sessions", {}).get(username, {}))
 
 def save_chat(username, role, content):
-    conn = _get_conn()
-    conn.execute("INSERT INTO chat_history (username, role, content) VALUES (?, ?, ?)", (username, role, content))
-    conn.commit()
-    conn.close()
+    data = _read()
+    chats = data["chats"].setdefault(username, [])
+    chats.append({"role": role, "content": content, "time": _now()})
+    _write(data)
 
 def load_chat(username, limit=50):
-    conn = _get_conn()
-    rows = conn.execute(
-        "SELECT role, content, created_at FROM chat_history WHERE username=? ORDER BY id DESC LIMIT ?",
-        (username, limit)
-    ).fetchall()
-    conn.close()
-    return [{"role": r["role"], "content": r["content"], "time": r["created_at"]} for r in reversed(rows)]
+    data = _read()
+    chats = data.get("chats", {}).get(username, [])
+    return list(reversed(chats[-limit:]))
 
 def ensure_user(username):
-    conn = _get_conn()
-    conn.execute("INSERT OR IGNORE INTO users (username) VALUES (?)", (username,))
-    conn.commit()
-    conn.close()
+    data = _read()
+    if not any(u["username"] == username for u in data["users"]):
+        data["users"].append({
+            "id": _next_id(data["users"]),
+            "username": username,
+            "created_at": _now()
+        })
+        _write(data)
 
 def reset_password(username, new_password):
-    conn = _get_conn()
-    row = conn.execute("SELECT COUNT(*) FROM users WHERE username=?", (username,)).fetchone()
-    if not row or row[0] == 0:
-        conn.close()
+    data = _read()
+    if not any(u["username"] == username for u in data["users"]):
         return False
-    conn.execute("INSERT OR REPLACE INTO sessions (username, key, value) VALUES (?, 'password', ?)", (username, new_password))
-    conn.commit()
-    conn.close()
+    data["sessions"].setdefault(username, {})["password"] = new_password
+    _write(data)
     return True
 
 try:
-    init_db()
+    os.makedirs(_DB_DIR, exist_ok=True)
 except Exception as e:
     import logging
-    logging.getLogger(__name__).warning("init_db failed: %s", e)
+    logging.getLogger(__name__).warning("DB dir create failed: %s", e)
