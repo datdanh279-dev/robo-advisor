@@ -34,7 +34,19 @@ from backend.calculations import (
     phan_tich_danh_muc_nang_cao,
     tinh_tuong_quan,
 )
-from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX, reset_password
+try:
+    from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX, reset_password
+except Exception:
+    import logging
+    logging.getLogger("backend.database").warning("import failed", exc_info=True)
+    save_state = load_state = save_chat = load_chat = ensure_user = lambda *a, **kw: None
+    count_users = lambda: 0
+    register_beta_user = lambda u, p="": (True, 1)
+    verify_user = lambda u, p: False
+    is_founding_member = lambda u: False
+    get_beta_progress = lambda: (0, 1000)
+    BETA_MAX = 1000
+    reset_password = lambda u, p: False
 
 st.set_page_config(
     page_title="Robo-Advisor AI - Đầu tư thông minh",
