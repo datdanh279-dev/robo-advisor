@@ -13,15 +13,22 @@ def _get_conn():
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
+BETA_MAX = 100
+
 def init_db():
     conn = _get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
+            beta_slot INTEGER,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
     """)
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN beta_slot INTEGER")
+    except:
+        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +50,48 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
+def count_users():
+    conn = _get_conn()
+    c = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    conn.close()
+    return c
+
+def register_beta_user(username, password=""):
+    conn = _get_conn()
+    c = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if c >= BETA_MAX:
+        conn.close()
+        return False, 0
+    slot = c + 1
+    conn.execute("INSERT OR IGNORE INTO users (username, beta_slot) VALUES (?, ?)", (username, slot))
+    if conn.total_changes == 0:
+        conn.close()
+        return False, slot
+    conn.execute("INSERT OR REPLACE INTO sessions (username, key, value) VALUES (?, 'password', ?)", (username, password))
+    conn.commit()
+    conn.close()
+    return True, slot
+
+def verify_user(username, password):
+    conn = _get_conn()
+    row = conn.execute("SELECT value FROM sessions WHERE username=? AND key='password'", (username,)).fetchone()
+    conn.close()
+    if row:
+        return row[0] == password
+    return False
+
+def is_founding_member(username):
+    conn = _get_conn()
+    row = conn.execute("SELECT beta_slot FROM users WHERE username=?", (username,)).fetchone()
+    conn.close()
+    return row and row[0] is not None and 1 <= row[0] <= BETA_MAX
+
+def get_beta_progress():
+    conn = _get_conn()
+    c = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    conn.close()
+    return c, BETA_MAX
 
 def save_state(username, data):
     conn = _get_conn()

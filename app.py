@@ -34,7 +34,7 @@ from backend.calculations import (
     phan_tich_danh_muc_nang_cao,
     tinh_tuong_quan,
 )
-from backend.database import save_state, load_state, save_chat, load_chat, ensure_user
+from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, is_founding_member, get_beta_progress, BETA_MAX
 
 st.set_page_config(
     page_title="Robo-Advisor AI - Đầu tư thông minh",
@@ -165,26 +165,69 @@ header[data-testid="stHeader"] { display: none; }
 
 def hien_thi_login():
     st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+    registered_count, max_slots = get_beta_progress()
+    remaining = max_slots - registered_count
+    pct = int(registered_count / max_slots * 100)
     st.markdown(
         '<div class="login-container">'
         '<div class="login-title">🤖 Robo-Advisor</div>'
         '<div class="login-subtitle">Đầu tư thông minh · Quản lý tài sản cá nhân</div>'
+        f'<div style="margin:0 auto 1.5rem;max-width:320px;background:rgba(255,215,0,0.05);border-radius:20px;padding:0.8rem 1rem;border:1px solid rgba(255,215,0,0.1);">'
+        f'<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#8E8E9A;margin-bottom:6px;">'
+        f'<span>🎯 Beta {registered_count}/{max_slots}</span>'
+        f'<span>{remaining} chỗ trống</span></div>'
+        f'<div style="height:4px;background:rgba(255,215,0,0.1);border-radius:4px;overflow:hidden;">'
+        f'<div style="height:100%;width:{pct}%;background:linear-gradient(90deg,#FFD700,#C9A84C);border-radius:4px;transition:width 0.5s;"></div></div>'
+        f'</div>'
         '<div class="login-box">',
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="step-badge">Bước 1/2</div>', unsafe_allow_html=True)
-    with st.form("login_form"):
-        username = st.text_input("Tên đăng nhập", placeholder="Nhập username...")
-        password = st.text_input("Mật khẩu", type="password", placeholder="Nhập password...")
-        submitted = st.form_submit_button("🔐 Đăng nhập", width='stretch')
-        if submitted:
-            if kiem_tra_dang_nhap(username, password):
-                st.session_state.password_ok = True
-                st.session_state.username = username
-                st.session_state.ma_otp = tao_ma_otp()
-                st.rerun()
-            else:
-                st.error("Sai tên đăng nhập hoặc mật khẩu!")
+    tab_log, tab_reg = st.tabs(["🔐 Đăng nhập", "📝 Đăng ký Beta"])
+    with tab_log:
+        st.markdown('<div class="step-badge">Bước 1/2</div>', unsafe_allow_html=True)
+        with st.form("login_form"):
+            username = st.text_input("Tên đăng nhập", placeholder="Nhập username...")
+            password = st.text_input("Mật khẩu", type="password", placeholder="Nhập password...")
+            submitted = st.form_submit_button("🔐 Đăng nhập", width='stretch')
+            if submitted:
+                ok = kiem_tra_dang_nhap(username, password) or verify_user(username, password)
+                if ok:
+                    st.session_state.password_ok = True
+                    st.session_state.username = username
+                    st.session_state.ma_otp = tao_ma_otp()
+                    st.rerun()
+                else:
+                    st.error("Sai tên đăng nhập hoặc mật khẩu!")
+    with tab_reg:
+        st.markdown(f'<div class="step-badge">🎯 Còn {remaining} suất</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<p style="color:#8892B0;font-size:0.85rem;">'
+            'Đăng ký thành viên Beta — 100 người đầu tiên nhận huy hiệu <b style="color:#FFD700;">Founding Member</b>'
+            ' và ưu đãi Premium vĩnh viễn.</p>',
+            unsafe_allow_html=True,
+        )
+        if remaining <= 0:
+            st.warning("Beta đã đầy (100/100). Cảm ơn bạn đã quan tâm!")
+        else:
+            with st.form("reg_form"):
+                reg_user = st.text_input("Chọn tên đăng nhập", placeholder="VD: nguyenvana")
+                reg_pass = st.text_input("Chọn mật khẩu", type="password", placeholder="Ít nhất 6 ký tự")
+                reg_ok = st.form_submit_button("🎯 Đăng ký Beta", width='stretch')
+                if reg_ok:
+                    if len(reg_user) < 3:
+                        st.error("Tên đăng nhập ít nhất 3 ký tự")
+                    elif len(reg_pass) < 6:
+                        st.error("Mật khẩu ít nhất 6 ký tự")
+                    else:
+                        success, slot = register_beta_user(reg_user, reg_pass)
+                        if success:
+                            st.session_state.password_ok = True
+                            st.session_state.username = reg_user
+                            st.session_state.ma_otp = tao_ma_otp()
+                            st.session_state.slot_beta = slot
+                            st.rerun()
+                        else:
+                            st.error(f"Đăng ký thất bại (tên đã tồn tại hoặc beta đã đầy). Còn {remaining} chỗ.")
     st.markdown("</div></div>", unsafe_allow_html=True)
 
 def hien_thi_otp():
@@ -215,6 +258,12 @@ def hien_thi_otp():
             if ma_nhap == st.session_state.ma_otp:
                 st.session_state.authenticated = True
                 username = st.session_state.get("username", "unknown")
+                if "slot_beta" not in st.session_state:
+                    success, slot = register_beta_user(username, "")
+                    if success:
+                        st.session_state.slot_beta = slot
+                    else:
+                        st.session_state.slot_beta = 0
                 ensure_user(username)
                 saved = load_state(username)
                 for k, v in saved.items():
@@ -439,6 +488,27 @@ with sidebar:
             st.rerun()
 
     st.markdown("---")
+    username = st.session_state.get("username", "")
+    if username and is_founding_member(username):
+        slot = st.session_state.get("slot_beta", 0)
+        st.markdown(
+            f'<div style="background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(201,168,76,0.03));'
+            f'border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:0.6rem 1rem;text-align:center;">'
+            f'<span style="font-size:0.6rem;color:#8E8E9A;text-transform:uppercase;letter-spacing:1px;">Thành viên</span><br>'
+            f'<span style="font-size:1.1rem;">👑 <b style="color:#FFD700;">Founding Member</b></span><br>'
+            f'<span style="font-size:0.7rem;color:#C9A84C;">#{slot}/100</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    elif username:
+        reg_count, max_slots = get_beta_progress()
+        st.markdown(
+            f'<div style="background:rgba(255,215,0,0.03);border:1px solid rgba(255,215,0,0.08);'
+            f'border-radius:12px;padding:0.4rem 1rem;text-align:center;">'
+            f'<span style="font-size:0.7rem;color:#8E8E9A;">Beta <b style="color:#FFD700;">{reg_count}/{max_slots}</b></span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
     if st.button("🚪 Đăng xuất", width='stretch'):
         st.session_state.authenticated = False
         st.rerun()
