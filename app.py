@@ -6,6 +6,8 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 
+_T0 = datetime.now()
+
 from backend.risk_profile import (
     CAU_HOI_KHAO_SAT,
     LOAI_NHA_DAU_TU,
@@ -34,6 +36,7 @@ from backend.calculations import (
     tinh_tuong_quan,
 )
 from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX, reset_password
+_T1 = datetime.now(); print(f"[TRACE] backend imports: {(_T1-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
 
 st.set_page_config(
     page_title="Robo-Advisor AI - Đầu tư thông minh",
@@ -41,6 +44,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+_T2 = datetime.now(); print(f"[TRACE] set_page_config: {(_T2-_T1).total_seconds():.3f}s", file=__import__('sys').stderr)
 
 import random
 import json
@@ -49,6 +53,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import streamlit.components.v1 as components
 import sys, traceback
+_T3 = datetime.now(); print(f"[TRACE] stdlib/dotenv: {(_T3-_T2).total_seconds():.3f}s", file=__import__('sys').stderr)
 try:
     from backend.data_loader import DOCS, load_all
 except Exception:
@@ -56,14 +61,16 @@ except Exception:
     print("ERROR importing backend.data_loader:", file=sys.stderr)
     traceback.print_exc()
     print("=" * 60, file=sys.stderr)
-    # Degrade gracefully: provide empty fallbacks
     DOCS = {}
     def load_all():
         pass
+_T4 = datetime.now(); print(f"[TRACE] data_loader import: {(_T4-_T3).total_seconds():.3f}s", file=__import__('sys').stderr)
 
 @st.cache_data(ttl=3600, show_spinner="Đang tải dữ liệu thị trường...")
 def _khoi_tao_dulieu():
+    print("[TRACE] _khoi_tao_dulieu called", file=__import__('sys').stderr)
     load_all()
+    print("[TRACE] _khoi_tao_dulieu done", file=__import__('sys').stderr)
     return True
 
 if "authenticated" not in st.session_state:
@@ -332,10 +339,13 @@ if not st.session_state.authenticated:
         hien_thi_login()
     else:
         hien_thi_otp()
+    _T5 = datetime.now(); print(f"[TRACE] login rendered: {(_T5-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
     st.stop()
 
 
+_T6 = datetime.now(); print(f"[TRACE] past login, calling _khoi_tao_dulieu: {(_T6-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
 _khoi_tao_dulieu()
+_T7 = datetime.now(); print(f"[TRACE] _khoi_tao_dulieu returned: {(_T7-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
 
 
 @st.cache_data(show_spinner=False)
