@@ -5099,6 +5099,214 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần giá thật 6T để vẽ Q-Q plot.")
 
         st.write("---")
+        st.write("## 🌍 Quét toàn thị trường — Top Movers & Volume Leaders")
+        _all_vn_stocks = ["VCB", "FPT", "HPG", "VNM", "MWG", "MBB", "VIC", "CTG", "VHM", "BID",
+                          "TCB", "VPB", "SSI", "PLX", "GAS", "MSN", "SAB", "NVL", "POW", "HDB",
+                          "TPB", "STB", "EIB", "SHB", "VIB", "ACB", "BCM", "VRE", "KDH", "DXG",
+                          "PDR", "NLG", "IJC", "PC1", "REE", "PNJ", "VJC", "VCI", "HCM", "DCM",
+                          "DPM", "GVR", "PVD", "PVS", "BSR", "PVT", "BWE", "TCH", "DIG", "CII"]
+        @st.cache_data(ttl=1800, show_spinner="📡 Quét toàn thị trường...")
+        def _scan_market_stocks(symbols_tuple):
+            import requests as _rq_s
+            out = []
+            for sym in symbols_tuple:
+                try:
+                    r = _rq_s.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.VN",
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                    if r.status_code == 200:
+                        data = r.json()
+                        result = data.get("chart", {}).get("result", [{}])[0]
+                        meta = result.get("meta", {})
+                        closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                        volumes = result.get("indicators", {}).get("quote", [{}])[0].get("volume", [])
+                        if closes and len(closes) > 5:
+                            cur = float(meta.get("regularMarketPrice", closes[-1] or 0))
+                            prev = float(closes[-2]) if len(closes) > 1 and closes[-2] else cur
+                            chg_pct = (cur / prev - 1) * 100 if prev > 0 else 0
+                            ret_3m = (cur / float(closes[-min(66, len(closes))]) - 1) * 100 if len(closes) > 5 else 0
+                            vol_today = volumes[-1] if volumes and volumes[-1] else 0
+                            avg_vol_20 = float(np.mean([v for v in volumes[-20:] if v])) if len(volumes) >= 5 else 0
+                            vol_ratio = vol_today / avg_vol_20 if avg_vol_20 > 0 else 0
+                            out.append({"ma": sym, "ten": meta.get("longName", sym)[:30],
+                                "nganh": meta.get("industry", "Khác") or "Khác",
+                                "gia": cur, "thay_doi": chg_pct, "ret_3m": ret_3m,
+                                "vol": vol_today, "vol_ratio": vol_ratio, "von_hoa": meta.get("marketCap", 0)})
+                except Exception:
+                    continue
+            return out
+        with st.spinner(f"📡 Đang quét {len(_all_vn_stocks)} mã toàn thị trường..."):
+            market_data = _scan_market_stocks(tuple(_all_vn_stocks))
+        if market_data and len(market_data) >= 5:
+            df_mkt = pd.DataFrame(market_data)
+            st.caption(f"📊 Quét {len(market_data)}/{len(_all_vn_stocks)} mã thành công từ yfinance")
+            mv1, mv2 = st.columns(2)
+            with mv1:
+                st.write("**🚀 Top 10 tăng mạnh nhất hôm nay:**")
+                top_up = df_mkt.nlargest(10, "thay_doi")[["ma", "ten", "gia", "thay_doi", "vol_ratio"]]
+                top_up.columns = ["Mã", "Tên", "Giá", "% Thay đổi", "Vol vs TB20D"]
+                st.dataframe(top_up, use_container_width=True, hide_index=True)
+            with mv2:
+                st.write("**💀 Top 10 giảm mạnh nhất hôm nay:**")
+                top_dn = df_mkt.nsmallest(10, "thay_doi")[["ma", "ten", "gia", "thay_doi", "vol_ratio"]]
+                top_dn.columns = ["Mã", "Tên", "Giá", "% Thay đổi", "Vol vs TB20D"]
+                st.dataframe(top_dn, use_container_width=True, hide_index=True)
+            mv3, mv4 = st.columns(2)
+            with mv3:
+                st.write("**📊 Top 10 Volume đột biến (Vol > 2x TB20D):**")
+                hot_vol = df_mkt[df_mkt["vol_ratio"] > 1].nlargest(10, "vol_ratio")[["ma", "ten", "vol", "vol_ratio", "thay_doi"]]
+                hot_vol.columns = ["Mã", "Tên", "Volume hôm nay", "Vol/TB20D", "% Thay đổi"]
+                st.dataframe(hot_vol, use_container_width=True, hide_index=True)
+            with mv4:
+                st.write("**📈 Top 10 Return 3 tháng cao nhất:**")
+                top_3m = df_mkt.nlargest(10, "ret_3m")[["ma", "ten", "gia", "ret_3m", "thay_doi"]]
+                top_3m.columns = ["Mã", "Tên", "Giá hiện tại", "Return 3M %", "% Hôm nay"]
+                st.dataframe(top_3m, use_container_width=True, hide_index=True)
+            st.caption("📊 Tất cả dữ liệu từ yfinance chart API (giá thật real-time). Phân tích toàn thị trường giúp nhận diện cơ hội đầu tư mới.")
+        else:
+            st.info("⚠️ Không quét được dữ liệu thị trường. Thử lại sau.")
+
+        st.write("---")
+        st.write("## 🔍 Stock Screener — Quét mã theo tiêu chí đầu tư")
+        if market_data and len(market_data) >= 5:
+            sc1, sc2, sc3 = st.columns(3)
+            with sc1:
+                min_ret_3m = st.number_input("Return 3M tối thiểu (%)", value=-100.0, step=5.0, key="scr_ret")
+                max_pe = st.number_input("P/E tối đa", value=30.0, step=1.0, key="scr_pe")
+            with sc2:
+                min_vol_ratio = st.number_input("Volume/TB20D tối thiểu", value=0.5, step=0.1, key="scr_vol")
+                max_change = st.number_input("Thay đổi hôm nay max (%)", value=10.0, step=0.5, key="scr_chg")
+            with sc3:
+                sort_by = st.selectbox("Sắp xếp theo", ["ret_3m", "thay_doi", "vol_ratio", "von_hoa"], key="scr_sort")
+                ascending = st.checkbox("Tăng dần", value=False, key="scr_asc")
+            df_scr = df_mkt[(df_mkt["ret_3m"] >= min_ret_3m) &
+                            (df_mkt["vol_ratio"] >= min_vol_ratio) &
+                            (df_mkt["thay_doi"] <= max_change)].sort_values(sort_by, ascending=ascending)
+            st.write(f"**Tìm thấy {len(df_scr)} mã thỏa mãn:**")
+            st.dataframe(df_scr[["ma", "ten", "gia", "thay_doi", "ret_3m", "vol_ratio"]].head(20),
+                use_container_width=True, hide_index=True)
+            st.caption("📊 Screener dùng dữ liệu thật yfinance. Tùy chỉnh tiêu chí để tìm mã phù hợp chiến lược.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường để screener.")
+
+        st.write("---")
+        st.write("## 🌡️ Sector Performance Heatmap — Toàn thị trường")
+        if market_data and len(market_data) >= 5:
+            sec_perf = df_mkt.groupby("nganh").agg(
+                so_ma=("ma", "count"),
+                ret_tb=("thay_doi", "mean"),
+                ret_3m_tb=("ret_3m", "mean"),
+                vol_ratio_tb=("vol_ratio", "mean"),
+                max_thay_doi=("thay_doi", "max"),
+                min_thay_doi=("thay_doi", "min"),
+            ).reset_index()
+            sec_perf = sec_perf[sec_perf["so_ma"] >= 1].sort_values("ret_tb", ascending=False)
+            st.dataframe(sec_perf.round(2), use_container_width=True, hide_index=True)
+            st.caption(f"📊 Phân tích {len(market_data)} mã theo ngành từ yfinance. Ngành nào return TB cao nhất = xu hướng nóng. Return 3M TB cho thấy trend dài hơn.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 📊 Phân phối P/E & Market Valuation Dashboard")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=3600)
+            def _get_pe_distribution(symbols):
+                import yfinance as _yf_pe
+                pes = []
+                for s in symbols:
+                    try:
+                        info = _yf_pe.Ticker(s + ".VN").info
+                        pe = info.get("trailingPE")
+                        pb = info.get("priceToBook")
+                        roe = info.get("returnOnEquity")
+                        if pe and pe > 0:
+                            pes.append({"ma": s, "pe": pe, "pb": pb or 0, "roe": roe or 0})
+                    except Exception:
+                        continue
+                return pes
+            with st.spinner(f"📡 Lấy P/E/P/B/ROE cho {len(df_mkt['ma'].tolist())} mã..."):
+                pe_data = _get_pe_distribution(tuple(df_mkt["ma"].tolist()))
+            if pe_data:
+                df_pe = pd.DataFrame(pe_data)
+                st.write(f"**📊 Định giá thị trường từ {len(df_pe)} mã:**")
+                vd1, vd2, vd3, vd4, vd5 = st.columns(5)
+                vd1.metric("📊 P/E TB", f"{df_pe['pe'].mean():.1f}", help="Trung bình P/E toàn thị trường")
+                vd2.metric("📊 P/E Median", f"{df_pe['pe'].median():.1f}", help="P/E trung vị (ít bị ảnh hưởng bởi outlier)")
+                vd3.metric("📊 P/B TB", f"{df_pe['pb'].mean():.2f}")
+                vd4.metric("📊 ROE TB", f"{df_pe['roe'].mean()*100:.1f}%")
+                vd5.metric("📊 Số mã PE>20", f"{(df_pe['pe']>20).sum()}/{len(df_pe)}",
+                    help="Mã có P/E > 20 (đắt)")
+                st.write("**Top 10 P/E thấp nhất (rẻ nhất):**")
+                cheap = df_pe.nsmallest(10, "pe")[["ma", "pe", "pb", "roe"]]
+                cheap["roe"] = (cheap["roe"] * 100).round(1)
+                cheap.columns = ["Mã", "P/E", "P/B", "ROE %"]
+                st.dataframe(cheap, use_container_width=True, hide_index=True)
+                st.write("**Top 10 P/E cao nhất (đắt nhất):**")
+                exp = df_pe.nlargest(10, "pe")[["ma", "pe", "pb", "roe"]]
+                exp["roe"] = (exp["roe"] * 100).round(1)
+                exp.columns = ["Mã", "P/E", "P/B", "ROE %"]
+                st.dataframe(exp, use_container_width=True, hide_index=True)
+                st.caption(f"📊 Tính từ {len(df_pe)} mã có P/E > 0 từ yfinance.info. P/E thấp + ROE cao = cổ phiếu giá trị. P/E cao + ROE thấp = cổ phiếu tăng trưởng đắt.")
+            else:
+                st.info("⚠️ Không lấy được P/E từ yfinance.info.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 💎 Dividend Champions — Top cổ tức toàn thị trường")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=3600)
+            def _get_dividend_champions(symbols):
+                import yfinance as _yf_dv
+                rows = []
+                for s in symbols:
+                    try:
+                        info = _yf_dv.Ticker(s + ".VN").info
+                        dy = info.get("dividendYield")
+                        mcap = info.get("marketCap")
+                        price = info.get("currentPrice") or info.get("regularMarketPrice")
+                        if dy and dy > 0 and price and mcap:
+                            rows.append({"ma": s, "ten": info.get("longName", s)[:30],
+                                "gia": float(price), "dy": float(dy), "von_hoa": float(mcap)})
+                    except Exception:
+                        continue
+                return rows
+            with st.spinner(f"📡 Lấy dividend yield cho {len(df_mkt['ma'].tolist())} mã..."):
+                div_data = _get_dividend_champions(tuple(df_mkt["ma"].tolist()))
+            if div_data:
+                df_div = pd.DataFrame(div_data).sort_values("dy", ascending=False)
+                st.write(f"**💰 Top cổ tức toàn thị trường ({len(df_div)} mã có trả cổ tức):**")
+                st.dataframe(df_div.head(20), use_container_width=True, hide_index=True)
+                top_div = df_div.iloc[0]
+                avg_dy = df_div["dy"].mean() * 100
+                st.caption(f"📊 Tính từ yfinance.info. Top: **{top_div['ma']}** = {top_div['dy']*100:.2f}%/năm. Cổ tức TB toàn thị trường: {avg_dy:.2f}%.")
+            else:
+                st.info("⚠️ Không lấy được dividend data.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 📊 Volume Distribution — Phân phối thanh khoản toàn thị trường")
+        if market_data and len(market_data) >= 5:
+            vold = df_mkt["vol_ratio"].dropna()
+            if len(vold) > 0:
+                vold1, vold2, vold3, vold4 = st.columns(4)
+                vold1.metric("📊 Vol Ratio TB", f"{vold.mean():.2f}x", help="TB volume hôm nay / TB 20 phiên")
+                vold2.metric("📊 Vol Ratio Median", f"{vold.median():.2f}x")
+                vold3.metric("🔥 Số mã Vol > 2x", f"{(vold>2).sum()}/{len(vold)}", help="Mã có volume đột biến > 2x TB")
+                vold4.metric("💀 Số mã Vol < 0.5x", f"{(vold<0.5).sum()}/{len(vold)}", help="Mã kém thanh khoản")
+                fig_vd = go.Figure()
+                fig_vd.add_trace(go.Histogram(x=vold, nbinsx=30, marker_color='#4FC3F7', opacity=0.7,
+                    name='Vol Ratio'))
+                fig_vd.add_vline(x=1.0, line_dash="dash", line_color='#FFD700', annotation_text="Bình thường (1x)")
+                fig_vd.update_layout(title="Phân phối Volume Ratio (Vol hôm nay / TB 20D)",
+                    xaxis_title="Vol Ratio", yaxis_title="Số mã",
+                    height=300, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_vd, use_container_width=True)
+                st.caption(f"📊 Phân tích {len(vold)} mã toàn thị trường từ yfinance. Vol>2x = mã được chú ý đặc biệt, Vol<0.5x = mã kém thanh khoản.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
