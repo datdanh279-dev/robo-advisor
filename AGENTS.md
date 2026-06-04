@@ -36,3 +36,19 @@ https://robo-advisor-jkp9byppflcdsrgapbm4vd.streamlit.app/
   - `streamlit>=1.50,<2`
 - `.streamlit/config.toml` KHÔNG để `address = "0.0.0.0"` (Cloud sẽ tự bind).
 - Push lên `main` → Streamlit Cloud auto‑redeploy ~1–3 phút.
+
+## Console noise (chỉ trên mạng công ty / ad-block)
+
+Nếu DevTools → Console có các lỗi dưới đây, **KHÔNG phải bug app** — chỉ là network bị chặn:
+
+- `cdn.segment.com/analytics.js` / `www.google-analytics.com/analytics.js` → đã được tắt bằng `[browser] gatherUsageStats = false` trong `.streamlit/config.toml`. Nếu vẫn còn, kiểm tra file `config.toml` đã push lên `main` chưa.
+- `translate.google.com/gen204` / `translate.googleapis.com/element/log` → Chrome auto‑offer dịch vì page chưa khai báo ngôn ngữ. Đã fix bằng `<meta http-equiv="Content-Language" content="vi">` trong `app.py` (ngay sau `set_page_config`).
+- `bufferedData-*.js:5 INITIAL -> (10, 0, ) -> ERROR` → state machine của Streamlit gửi Segment events fail do network block. Không ảnh hưởng render app.
+
+## React removeChild bug (đã fix)
+
+Nếu console có `NotFoundError: Failed to execute 'removeChild' on 'Node'` trong `routes-Bl4CT19H.js`:
+
+- Nguyên nhân: CSS block lớn (`.main-header`, `.metric-box`, …) bị re‑emit mỗi `st.rerun()` → React reconciliation vỡ.
+- Fix: tất cả `<style>` / `<link>` blocks được inject qua flag `session_state._main_css_injected` / `_login_css_injected`, đảm bảo **chỉ inject 1 lần / session**.
+- Ngoài ra: bỏ `#root { ... }` selector (đụng React root), đổi `header[data-testid="stHeader"] { display: none; }` thành `visibility: hidden; height: 0` (giữ node trong DOM).

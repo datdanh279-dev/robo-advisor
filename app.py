@@ -11,6 +11,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+st.markdown('<meta http-equiv="Content-Language" content="vi">', unsafe_allow_html=True)
+
 try:
     import pandas as pd
     import plotly.graph_objects as go
