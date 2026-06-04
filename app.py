@@ -450,9 +450,9 @@ if 'is_pro' not in st.session_state:
     st.session_state.is_pro = False
 
 try:
-    PASSWORD_PRO = st.secrets.get("PRO_PASSWORD", "DatSolocodoc2026")
+    PASSWORD_PRO = st.secrets.get("PRO_PASSWORD", "hdfkemr rmo8490hd")
 except Exception:
-    PASSWORD_PRO = "DatSolocodoc2026"
+    PASSWORD_PRO = "hdfkemr rmo8490hd"
 
 with st.sidebar:
     st.markdown("---")
@@ -730,9 +730,13 @@ with sidebar:
         st.session_state.trang_thai = "chat"
         st.rerun()
 
-    if st.button("📊 Phân tích chuyên sâu", width='stretch'):
-        st.session_state.trang_thai = "deep_analysis"
-        st.rerun()
+    if st.session_state.is_pro:
+        if st.button("📊 Phân tích chuyên sâu", width='stretch'):
+            st.session_state.trang_thai = "deep_analysis"
+            st.rerun()
+    else:
+        if st.button("🔒 Phân tích chuyên sâu (Gói PRO)", width='stretch', disabled=True):
+            pass
 
     st.markdown("---")
     if st.button("🔄 Cập nhật dữ liệu", width='stretch'):
@@ -1688,9 +1692,17 @@ elif st.session_state.trang_thai == "portfolio":
         st.info("Chưa có dữ liệu danh mục. Hãy cập nhật dữ liệu trước.")
 
 elif st.session_state.trang_thai == "deep_analysis":
-    _render_market()
-    _render_quoc_te()
-    _render_tonghop()
+    if st.session_state.is_pro:
+        _render_market()
+        _render_quoc_te()
+        _render_tonghop()
+    else:
+        st.markdown("## 🔒 Tính năng PRO")
+        st.warning("**Phân tích chuyên sâu** chỉ dành cho gói PRO. Vui lòng kích hoạt PRO trong Sidebar để sử dụng.")
+        st.info("👉 Mở Sidebar → 🔑 Kích hoạt Gói PRO → nhập mật khẩu → Enter")
+        if st.button("⬅️ Quay lại Dashboard", use_container_width=True):
+            st.session_state.trang_thai = "dashboard"
+            st.rerun()
 elif st.session_state.trang_thai == "dashboard":
     st.markdown('<p class="main-header">📊 Dashboard tổng quan</p>', unsafe_allow_html=True)
     st.markdown("---")
@@ -1892,6 +1904,16 @@ elif st.session_state.trang_thai == "chat":
                 st.rerun()
 
     with tab_expert:
+        if not st.session_state.is_pro:
+            st.markdown("## 🔒 Tính năng PRO")
+            st.warning("**Hội đồng 6 Chuyên gia** chỉ dành cho gói PRO. Vui lòng kích hoạt PRO trong Sidebar để sử dụng.")
+            st.info("👉 Mở Sidebar → 🔑 Kích hoạt Gói PRO → nhập mật khẩu → Enter")
+            st.markdown("---")
+            st.markdown("#### Tính năng sẽ mở khóa:")
+            st.markdown("- 🎯 Hỏi ý kiến **Warren Buffett, George Soros, Peter Lynch, Ray Dalio, Benjamin Graham, Charlie Munger**")
+            st.markdown("- 👑 **Chủ tịch Hội đồng** tổng hợp và đưa ra kết luận cuối cùng")
+            st.markdown("- 🧠 AI phân loại câu hỏi: Tiết kiệm / Tiêu chuẩn / Toàn diện")
+            st.stop()
         st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
         st.markdown(
             "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại** do AI đóng vai. "
