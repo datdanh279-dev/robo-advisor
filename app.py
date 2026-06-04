@@ -2521,9 +2521,9 @@ elif st.session_state.trang_thai == "portfolio":
         st.info("Chưa có dữ liệu danh mục. Hãy cập nhật dữ liệu trước.")
 
 elif st.session_state.trang_thai == "deep_analysis":
-    st.title("📊 Phân tích chuyên sâu danh mục")
-    st.caption("Chỉ số rủi ro–lợi nhuận nâng cao cho danh mục hiện tại.")
-    st.markdown("---")
+    st.write("# 📊 PHÂN TÍCH CHUYÊN SÂU DANH MỤC")
+    st.write("### Phiên bản v3.0 — Cập nhật 04/06/2026")
+    st.write("---")
 
     dm = DOCS.get("danh_muc", {}) or {}
     kpi = DOCS.get("kpi", {}) or {}
@@ -2532,28 +2532,28 @@ elif st.session_state.trang_thai == "deep_analysis":
     is_demo = False
     if not dm or tong_gt <= 0:
         is_demo = True
-        st.warning("📊 **Đang hiển thị danh mục mẫu (8 mã blue-chip VN)** — Vào **Sidebar → 🔄 Cập nhật dữ liệu** để dùng danh mục thực của anh.")
+        st.warning("📊 Đang hiển thị danh mục mẫu (8 mã blue-chip VN) — Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
         dm = {
-            "VCB": {"nganh": "Ngân hàng", "gia_thi_truong": 92000, "gia_von": 85000, "so_luong": 100, "von_hoa": 150000, "ty_trong_muc_tieu": 0.18},
-            "FPT": {"nganh": "Công nghệ", "gia_thi_truong": 145000, "gia_von": 120000, "so_luong": 50, "von_hoa": 110000, "ty_trong_muc_tieu": 0.15},
-            "HPG": {"nganh": "Thép", "gia_thi_truong": 27000, "gia_von": 30000, "so_luong": 500, "von_hoa": 80000, "ty_trong_muc_tieu": 0.12},
-            "VNM": {"nganh": "Thực phẩm", "gia_thi_truong": 68000, "gia_von": 72000, "so_luong": 200, "von_hoa": 140000, "ty_trong_muc_tieu": 0.14},
-            "MWG": {"nganh": "Bán lẻ", "gia_thi_truong": 48000, "gia_von": 55000, "so_luong": 300, "von_hoa": 70000, "ty_trong_muc_tieu": 0.10},
-            "MBB": {"nganh": "Ngân hàng", "gia_thi_truong": 24000, "gia_von": 22000, "so_luong": 800, "von_hoa": 95000, "ty_trong_muc_tieu": 0.12},
-            "VIC": {"nganh": "Bất động sản", "gia_thi_truong": 42000, "gia_von": 48000, "so_luong": 400, "von_hoa": 60000, "ty_trong_muc_tieu": 0.10},
-            "CTG": {"nganh": "Ngân hàng", "gia_thi_truong": 32000, "gia_von": 30000, "so_luong": 500, "von_hoa": 85000, "ty_trong_muc_tieu": 0.09},
+            "VCB": {"nganh": "Ngân hàng", "gia_thi_truong": 92000, "gia_von": 85000, "so_luong": 100},
+            "FPT": {"nganh": "Công nghệ", "gia_thi_truong": 145000, "gia_von": 120000, "so_luong": 50},
+            "HPG": {"nganh": "Thép", "gia_thi_truong": 27000, "gia_von": 30000, "so_luong": 500},
+            "VNM": {"nganh": "Thực phẩm", "gia_thi_truong": 68000, "gia_von": 72000, "so_luong": 200},
+            "MWG": {"nganh": "Bán lẻ", "gia_thi_truong": 48000, "gia_von": 55000, "so_luong": 300},
+            "MBB": {"nganh": "Ngân hàng", "gia_thi_truong": 24000, "gia_von": 22000, "so_luong": 800},
+            "VIC": {"nganh": "Bất động sản", "gia_thi_truong": 42000, "gia_von": 48000, "so_luong": 400},
+            "CTG": {"nganh": "Ngân hàng", "gia_thi_truong": 32000, "gia_von": 30000, "so_luong": 500},
         }
         kpi = {
-            "VCB": {"nganh": "Ngân hàng", "beta": 0.85, "roe": 0.21, "pe": 9.5, "lai_lo_pct": 0.082, "ty_trong_ht": 0.13, "ty_trong_mt": 0.18, "chenh_lech": 0.05, "upside": 15000, "var_1": 1200000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 85, "diem_ban": 30},
-            "FPT": {"nganh": "Công nghệ", "beta": 1.15, "roe": 0.25, "pe": 18.2, "lai_lo_pct": 0.21, "ty_trong_ht": 0.10, "ty_trong_mt": 0.15, "chenh_lech": 0.05, "upside": 25000, "var_1": 1500000, "ket_luan": "MUA MẠNH", "hanh_dong": "Giữ", "diem_mua": 92, "diem_ban": 25},
-            "HPG": {"nganh": "Thép", "beta": 1.35, "roe": 0.12, "pe": 12.0, "lai_lo_pct": -0.10, "ty_trong_ht": 0.18, "ty_trong_mt": 0.12, "chenh_lech": 0.06, "upside": 5000, "var_1": 1800000, "ket_luan": "GIỮ", "hanh_dong": "Quan sát", "diem_mua": 55, "diem_ban": 45},
-            "VNM": {"nganh": "Thực phẩm", "beta": 0.70, "roe": 0.27, "pe": 14.5, "lai_lo_pct": -0.056, "ty_trong_ht": 0.19, "ty_trong_mt": 0.14, "chenh_lech": 0.05, "upside": 8000, "var_1": 900000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 78, "diem_ban": 32},
-            "MWG": {"nganh": "Bán lẻ", "beta": 1.20, "roe": 0.15, "pe": 22.0, "lai_lo_pct": -0.127, "ty_trong_ht": 0.20, "ty_trong_mt": 0.10, "chenh_lech": 0.10, "upside": 6000, "var_1": 2000000, "ket_luan": "BÁN", "hanh_dong": "Giảm tỷ trọng", "diem_mua": 38, "diem_ban": 72},
-            "MBB": {"nganh": "Ngân hàng", "beta": 0.90, "roe": 0.23, "pe": 7.2, "lai_lo_pct": 0.091, "ty_trong_ht": 0.13, "ty_trong_mt": 0.12, "chenh_lech": 0.01, "upside": 3000, "var_1": 1100000, "ket_luan": "MUA MẠNH", "hanh_dong": "Giữ", "diem_mua": 88, "diem_ban": 22},
-            "VIC": {"nganh": "Bất động sản", "beta": 1.10, "roe": 0.08, "pe": 35.0, "lai_lo_pct": -0.125, "ty_trong_ht": 0.05, "ty_trong_mt": 0.10, "chenh_lech": 0.05, "upside": 5000, "var_1": 2500000, "ket_luan": "GIỮ", "hanh_dong": "Quan sát", "diem_mua": 50, "diem_ban": 50},
-            "CTG": {"nganh": "Ngân hàng", "beta": 0.95, "roe": 0.18, "pe": 8.5, "lai_lo_pct": 0.067, "ty_trong_ht": 0.02, "ty_trong_mt": 0.09, "chenh_lech": 0.07, "upside": 4000, "var_1": 1000000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 75, "diem_ban": 35},
+            "VCB": {"nganh": "Ngân hàng", "beta": 0.85, "roe": 0.21},
+            "FPT": {"nganh": "Công nghệ", "beta": 1.15, "roe": 0.25},
+            "HPG": {"nganh": "Thép", "beta": 1.35, "roe": 0.12},
+            "VNM": {"nganh": "Thực phẩm", "beta": 0.70, "roe": 0.27},
+            "MWG": {"nganh": "Bán lẻ", "beta": 1.20, "roe": 0.15},
+            "MBB": {"nganh": "Ngân hàng", "beta": 0.90, "roe": 0.23},
+            "VIC": {"nganh": "Bất động sản", "beta": 1.10, "roe": 0.08},
+            "CTG": {"nganh": "Ngân hàng", "beta": 0.95, "roe": 0.18},
         }
-        perf = {"Rf": 0.045, "Rm": 0.082, "Beta": 1.02, "Rp": 0.107, "phi_gd": 0.0015, "thue": 0.001}
+        perf = {"Rf": 0.045, "Rm": 0.082, "Beta": 1.02, "Rp": 0.107}
         tong_gt, tong_von, tong_lai_lo, return_pct = tinh_return_danh_muc(dm)
 
     rf = float(perf.get("Rf", 0.045))
@@ -2580,7 +2580,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         n_ma += 1
 
     if not weights:
-        st.error("Không thể tính toán — dữ liệu danh mục không hợp lệ.")
+        st.error("Khong the tinh toan — du lieu danh muc khong hop le.")
     else:
         port_beta = sum(betas)
         port_return = rp
@@ -2597,107 +2597,102 @@ elif st.session_state.trang_thai == "deep_analysis":
         top_ma = max(dm.items(), key=lambda kv: kv[1].get("gia_thi_truong", 0) * kv[1].get("so_luong", 0))[0] if dm else ""
 
         if diversification > 0.7 and nganh_count >= 4 and port_beta < 1.2:
-            risk_grade = ("A", "Rất tốt — đa dạng hóa cao")
+            risk_grade = ("A", "Rat tot — da dang hoa cao")
         elif diversification > 0.5 and nganh_count >= 3:
-            risk_grade = ("B", "Tốt — cân bằng")
+            risk_grade = ("B", "Tot — can bang")
         elif diversification > 0.3:
-            risk_grade = ("C", "Trung bình — cần đa dạng thêm")
+            risk_grade = ("C", "Trung binh — can da dang them")
         else:
-            risk_grade = ("D", "Yếu — tập trung quá mức")
+            risk_grade = ("D", "Yeu — tap trung qua muc")
 
         var_95 = vol_proxy * 1.645
         cvar_95 = vol_proxy * 2.06
         max_dd_uoc = vol_proxy * 2.5
         expected_1y = port_return + 0.5 * vol_proxy
 
-        st.subheader("💎 Chỉ số Rủi ro — Lợi nhuận")
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("📊 Sharpe Ratio", f"{sharpe:.2f}", help=">1: Tốt | >2: Rất tốt")
-        k2.metric("📈 Alpha (Jensen)", f"{alpha*100:+.2f}%", help=">0: Vượt thị trường")
-        k3.metric("⚡ Beta DM", f"{port_beta:.2f}", help=">1: Lắc mạnh hơn thị trường")
-        k4.metric("🎯 Điểm rủi ro", risk_grade[0], help=risk_grade[1])
+        st.write("## 💎 Chỉ số Rủi ro — Lợi nhuận (12 chỉ số)")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("📊 Sharpe Ratio", f"{sharpe:.2f}")
+        c2.metric("📈 Alpha (Jensen)", f"{alpha*100:+.2f}%")
+        c3.metric("⚡ Beta DM", f"{port_beta:.2f}")
+        c4.metric("🎯 Điểm rủi ro", f"{risk_grade[0]} — {risk_grade[1]}")
 
-        k5, k6, k7, k8 = st.columns(4)
-        k5.metric("📉 Volatility (năm)", f"{vol_proxy*100:.1f}%", help="Độ lệch chuẩn danh mục")
-        k6.metric("🔴 VaR 95% (1 ngày)", f"{var_95*100:.2f}%", help="Mất tối đa/ngày ở 95% độ tin cậy", delta_color="inverse")
-        k7.metric("🔴 CVaR 95%", f"{cvar_95*100:.2f}%", help="Mất TB khi vượt VaR", delta_color="inverse")
-        k8.metric("📊 Max Drawdown", f"{max_dd_uoc*100:.1f}%", help="Kịch bản xấu nhất", delta_color="inverse")
+        c5, c6, c7, c8 = st.columns(4)
+        c5.metric("📉 Volatility (năm)", f"{vol_proxy*100:.1f}%")
+        c6.metric("🔴 VaR 95% (1 ngày)", f"{var_95*100:.2f}%", delta_color="inverse")
+        c7.metric("🔴 CVaR 95%", f"{cvar_95*100:.2f}%", delta_color="inverse")
+        c8.metric("📊 Max Drawdown", f"{max_dd_uoc*100:.1f}%", delta_color="inverse")
 
-        k9, k10, k11, k12 = st.columns(4)
-        k9.metric("📐 Treynor", f"{treynor:.4f}", help="Return trên mỗi đơn vị β")
-        k10.metric("📐 Info Ratio", f"{info_ratio:.2f}", help="α/σ")
-        k11.metric("🌐 Đa dạng hóa", f"{diversification*100:.0f}%", help="HHI-based")
-        k12.metric("🏆 Top 1 tỷ trọng", f"{top_w*100:.1f}%", help=top_ma)
+        c9, c10, c11, c12 = st.columns(4)
+        c9.metric("📐 Treynor", f"{treynor:.4f}")
+        c10.metric("📐 Info Ratio", f"{info_ratio:.2f}")
+        c11.metric("🌐 Đa dạng hóa", f"{diversification*100:.0f}%")
+        c12.metric(f"🏆 Top 1 ({top_ma})", f"{top_w*100:.1f}%")
 
-        st.markdown("---")
-        c_a, c_b = st.columns(2)
-        with c_a:
-            st.subheader("🥧 Phân bổ ngành")
-            if sector_exp:
-                sec_sorted = sorted(sector_exp.items(), key=lambda x: x[1], reverse=True)
-                fig_sec = go.Figure(data=[go.Pie(
-                    labels=[s[0] for s in sec_sorted],
-                    values=[s[1] * 100 for s in sec_sorted],
-                    hole=0.4, textinfo="label+percent"
-                )])
-                fig_sec.update_layout(height=380, showlegend=True,
-                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
-                st.plotly_chart(fig_sec, use_container_width=True)
-            else:
-                st.info("Chưa có dữ liệu ngành.")
-        with c_b:
-            st.subheader("📊 Tỷ trọng & Beta từng mã")
-            rows_chi = []
-            for ma, info in dm.items():
-                gia_tt = info.get("gia_thi_truong", 0)
-                sl = info.get("so_luong", 0)
-                v = gia_tt * sl
-                if v <= 0 or tong_gt <= 0: continue
-                ki = kpi.get(ma, {})
-                rows_chi.append({
-                    "Mã": ma,
-                    "Ngành": ki.get("nganh", "") or "-",
-                    "Tỷ trọng %": f"{v/tong_gt*100:.1f}",
-                    "Beta": f"{float(ki.get('beta', 1.0) or 1.0):.2f}",
-                    "ROE %": f"{float(ki.get('roe', 0) or 0)*100:.1f}",
-                    "Lãi/Lỗ %": f"{(gia_tt - info.get('gia_von', 0))/max(info.get('gia_von', 1), 1)*100:+.1f}",
-                })
-            if rows_chi:
-                df_chi = pd.DataFrame(rows_chi)
-                st.dataframe(df_chi, use_container_width=True, hide_index=True)
+        st.write("---")
+        st.write("## 🥧 Phân bổ ngành")
+        if sector_exp:
+            sec_sorted = sorted(sector_exp.items(), key=lambda x: x[1], reverse=True)
+            sec_labels = [f"{s[0]} ({s[1]*100:.1f}%)" for s in sec_sorted]
+            sec_values = [s[1] * 100 for s in sec_sorted]
+            fig_sec = go.Figure(data=[go.Pie(
+                labels=sec_labels, values=sec_values, hole=0.4
+            )])
+            fig_sec.update_layout(height=380, showlegend=True,
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_sec, use_container_width=True)
 
-        st.markdown("---")
-        st.subheader("🔮 Kịch bản dự phóng 1 năm")
-        s1, s2, s3 = st.columns(3)
-        s1.metric("🐂 Tích cực (+1σ)", f"{tong_gt*(1+expected_1y+vol_proxy):,.0f} ₫", f"Lợi nhuận {(expected_1y+vol_proxy)*100:+.1f}%")
-        s2.metric("😐 Cơ sở (kỳ vọng)", f"{tong_gt*(1+port_return):,.0f} ₫", f"Lợi nhuận {port_return*100:+.1f}%")
-        s3.metric("🐻 Tiêu cực (−1σ)", f"{tong_gt*max(0.01, 1+port_return-vol_proxy):,.0f} ₫", f"Lợi nhuận {(port_return-vol_proxy)*100:+.1f}%")
+        st.write("## 📊 Tỷ trọng & Beta từng mã")
+        rows_chi = []
+        for ma, info in dm.items():
+            gia_tt = info.get("gia_thi_truong", 0)
+            sl = info.get("so_luong", 0)
+            v = gia_tt * sl
+            if v <= 0 or tong_gt <= 0: continue
+            ki = kpi.get(ma, {})
+            rows_chi.append({
+                "Mã": ma,
+                "Ngành": ki.get("nganh", "") or "-",
+                "Tỷ trọng %": round(v/tong_gt*100, 1),
+                "Beta": round(float(ki.get('beta', 1.0) or 1.0), 2),
+                "ROE %": round(float(ki.get('roe', 0) or 0)*100, 1),
+                "Lãi/Lỗ %": round((gia_tt - info.get('gia_von', 0))/max(info.get('gia_von', 1), 1)*100, 1),
+            })
+        if rows_chi:
+            df_chi = pd.DataFrame(rows_chi)
+            st.dataframe(df_chi, use_container_width=True, hide_index=True)
 
-        st.markdown("---")
-        st.subheader("💡 Khuyến nghị từ hệ thống")
+        st.write("---")
+        st.write("## 🔮 Kịch bản dự phóng 1 năm")
+        sc1, sc2, sc3 = st.columns(3)
+        sc1.metric("🐂 Tích cực (+1σ)", f"{tong_gt*(1+expected_1y+vol_proxy):,.0f} ₫", f"{(expected_1y+vol_proxy)*100:+.1f}%")
+        sc2.metric("😐 Cơ sở (kỳ vọng)", f"{tong_gt*(1+port_return):,.0f} ₫", f"{port_return*100:+.1f}%")
+        sc3.metric("🐻 Tiêu cực (−1σ)", f"{tong_gt*max(0.01, 1+port_return-vol_proxy):,.0f} ₫", f"{(port_return-vol_proxy)*100:+.1f}%")
+
+        st.write("---")
+        st.write("## 💡 Khuyến nghị từ hệ thống")
         recs = []
         if top_w > 0.4:
             recs.append(f"⚠️ **{top_ma}** chiếm {top_w*100:.0f}% danh mục — quá tập trung. Cân nhắc giảm tỷ trọng.")
         if port_beta > 1.3:
-            recs.append(f"⚠️ **Beta danh mục = {port_beta:.2f}** — lắc lư mạnh hơn thị trường. Cân nhắc thêm mã phòng thủ (beta < 0.8).")
+            recs.append(f"⚠️ **Beta = {port_beta:.2f}** lắc lư mạnh hơn thị trường. Thêm mã phòng thủ (beta < 0.8).")
         if sharpe < 0.5:
-            recs.append(f"⚠️ **Sharpe = {sharpe:.2f}** thấp — lợi nhuận chưa tương xứng rủi ro. Xem xét cắt mã yếu.")
+            recs.append(f"⚠️ **Sharpe = {sharpe:.2f}** thấp — lợi nhuận chưa tương xứng rủi ro.")
         if alpha > 0:
-            recs.append(f"✅ **Alpha = {alpha*100:+.2f}%** — đang vượt kỳ vọng CAPM. Duy trì chiến lược.")
+            recs.append(f"✅ **Alpha = {alpha*100:+.2f}%** vượt kỳ vọng CAPM. Duy trì chiến lược.")
         if nganh_count < 3:
-            recs.append(f"⚠️ Chỉ có **{nganh_count} ngành** — nên đa dạng thêm để giảm rủi ro tập trung ngành.")
+            recs.append(f"⚠️ Chỉ **{nganh_count} ngành** — nên đa dạng thêm.")
         if diversification > 0.7:
-            recs.append(f"✅ **Đa dạng hóa = {diversification*100:.0f}%** — rất tốt. Danh mục cân bằng.")
+            recs.append(f"✅ **Đa dạng hóa = {diversification*100:.0f}%** — danh mục cân bằng.")
         if not recs:
-            recs.append("✅ Danh mục hiện tại đạt các tiêu chí rủi ro–lợi nhuận cơ bản.")
+            recs.append("✅ Danh mục đạt các tiêu chí rủi ro–lợi nhuận cơ bản.")
         for r in recs:
-            st.markdown(f"- {r}")
+            st.write(f"- {r}")
 
-        st.markdown("---")
+        st.write("---")
+        st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
-            st.info("📐 **Lưu ý:** Đang hiển thị danh mục mẫu để demo. Vào **Sidebar → 🔄 Cập nhật dữ liệu** để dùng danh mục thực.")
-        else:
-            st.caption("📐 *Volatility/Var/CVaR/MaxDD là ước lượng CAPM (~18% σ/năm). Số liệu chính xác 100% cần dữ liệu lịch sử từ vnstock/CAFEF.*")
+            st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
 elif st.session_state.trang_thai == "dashboard":
     st.markdown('<div class="main-header" style="font-size:1.8rem;font-weight:700;color:#FFD700;margin:0.5rem 0;">📊 Dashboard tổng quan</div>', unsafe_allow_html=True)
     st.markdown("---")
