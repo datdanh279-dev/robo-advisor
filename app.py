@@ -939,7 +939,22 @@ def _render_quoc_te():
     st.markdown("### Chỉ số quốc tế")
     tt_qt = lay_thong_tin_quoc_te()
     if not tt_qt:
-        tt_qt = {"S&P 500": {"mieu_ta": "500 công ty lớn nhất Mỹ", "gia_hien_tai": 5430, "thay_doi_1nam": 0.12},"Dow Jones": {"mieu_ta": "30 công ty công nghiệp Mỹ", "gia_hien_tai": 38800, "thay_doi_1nam": 0.08},"Nasdaq": {"mieu_ta": "Chỉ số công nghệ Mỹ", "gia_hien_tai": 17600, "thay_doi_1nam": 0.18},"Nikkei 225": {"mieu_ta": "Chỉ số chính Nhật Bản", "gia_hien_tai": 38500, "thay_doi_1nam": 0.14},"HSI": {"mieu_ta": "Hang Seng - Hong Kong", "gia_hien_tai": 17800, "thay_doi_1nam": -0.05},"Vàng/XAU": {"mieu_ta": "Giá vàng thế giới (USD/oz)", "gia_hien_tai": 2350, "thay_doi_1nam": 0.22},"Dầu WTI": {"mieu_ta": "Dầu thô WTI (USD/thùng)", "gia_hien_tai": 78, "thay_doi_1nam": 0.06},"Bitcoin": {"mieu_ta": "Tiền điện tử lớn nhất", "gia_hien_tai": 67000, "thay_doi_1nam": 0.85},"Ethereum": {"mieu_ta": "Tiền điện tử lớn thứ 2", "gia_hien_tai": 3500, "thay_doi_1nam": 0.65}}
+        import yfinance as _yf_qt
+        qt_syms = {"S&P 500": "^GSPC", "Dow Jones": "^DJI", "Nasdaq": "^IXIC", "Nikkei 225": "^N225", "HSI": "^HSI", "Vàng/XAU": "GC=F", "Dầu WTI": "CL=F", "Bitcoin": "BTC-USD", "Ethereum": "ETH-USD"}
+        qt_desc = {"S&P 500": "500 công ty lớn nhất Mỹ", "Dow Jones": "30 công ty công nghiệp Mỹ", "Nasdaq": "Chỉ số công nghệ Mỹ", "Nikkei 225": "Chỉ số chính Nhật Bản", "HSI": "Hang Seng - Hong Kong", "Vàng/XAU": "Giá vàng thế giới (USD/oz)", "Dầu WTI": "Dầu thô WTI (USD/thùng)", "Bitcoin": "Tiền điện tử lớn nhất", "Ethereum": "Tiền điện tử lớn thứ 2"}
+        tt_qt = {}
+        for ten, sym in qt_syms.items():
+            try:
+                h = _yf_qt.Ticker(sym).history(period="1y", timeout=5)
+                if not h.empty and len(h) > 5:
+                    cur = float(h['Close'].iloc[-1])
+                    y_ago = float(h['Close'].iloc[0])
+                    chg = (cur / y_ago - 1) if y_ago > 0 else 0
+                    tt_qt[ten] = {"mieu_ta": qt_desc[ten], "gia_hien_tai": cur, "thay_doi_1nam": chg, "ma": sym}
+            except Exception:
+                pass
+        if not tt_qt:
+            tt_qt = {"S&P 500": {"mieu_ta": "500 công ty lớn nhất Mỹ", "gia_hien_tai": 0, "thay_doi_1nam": 0}}
     cols = st.columns(3)
     for i, (ten, info) in enumerate(tt_qt.items()):
         with cols[i % 3]:
