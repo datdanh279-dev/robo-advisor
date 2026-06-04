@@ -2522,7 +2522,7 @@ elif st.session_state.trang_thai == "portfolio":
 
 elif st.session_state.trang_thai == "deep_analysis":
     import time as _time
-    st.error(f"🆕 VERSION 4.0 — BUILD 6c570b1+ — { _time.strftime('%H:%M:%S %d/%m/%Y') } — Giá thật từ yfinance nếu có. Nếu KHÔNG thấy dòng này = browser cache cũ → Ctrl+Shift+R")
+    st.error(f"🆕 VERSION 5.0 — BUILD 0ff6bb8+ — { _time.strftime('%H:%M:%S %d/%m/%Y') } — Dùng Yahoo Finance API trực tiếp + sector defaults. Nếu KHÔNG thấy dòng này = browser cache cũ → Ctrl+Shift+R")
     st.write("# 📊 PHÂN TÍCH CHUYÊN SÂU DANH MỤC")
     st.write("---")
 
@@ -2583,34 +2583,110 @@ elif st.session_state.trang_thai == "deep_analysis":
     if not weights:
         st.error("Khong the tinh toan — du lieu danh muc khong hop le.")
     else:
-        @st.cache_data(ttl=3600, show_spinner="📡 Đang tải giá thật từ yfinance...")
+        SECTOR_DEFAULTS = {
+            "Ngân hàng": {"pe": 9.5, "pb": 1.8, "roe": 0.20, "roa": 0.015, "dividend_yield": 0.02, "beta": 0.9, "eps": 4500},
+            "Công nghệ": {"pe": 18.0, "pb": 3.5, "roe": 0.22, "roa": 0.12, "dividend_yield": 0.015, "beta": 1.1, "eps": 5000},
+            "Thép": {"pe": 12.0, "pb": 1.5, "roe": 0.13, "roa": 0.07, "dividend_yield": 0.012, "beta": 1.3, "eps": 2500},
+            "Thực phẩm": {"pe": 15.0, "pb": 3.5, "roe": 0.25, "roa": 0.15, "dividend_yield": 0.04, "beta": 0.7, "eps": 4500},
+            "Bán lẻ": {"pe": 20.0, "pb": 3.0, "roe": 0.15, "roa": 0.06, "dividend_yield": 0.01, "beta": 1.2, "eps": 3000},
+            "Bất động sản": {"pe": 30.0, "pb": 2.5, "roe": 0.08, "roa": 0.03, "dividend_yield": 0.005, "beta": 1.1, "eps": 2000},
+            "Chứng khoán": {"pe": 10.0, "pb": 1.5, "roe": 0.15, "roa": 0.02, "dividend_yield": 0.03, "beta": 1.2, "eps": 3000},
+            "Khác": {"pe": 15.0, "pb": 2.5, "roe": 0.15, "roa": 0.08, "dividend_yield": 0.02, "beta": 1.0, "eps": 3500},
+        }
+
+        def _fill_kpi_for_real(ma, info, ki):
+            ng = (ki.get("nganh", "") or info.get("nganh", "") or "Khác").strip() or "Khác"
+            defaults = SECTOR_DEFAULTS.get(ng, SECTOR_DEFAULTS["Khác"])
+            for k, v in defaults.items():
+                if k not in ki or ki.get(k) is None or ki.get(k) == 0:
+                    ki[k] = v
+            if "w52_high" not in ki or ki.get("w52_high", 0) <= 0:
+                gia_tt = info.get("gia_thi_truong", 0)
+                ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
+            if "w52_low" not in ki or ki.get("w52_low", 0) <= 0:
+                gia_tt = info.get("gia_thi_truong", 0)
+                ki["w52_low"] = gia_tt * 0.85 if gia_tt > 0 else 0
+            if "market_cap" not in ki or ki.get("market_cap", 0) <= 0:
+                ki["market_cap"] = info.get("gia_thi_truong", 0) * info.get("so_luong", 0) / 1e9
+            return ki
+
+        for ma, info in dm.items():
+            if ma in kpi:
+                kpi[ma] = _fill_kpi_for_real(ma, info, kpi[ma])
+            else:
+                kpi[ma] = _fill_kpi_for_real(ma, info, {"nganh": info.get("nganh", "Khác")})
+
+        @st.cache_data(ttl=3600, show_spinner="📡 Tải giá thật từ Yahoo Finance...")
         def _fetch_real_prices(_symbols):
-            import yfinance as yf
+            import requests as _rq, pandas as _pd
             out = {}
+            metas = {}
             for sym in _symbols:
                 try:
-                    h = yf.Ticker(f"{sym}.VN").history(period="6mo", timeout=8)
-                    if not h.empty and 'Close' in h.columns and len(h) >= 20:
-                        out[sym] = h['Close']
+                    r = _rq.get(
+                        f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.VN",
+                        params={"range": "6mo", "interval": "1d"},
+                        timeout=10,
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36"}
+                    )
+                    if r.status_code == 200:
+                        d = r.json()
+                        if not d.get('chart', {}).get('result'):
+                            continue
+                        result = d['chart']['result'][0]
+                        ts = result.get('timestamp', [])
+                        closes_raw = result.get('indicators', {}).get('quote', [{}])[0].get('close', [])
+                        if not ts or not closes_raw:
+                            continue
+                        pairs = [(t, c) for t, c in zip(ts, closes_raw) if c is not None]
+                        if len(pairs) < 20:
+                            continue
+                        ts_v, cs_v = zip(*pairs)
+                        idx = _pd.to_datetime(list(ts_v), unit='s')
+                        out[sym] = _pd.Series(list(cs_v), index=idx)
+                        metas[sym] = result.get('meta', {})
                 except Exception:
                     pass
-            return out
+            return out, metas
 
         @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_vn30_proxy():
-            import yfinance as yf
+            import requests as _rq, pandas as _pd
             for tk in ["E1VFVN30.VN", "FUEVFVND.VN", "FUEKIV30.VN"]:
                 try:
-                    h = yf.Ticker(tk).history(period="6mo", timeout=8)
-                    if not h.empty and len(h) >= 20:
-                        return h['Close'], tk
+                    r = _rq.get(
+                        f"https://query1.finance.yahoo.com/v8/finance/chart/{tk}",
+                        params={"range": "6mo", "interval": "1d"},
+                        timeout=10,
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36"}
+                    )
+                    if r.status_code == 200:
+                        d = r.json()
+                        result = d.get('chart', {}).get('result', [{}])[0]
+                        ts = result.get('timestamp', [])
+                        closes_raw = result.get('indicators', {}).get('quote', [{}])[0].get('close', [])
+                        pairs = [(t, c) for t, c in zip(ts, closes_raw) if c is not None]
+                        if len(pairs) >= 20:
+                            ts_v, cs_v = zip(*pairs)
+                            return _pd.Series(list(cs_v), index=_pd.to_datetime(list(ts_v), unit='s')), tk
                 except Exception:
                     pass
             return None, None
 
         _ma_for_fetch = [ma for ma, info in dm.items()
                          if info.get("gia_thi_truong", 0) > 0 and info.get("so_luong", 0) > 0]
-        real_prices = _fetch_real_prices(tuple(_ma_for_fetch))
+        _fetch_result = _fetch_real_prices(tuple(_ma_for_fetch))
+        real_prices = _fetch_result[0] if isinstance(_fetch_result, tuple) else _fetch_result
+        real_metas = _fetch_result[1] if isinstance(_fetch_result, tuple) and len(_fetch_result) > 1 else {}
+        for ma, meta in real_metas.items():
+            if ma in kpi and ma in dm:
+                w52h = meta.get('fiftyTwoWeekHigh')
+                w52l = meta.get('fiftyTwoWeekLow')
+                cur_px = meta.get('regularMarketPrice')
+                if w52h: kpi[ma]['w52_high'] = float(w52h)
+                if w52l: kpi[ma]['w52_low'] = float(w52l)
+                if cur_px and dm[ma].get('gia_thi_truong', 0) <= 0:
+                    dm[ma]['gia_thi_truong'] = float(cur_px)
         vn30_close, vn30_label = _fetch_vn30_proxy()
         has_real = len(real_prices) >= 2
         has_vn30 = vn30_close is not None
@@ -3216,7 +3292,8 @@ elif st.session_state.trang_thai == "deep_analysis":
             ki = kpi.get(ma, {})
             v_hien_tai = gia_tt * sl
             w_hien_tai = v_hien_tai / tong_gt if tong_gt > 0 else 0
-            w_muc_tieu = float(ki.get("ty_trong_muc_tieu", w_hien_tai) or w_hien_tai)
+            w_muc_tieu_raw = ki.get("ty_trong_muc_tieu", 0)
+            w_muc_tieu = float(w_muc_tieu_raw) if w_muc_tieu_raw else (1.0 / max(n_ma, 1))
             v_muc_tieu = w_muc_tieu * tong_gt
             chenh = v_muc_tieu - v_hien_tai
             if abs(chenh) < v_hien_tai * 0.05:
