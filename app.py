@@ -2144,7 +2144,7 @@ def _render_tonghop():
 
         with sub_optim:
             st.markdown("#### 🎯 Tối ưu danh mục (Markowitz)")
-            st.caption("⚠️ Tối ưu trên dữ liệu synthetic — minh họa Markowitz mean-variance, KHÔNG dùng để đầu tư thật.")
+            st.caption("📊 Mean-variance tối ưu trên giá thật yfinance 6T (fallback ước lượng nếu yfinance lỗi).")
             cp_vn_op = sorted(DOCS.get("co_phieu_vn", {}).keys())
             ds_chon_op = st.multiselect("Chọn 2-8 mã CP", options=cp_vn_op, default=cp_vn_op[:5] if len(cp_vn_op) >= 5 else cp_vn_op, key="op_chon")
             rf = st.number_input("Lãi suất phi rủi ro (%/năm)", value=5.0, step=0.5, key="op_rf") / 100
@@ -2152,12 +2152,29 @@ def _render_tonghop():
             if st.button("🎯 Tối ưu", use_container_width=True, key="op_run") and len(ds_chon_op) >= 2:
                 try:
                     from scipy.optimize import minimize
-                    np.random.seed(42)
+                    import yfinance as _yf_op
                     n_assets = len(ds_chon_op)
-                    mean_returns = np.random.uniform(0.05, 0.25, n_assets)
-                    cov = np.random.uniform(0.005, 0.04, (n_assets, n_assets))
-                    cov = (cov + cov.T) / 2
-                    np.fill_diagonal(cov, np.random.uniform(0.02, 0.06, n_assets))
+                    returns_data = []
+                    for ma_op in ds_chon_op:
+                        try:
+                            h_op = _yf_op.Ticker(ma_op + ".VN").history(period="6mo", timeout=5)
+                            if not h_op.empty and len(h_op) > 30:
+                                returns_data.append(h_op['Close'].pct_change().dropna())
+                        except Exception:
+                            continue
+                    if len(returns_data) == n_assets:
+                        df_ret = pd.concat(returns_data, axis=1).dropna()
+                        df_ret.columns = ds_chon_op
+                        mean_returns = df_ret.mean().values * 252
+                        cov = df_ret.cov().values * 252
+                        data_source_op = f"📊 Real: {len(df_ret)} phiên × {n_assets} mã (yfinance 6T)"
+                    else:
+                        np.random.seed(42)
+                        mean_returns = np.random.uniform(0.05, 0.25, n_assets)
+                        cov = np.random.uniform(0.005, 0.04, (n_assets, n_assets))
+                        cov = (cov + cov.T) / 2
+                        np.fill_diagonal(cov, np.random.uniform(0.02, 0.06, n_assets))
+                        data_source_op = "⚠️ Synthetic (yfinance tạm lỗi)"
                     def neg_sharpe(w):
                         port_ret = np.dot(w, mean_returns)
                         port_vol = np.sqrt(np.dot(w.T, np.dot(cov, w)))
@@ -2170,6 +2187,7 @@ def _render_tonghop():
                     ret_opt = np.dot(w_opt, mean_returns)
                     vol_opt = np.sqrt(np.dot(w_opt.T, np.dot(cov, w_opt)))
                     sharpe_opt = (ret_opt - rf) / vol_opt if vol_opt > 0 else 0
+                    st.caption(data_source_op)
                     st.markdown("##### Trọng số tối ưu (max Sharpe ratio)")
                     fig_pie = go.Figure(data=[go.Pie(labels=ds_chon_op, values=w_opt, hole=0.4, marker=dict(colors=["#FFD700", "#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#F44336", "#00BCD4", "#795548"][:n_assets]))])
                     fig_pie.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
