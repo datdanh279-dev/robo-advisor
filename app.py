@@ -485,12 +485,19 @@ with st.sidebar:
     st.markdown("---")
     if "lang" not in st.session_state:
         st.session_state.lang = "vi"
-    lang_now = st.radio("🌐 Ngôn ngữ / Language", ["vi", "en"], format_func=lambda x: "🇻🇳 Tiếng Việt" if x == "vi" else "🇬🇧 English", horizontal=True, key="lang_toggle", index=0 if st.session_state.lang == "vi" else 1)
+    lang_now = st.radio("🌐 Ngôn ngữ", ["vi", "en"], format_func=lambda x: "🇻🇳 VI" if x == "vi" else "🇬🇧 EN", horizontal=True, key="lang_toggle", index=0 if st.session_state.lang == "vi" else 1, label_visibility="collapsed")
     st.session_state.lang = lang_now
     _T = {
         "vi": {"home": "Trang chủ", "dashboard": "Dashboard", "chat": "Chat", "tools": "Công cụ", "profile": "Hồ sơ", "logout": "Đăng xuất"},
         "en": {"home": "Home", "dashboard": "Dashboard", "chat": "Chat", "tools": "Tools", "profile": "Profile", "logout": "Logout"},
     }
+    if "is_founding_user" not in st.session_state:
+        try:
+            st.session_state.is_founding_user = is_founding_member(username) if username else False
+        except Exception:
+            st.session_state.is_founding_user = False
+    if st.session_state.is_founding_user and not st.session_state.is_pro:
+        st.session_state.is_pro = True
     st.markdown("---")
     st.markdown("🛡️ **Phân Loại Khách Hàng**")
     user_type = st.selectbox(
@@ -498,13 +505,29 @@ with st.sidebar:
         ["Nhà đầu tư mới", "Nhà đầu tư lâu năm"],
         key="user_type_select",
     )
-    if st.session_state.is_pro:
+    if st.session_state.is_founding_user:
+        st.markdown(
+            '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(201,168,76,0.04));'
+            'border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px 14px;margin:4px 0 8px 0;">'
+            '<div style="color:#8E8E9A;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;">Tài khoản</div>'
+            '<div style="color:#FFD700;font-size:1.05rem;font-weight:600;">👑 Đặc quyền Founder</div>'
+            '<div style="color:#C9A84C;font-size:0.75rem;margin-top:2px;">Toàn quyền PRO — miễn phí trọn đời</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    elif st.session_state.is_pro:
         st.success("✨ Tài khoản: **GÓI PRO** (Đã mở khóa)")
         if st.button("Đăng xuất gói PRO", key="logout_pro", use_container_width=True):
             st.session_state.is_pro = False
             st.rerun()
     else:
-        st.info("📌 Tài khoản: **GÓI BÌNH THƯỜNG**")
+        st.markdown(
+            '<div style="background:rgba(142,142,154,0.08);border:1px solid rgba(142,142,154,0.2);'
+            'border-radius:10px;padding:8px 14px;margin:4px 0 8px 0;">'
+            '<span style="color:#8E8E9A;font-size:0.75rem;">Tài khoản: </span>'
+            '<b style="color:#ECE8E1;">GÓI TIÊU CHUẨN</b></div>',
+            unsafe_allow_html=True,
+        )
         with st.expander("🔑 Kích hoạt Gói PRO"):
             input_password = st.text_input(
                 "Nhập mật khẩu cấp phép:",
@@ -824,11 +847,27 @@ with sidebar:
     Phiên bản: 3.0 Hoàng gia<br>
     Dành cho: Nhà đầu tư Việt Nam<br>
     Dữ liệu: Yahoo Finance + VNDirect<br>
-    Phí quản lý: <b style="color:#FFD700;">0,3%/năm</b><br>
+    Phí dịch vụ: <b style="color:#FFD700;">0,3%/năm</b> <span title="Phí dịch vụ nền tảng — trừ theo ngày trên tổng giá trị danh mục (NAV). Chỉ áp dụng khi dùng gói Premium, KHÔNG thu phí quản lý tài sản như quỹ ủy thác.">ℹ️</span><br>
     Đầu tư từ: <b style="color:#FFD700;">100.000 VNĐ</b><br>
-    Cập nhật: """ + datetime.now().strftime("%H:%M %d/%m/%Y") + """
+    Cập nhật: """ + datetime.now().strftime("%H:%M:%S %d/%m/%Y") + """
     </small>
     """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div style="display:flex;gap:6px;margin:4px 0;flex-wrap:wrap;">'
+        '<span style="background:#4CAF5022;border:1px solid #4CAF5055;border-radius:6px;padding:2px 8px;font-size:0.7rem;">🟢 SSL/TLS</span>'
+        '<span style="background:#2196F322;border:1px solid #2196F355;border-radius:6px;padding:2px 8px;font-size:0.7rem;">🔐 Mã hóa AES-256</span>'
+        '<span style="background:#FFD70022;border:1px solid #FFD70055;border-radius:6px;padding:2px 8px;font-size:0.7rem;">🛡️ Bảo mật 2FA</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:#8E8E9A;">'
+        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#FFC107;box-shadow:0 0 4px #FFC107;"></span>'
+        'Dữ liệu thị trường: <b style="color:#FFC107;">Delayed 15-20 phút</b> (miễn phí) — '
+        'Nâng cấp Realtime với Premium'
+        '</div>',
         unsafe_allow_html=True,
     )
 
@@ -839,9 +878,21 @@ with sidebar:
         st.markdown(f"**Điểm rủi ro:** {st.session_state.get('diem_rui_ro', 0)}/60")
 
     st.markdown("---")
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = True
+    st.checkbox("🌙 Dark Mode", value=st.session_state.dark_mode, key="dark_toggle", help="Đã bật mặc định — tối ưu cho trader xem đêm")
+    st.session_state.dark_mode = st.session_state.get("dark_toggle", True)
+    st.markdown("---")
     st.caption(
-        "⚠️ **Tuyên bố miễn trừ:** Công cụ mô phỏng & phân tích dữ liệu lịch sử, "
-        "không phải khuyến nghị đầu tư. Crypto chưa được pháp luật VN công nhận. Đầu tư có rủi ro."
+        "⚠️ **Miễn trỡ trách nhiệm:** Đây là công cụ phân tích dữ liệu lịch sử, "
+        "không phải khuyến nghị đầu tư. Mọi quyết định đầu tư thuộc về trách nhiệm của người dùng."
+    )
+    st.markdown(
+        '<div style="font-size:0.7rem;color:#8E8E9A;margin-top:4px;">'
+        '📜 <a href="#terms" style="color:#8E8E9A;">Điều khoản</a> · '
+        '🔒 <a href="#privacy" style="color:#8E8E9A;">Bảo mật</a> · '
+        '⚖️ <a href="#disclaimer" style="color:#8E8E9A;">Miễn trừ</a></div>',
+        unsafe_allow_html=True,
     )
 
 # Business Plan — đã ẩn, xem file business_plan.html riêng
@@ -1148,17 +1199,43 @@ def _render_tonghop():
 
     with tab_tg:
         st.markdown(f"### 🌐 Cổ phiếu thế giới ({len(DOCS['co_phieu_tg'])} mã)")
-        st.markdown("Nguồn: **TONG_HOP_v44** — dữ liệu yfinance")
+        st.markdown("Nguồn: **TONG_HOP_v44** + **yfinance** (P/E, P/B, ROE, Vốn hóa — cached 24h)")
+        @st.cache_data(ttl=86400, show_spinner="📡 Đang tải dữ liệu yfinance...")
+        def _enrich_world_stocks(tickers):
+            import yfinance as yf
+            result = {}
+            for ma in tickers:
+                try:
+                    t = yf.Ticker(ma)
+                    info = t.info or {}
+                    result[ma] = {
+                        "pe": info.get("trailingPE") or info.get("forwardPE") or 0,
+                        "pb": info.get("priceToBook") or 0,
+                        "roe": (info.get("returnOnEquity") or 0) * 100,
+                        "von_hoa": (info.get("marketCap") or 0) / 1e9,
+                        "eps": info.get("trailingEps") or 0,
+                        "dividend_yield": (info.get("dividendYield") or 0) * 100,
+                    }
+                except Exception:
+                    result[ma] = {"pe": 0, "pb": 0, "roe": 0, "von_hoa": 0, "eps": 0, "dividend_yield": 0}
+            return result
+        tickers_list = list(DOCS["co_phieu_tg"].keys())
+        enriched = _enrich_world_stocks(tuple(tickers_list))
         rows_tg = []
         for ma, info in DOCS["co_phieu_tg"].items():
+            e = enriched.get(ma, {})
+            pe = e.get("pe", 0) or info.get("pe", 0) or 0
+            pb = e.get("pb", 0) or info.get("pb", 0) or 0
+            roe = e.get("roe", 0) or (info.get("roe", 0) * 100 if info.get("roe") else 0)
+            von_hoa = e.get("von_hoa", 0) or info.get("von_hoa", 0) or 0
             rows_tg.append({
                 "Ticker": ma, "Tên": info.get("ten", ""), "Sàn": info.get("san", ""),
                 "Giá ($)": f"{info.get('gia', 0):,.2f}",
-                "P/E": f"{info.get('pe', 0):.1f}" if info.get("pe") else "-",
-                "P/B": f"{info.get('pb', 0):.2f}" if info.get("pb") else "-",
-                "ROE%": f"{info.get('roe', 0)*100:.1f}" if info.get("roe") else "-",
-                "Vốn hóa (tỷ$)": f"{info.get('von_hoa', 0):,.1f}" if info.get("von_hoa") else "-",
-                "%YTD": f"{info.get('ytd', 0)*100:+.1f}" if info.get("ytd") else "-",
+                "P/E": f"{pe:.1f}" if pe else "-",
+                "P/B": f"{pb:.2f}" if pb else "-",
+                "ROE%": f"{roe:.1f}" if roe else "-",
+                "Vốn hóa (tỷ$)": f"{von_hoa:,.1f}" if von_hoa else "-",
+                "Cổ tức %": f"{e.get('dividend_yield', 0):.2f}" if e.get("dividend_yield") else "-",
                 "Tín hiệu": info.get("tin_hieu", ""), "Ngành": info.get("nganh", ""),
             })
         if rows_tg:
@@ -2229,7 +2306,7 @@ else:
     st.markdown(
         '<div style="background:#ECE8E10a;border:1px solid #8E8E9A33;border-radius:10px;'
         'padding:8px 16px;margin-bottom:12px;font-size:0.85rem;color:#8E8E9A;">'
-        '📌 Đang dùng <b>GÓI BÌNH THƯỜNG</b> — Kích hoạt PRO trong thanh Sidebar để mở khóa tính năng VIP.'
+        'Đang dùng <b style="color:#ECE8E1;">GÓI TIÊU CHUẨN</b> — mở khóa <b style="color:#FFD700;">GÓI PRO</b> tại Sidebar để dùng tính năng VIP.'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -2782,6 +2859,42 @@ elif st.session_state.trang_thai == "chat":
         st.markdown("Hỏi tôi về đầu tư, cổ phiếu, vàng, bất động sản, hay bất kỳ chủ đề tài chính nào!")
         st.markdown("---")
 
+        if not st.session_state.chat_history:
+            st.markdown(
+                '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.05),rgba(33,150,243,0.03));'
+                'border:1px solid rgba(255,215,0,0.15);border-radius:12px;padding:14px 18px;margin-bottom:14px;">'
+                '<div style="font-weight:600;color:#FFD700;margin-bottom:8px;">⚡ Gợi ý nhanh từ AI — bấm để hỏi ngay:</div>'
+                '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                '<span style="background:#2196F322;border:1px solid #2196F355;border-radius:20px;padding:6px 14px;font-size:0.85rem;">📊 Phân tích danh mục của tôi</span>'
+                '<span style="background:#4CAF5022;border:1px solid #4CAF5055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">📈 Mã nào đang MUA tốt?</span>'
+                '<span style="background:#FF980022;border:1px solid #FF980055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">🛡️ Cách phân bổ vốn 100tr?</span>'
+                '<span style="background:#9C27B022;border:1px solid #9C27B055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">🥇 Vàng SJC có nên mua?</span>'
+                '</div></div>',
+                unsafe_allow_html=True,
+            )
+            _quick_qs = [
+                "Phân tích danh mục hiện tại của tôi — nên tăng/giảm mã nào?",
+                "Top 3 mã cổ phiếu VN đang MUA tốt nhất tháng này?",
+                "Tôi có 100 triệu, nên phân bổ vào cổ phiếu/vàng/tiết kiệm thế nào?",
+                "Vàng SJC và vàng nhẫn — nên chọn loại nào 2026?",
+            ]
+            _qcols = st.columns(2)
+            for _i, _q in enumerate(_quick_qs):
+                with _qcols[_i % 2]:
+                    if st.button(_q, key=f"qq_{_i}", use_container_width=True):
+                        st.session_state.chat_history.append({"role": "user", "content": _q})
+                        with st.spinner("🤖 Robo-Advisor đang phân tích..."):
+                            tra_loi = tim_cau_tra_loi(_q, st.session_state.chat_history)
+                        st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
+                        try:
+                            username = st.session_state.get("username", "unknown")
+                            save_chat(username, "user", _q)
+                            save_chat(username, "bot", tra_loi)
+                        except Exception:
+                            pass
+                        st.rerun()
+            st.markdown("---")
+
         for i, msg in enumerate(st.session_state.chat_history):
             if msg["role"] == "bot":
                 st.markdown(
@@ -2794,13 +2907,11 @@ elif st.session_state.trang_thai == "chat":
                     unsafe_allow_html=True,
                 )
 
-        col1, col2, col3 = st.columns([1, 6, 4])
-        with col1:
-            st.caption("💬")
+        col2, col3 = st.columns([6, 1])
         with col2:
             with st.form(key="chat_form", clear_on_submit=True):
                 cau_hoi = st.text_input(
-                    "Nhập câu hỏi của bạn:",
+                    "Câu hỏi của bạn:",
                     placeholder="VD: Nên đầu tư cổ phiếu gì?",
                     key="chat_input",
                     label_visibility="collapsed",
@@ -2819,7 +2930,7 @@ elif st.session_state.trang_thai == "chat":
                         pass
                     st.rerun()
         with col3:
-            if st.session_state.chat_history and st.button("🗑️", use_container_width=True, help="Xóa lịch sử"):
+            if st.session_state.chat_history and st.button("🗑️ Xóa", key="clear_chat", use_container_width=True, help="Xóa lịch sử chat"):
                 st.session_state.chat_history = []
                 st.rerun()
 
@@ -2840,24 +2951,24 @@ elif st.session_state.trang_thai == "chat":
             "Chủ tịch Hội đồng sẽ tổng hợp và chọn ra phương án tốt nhất."
         )
         st.markdown("---")
-
+        _expert_chips_html = '<div style="margin:6px 0 14px 0;line-height:2.2;">'
         for exp in [
-            {"id": "buffett", "name": "Warren Buffett", "title": "Đầu tư Giá trị", "color": "#4CAF50"},
-            {"id": "soros", "name": "George Soros", "title": "Kinh tế Vĩ mô", "color": "#2196F3"},
-            {"id": "lynch", "name": "Peter Lynch", "title": "Đầu tư Tăng trưởng", "color": "#FF9800"},
-            {"id": "dalio", "name": "Ray Dalio", "title": "Nguyên tắc Thị trường", "color": "#9C27B0"},
-            {"id": "graham", "name": "Benjamin Graham", "title": "Phân tích Cơ bản", "color": "#795548"},
-            {"id": "munger", "name": "Charlie Munger", "title": "Tâm lý học Đầu tư", "color": "#607D8B"},
+            {"name": "Warren Buffett", "title": "Đầu tư Giá trị", "color": "#4CAF50"},
+            {"name": "George Soros", "title": "Kinh tế Vĩ mô", "color": "#2196F3"},
+            {"name": "Peter Lynch", "title": "Đầu tư Tăng trưởng", "color": "#FF9800"},
+            {"name": "Ray Dalio", "title": "Nguyên tắc Thị trường", "color": "#9C27B0"},
+            {"name": "Benjamin Graham", "title": "Phân tích Cơ bản", "color": "#795548"},
+            {"name": "Charlie Munger", "title": "Tâm lý học Đầu tư", "color": "#607D8B"},
         ]:
-            st.markdown(
-                f'<div style="display:inline-block;background:{exp["color"]}22;'
+            _expert_chips_html += (
+                f'<span style="display:inline-block;background:{exp["color"]}22;'
                 f'border:1px solid {exp["color"]}55;border-radius:20px;padding:4px 14px;margin:3px;'
-                f'font-size:0.8rem;">'
+                f'font-size:0.8rem;white-space:nowrap;">'
                 f'<b style="color:{exp["color"]};">{exp["name"]}</b>'
-                f'<span style="color:#8892B0;margin-left:6px;">— {exp["title"]}</span></div>',
-                unsafe_allow_html=True,
+                f'<span style="color:#8892B0;margin-left:6px;">— {exp["title"]}</span></span>'
             )
-
+        _expert_chips_html += '</div>'
+        st.markdown(_expert_chips_html, unsafe_allow_html=True)
         st.markdown("---")
 
         if "expert_results" not in st.session_state:
@@ -2874,15 +2985,12 @@ elif st.session_state.trang_thai == "chat":
             if submitted and cau_hoi:
                 try:
                     with st.spinner("🧠 Đang hỏi các chuyên gia AI..."):
-                        st.write("📡 Bộ phân loại AI đang đánh giá độ phức tạp của câu hỏi...")
                         results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
                     if results:
                         st.session_state.expert_results = results
                         mode = results.get("mode", "cao_cap")
                         mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
                         st.success(f"✅ Đã nhận phản hồi. Chế độ: {mode_labels.get(mode, mode)}")
-                        if results.get("chairman"):
-                            st.info("👑 Chủ tịch Hội đồng đang đưa ra kết luận...")
                     else:
                         st.error("❌ Không thể kết nối với các chuyên gia. Kiểm tra API keys.")
                 except Exception as _expert_err:
