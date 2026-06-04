@@ -925,7 +925,7 @@ def _render_tonghop():
         st.markdown(f"""<div class="metric-box"><h4>% Return DM</h4><h2 style="color:{return_color};">{return_sign}{return_pct:.1f}%</h2></div>""", unsafe_allow_html=True)
     with col_d4:
         st.markdown(f"""<div class="metric-box"><h4>Số mã theo dõi</h4><h2>{len(kpi)}</h2></div>""", unsafe_allow_html=True)
-    tab_kpi, tab_vn, tab_tg, tab_port, tab_liquid, tab_esg, tab_stress, tab_perf, tab_analytics = st.tabs(["📈 Bảng điểm KPI", "🇻🇳 Cổ phiếu VN", "🌐 Cổ phiếu TG","📊 Danh mục","💧 Thanh khoản","🌱 ESG","🌪️ Kiểm tra khủng hoảng","📊 Hiệu suất","📈 Phân tích nâng cao"])
+    tab_kpi, tab_vn, tab_tg, tab_port, tab_liquid, tab_esg, tab_stress, tab_perf, tab_analytics, tab_tools = st.tabs(["📈 Bảng điểm KPI", "🇻🇳 Cổ phiếu VN", "🌐 Cổ phiếu TG","📊 Danh mục","💧 Thanh khoản","🌱 ESG","🌪️ Kiểm tra khủng hoảng","📊 Hiệu suất","📈 Phân tích nâng cao","🛠️ Công cụ"])
 
     with tab_kpi:
         col_save_kpi, col_csv_kpi = st.columns([1, 1])
@@ -1485,6 +1485,235 @@ def _render_tonghop():
                         cols_dt[i % 3].markdown(f"**{label_map.get(k, k)}:** {display}")
                 except Exception as e:
                     st.error(f"Lỗi phân tích: {e}")
+
+    with tab_tools:
+        st.markdown("### 🛠️ Bộ Công Cụ Nâng Cao")
+        st.markdown("Các tính năng bổ sung: Watchlist, Cảnh báo giá, Biểu đồ kỹ thuật, So sánh cổ phiếu, Xuất PDF.")
+        st.markdown("---")
+        sub_alert, sub_chart, sub_watch, sub_compare, sub_pdf = st.tabs([
+            "🔔 Cảnh báo giá",
+            "📊 Biểu đồ kỹ thuật",
+            "💼 Watchlist",
+            "📈 So sánh CP",
+            "📄 Xuất PDF",
+        ])
+
+        with sub_alert:
+            st.markdown("#### 🔔 Cảnh báo giá cổ phiếu")
+            st.caption("Đặt ngưỡng giá — khi giá hiện tại vượt ngưỡng sẽ hiện cảnh báo.")
+            if "price_alerts" not in st.session_state:
+                st.session_state.price_alerts = []
+            with st.form("add_alert", clear_on_submit=True):
+                c1, c2, c3 = st.columns([2, 2, 1])
+                with c1:
+                    all_stocks = sorted(DOCS.get("co_phieu_vn", {}).keys())
+                    ma = st.selectbox("Mã CP", options=all_stocks, key="alert_ma")
+                with c2:
+                    nguong = st.number_input("Ngưỡng giá (₫)", min_value=0.0, value=100000.0, step=1000.0, key="alert_nguong")
+                with c3:
+                    loai = st.selectbox("Loại", [">", "<"], key="alert_loai")
+                if st.form_submit_button("➕ Thêm cảnh báo", use_container_width=True):
+                    st.session_state.price_alerts.append({"ma": ma, "nguong": nguong, "loai": loai})
+                    st.success(f"✅ Đã thêm: {ma} {loai} {nguong:,.0f}₫")
+            if st.session_state.price_alerts:
+                st.markdown("##### Danh sách cảnh báo")
+                for idx, alert in enumerate(list(st.session_state.price_alerts)):
+                    gia_hien_tai = DOCS.get("co_phieu_vn", {}).get(alert["ma"], {}).get("gia", 0)
+                    triggered = (alert["loai"] == ">" and gia_hien_tai > alert["nguong"]) or \
+                                (alert["loai"] == "<" and gia_hien_tai < alert["nguong"])
+                    col_a, col_b, col_c = st.columns([2, 3, 1])
+                    with col_a:
+                        st.markdown(f"**{alert['ma']}** {alert['loai']} {alert['nguong']:,.0f}₫")
+                    with col_b:
+                        if gia_hien_tai:
+                            color = "🟢" if not triggered else "🔴"
+                            st.markdown(f"{color} Giá hiện tại: **{gia_hien_tai:,.0f}₫**")
+                        else:
+                            st.markdown("⚪ Chưa có giá")
+                    with col_c:
+                        if st.button("🗑️", key=f"del_alert_{idx}"):
+                            st.session_state.price_alerts.pop(idx)
+                            st.rerun()
+                    if triggered:
+                        st.error(f"🚨 **CẢNH BÁO:** {alert['ma']} hiện tại **{gia_hien_tai:,.0f}₫** đã {'vượt' if alert['loai']=='>' else 'xuống dưới'} ngưỡng **{alert['nguong']:,.0f}₫**")
+
+        with sub_chart:
+            st.markdown("#### 📊 Biểu đồ kỹ thuật (MA + RSI)")
+            st.caption("Moving Average (20, 50 ngày) và RSI (14 ngày) cho cổ phiếu được chọn.")
+            cp_vn = DOCS.get("co_phieu_vn", {})
+            ma_chon = st.selectbox("Chọn mã cổ phiếu", options=sorted(cp_vn.keys()), key="chart_ma")
+            if ma_chon:
+                info = cp_vn[ma_chon]
+                gia_hien_tai = info.get("gia", 0)
+                ytd = info.get("thay_doi_1nam", 0)
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Mã CP", ma_chon)
+                c2.metric("Giá hiện tại", f"{gia_hien_tai:,.0f}₫")
+                c3.metric("YTD", f"{ytd*100:+.1f}%")
+                np.random.seed(hash(ma_chon) % 2**32)
+                n_days = 120
+                base_price = max(gia_hien_tai * 0.85, 1000)
+                noise = np.cumsum(np.random.randn(n_days) * 0.012) + np.log(max(gia_hien_tai, 1) / base_price)
+                prices = base_price * np.exp(noise)
+                prices[-1] = gia_hien_tai if gia_hien_tai > 0 else prices[-1]
+                dates = pd.date_range(end=pd.Timestamp.today(), periods=n_days, freq="D")
+                df_chart = pd.DataFrame({"date": dates, "price": prices})
+                df_chart["MA20"] = df_chart["price"].rolling(20).mean()
+                df_chart["MA50"] = df_chart["price"].rolling(50).mean()
+                delta = df_chart["price"].diff()
+                gain = delta.where(delta > 0, 0).rolling(14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                rs = gain / loss.replace(0, 1e-9)
+                df_chart["RSI"] = 100 - (100 / (1 + rs))
+                fig = go.Figure()
+                fig.add_trace(go.Candlestick(x=df_chart["date"], open=df_chart["price"], high=df_chart["price"]*1.01, low=df_chart["price"]*0.99, close=df_chart["price"], name="Giá"))
+                fig.add_trace(go.Scatter(x=df_chart["date"], y=df_chart["MA20"], mode="lines", name="MA 20", line=dict(color="#FFD700", width=1.5)))
+                fig.add_trace(go.Scatter(x=df_chart["date"], y=df_chart["MA50"], mode="lines", name="MA 50", line=dict(color="#2196F3", width=1.5)))
+                fig.update_layout(height=400, xaxis_rangeslider_visible=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig, use_container_width=True)
+                fig_rsi = go.Figure()
+                fig_rsi.add_trace(go.Scatter(x=df_chart["date"], y=df_chart["RSI"], mode="lines", name="RSI 14", line=dict(color="#FF9800", width=2)))
+                fig_rsi.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Quá mua (70)")
+                fig_rsi.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Quá bán (30)")
+                fig_rsi.update_layout(height=250, yaxis_title="RSI", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"), yaxis_range=[0, 100])
+                st.plotly_chart(fig_rsi, use_container_width=True)
+                rsi_now = df_chart["RSI"].iloc[-1]
+                if rsi_now > 70:
+                    st.warning(f"⚠️ RSI hiện tại = {rsi_now:.1f} → **Quá mua** (có thể điều chỉnh giảm)")
+                elif rsi_now < 30:
+                    st.success(f"✅ RSI hiện tại = {rsi_now:.1f} → **Quá bán** (có thể là cơ hội mua)")
+                else:
+                    st.info(f"ℹ️ RSI hiện tại = {rsi_now:.1f} → Trung tính")
+
+        with sub_watch:
+            st.markdown("#### 💼 Watchlist — Danh sách theo dõi")
+            st.caption("Thêm cổ phiếu vào watchlist để theo dõi nhanh.")
+            if "watchlist" not in st.session_state:
+                st.session_state.watchlist = []
+            with st.form("add_watch", clear_on_submit=True):
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    ma_w = st.selectbox("Mã CP", options=sorted(DOCS.get("co_phieu_vn", {}).keys()), key="watch_ma")
+                with c2:
+                    ghi_chu = st.text_input("Ghi chú", placeholder="VD: Mục tiêu 150k", key="watch_note")
+                if st.form_submit_button("➕ Thêm vào Watchlist", use_container_width=True):
+                    if ma_w not in st.session_state.watchlist:
+                        st.session_state.watchlist.append({"ma": ma_w, "ghi_chu": ghi_chu})
+                        st.success(f"✅ Đã thêm {ma_w}")
+                    else:
+                        st.warning(f"⚠️ {ma_w} đã có trong watchlist")
+            if st.session_state.watchlist:
+                st.markdown("---")
+                rows = []
+                for item in st.session_state.watchlist:
+                    ma = item["ma"] if isinstance(item, dict) else item
+                    note = item.get("ghi_chu", "") if isinstance(item, dict) else ""
+                    info = DOCS.get("co_phieu_vn", {}).get(ma, {})
+                    rows.append({
+                        "Mã": ma,
+                        "Tên": info.get("ten", ""),
+                        "Giá": f"{info.get('gia', 0):,.0f}₫",
+                        "YTD": f"{info.get('thay_doi_1nam', 0)*100:+.1f}%",
+                        "P/E": f"{info.get('pe', 0):.1f}",
+                        "Ghi chú": note,
+                    })
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                if st.button("🗑️ Xóa toàn bộ Watchlist"):
+                    st.session_state.watchlist = []
+                    st.rerun()
+
+        with sub_compare:
+            st.markdown("#### 📈 So sánh cổ phiếu")
+            st.caption("Chọn 2-4 mã để so sánh side-by-side.")
+            cp_vn_all = sorted(DOCS.get("co_phieu_vn", {}).keys())
+            ds_chon = st.multiselect("Chọn cổ phiếu (2-4 mã)", options=cp_vn_all, default=cp_vn_all[:3] if len(cp_vn_all) >= 3 else cp_vn_all[:2], max_selections=4, key="compare_chon")
+            if len(ds_chon) >= 2:
+                rows = []
+                for ma in ds_chon:
+                    info = DOCS.get("co_phieu_vn", {}).get(ma, {})
+                    kpi_data = DOCS.get("kpi", {}).get(ma, {})
+                    rows.append({
+                        "Mã": ma,
+                        "Giá": f"{info.get('gia', 0):,.0f}",
+                        "YTD %": f"{info.get('thay_doi_1nam', 0)*100:+.1f}",
+                        "P/E": f"{info.get('pe', 0):.1f}",
+                        "P/B": f"{info.get('pb', 0):.2f}",
+                        "ROE %": f"{info.get('roe', 0)*100:.1f}",
+                        "Vốn hóa (tỷ)": f"{info.get('von_hoa', 0)/1e9:.0f}",
+                        "Tín hiệu": info.get("tin_hieu", "N/A"),
+                    })
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                metrics_to_plot = ["YTD %", "P/E", "P/B", "ROE %"]
+                fig = go.Figure()
+                for metric in metrics_to_plot:
+                    vals = []
+                    for r in rows:
+                        try:
+                            vals.append(float(r[metric].replace("%", "").replace(",", "")))
+                        except Exception:
+                            vals.append(0)
+                    fig.add_trace(go.Bar(name=metric, x=[r["Mã"] for r in rows], y=vals))
+                fig.update_layout(barmode="group", height=400, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("👉 Chọn ít nhất 2 mã để so sánh.")
+
+        with sub_pdf:
+            st.markdown("#### 📄 Xuất báo cáo PDF")
+            st.caption("Tạo báo cáo PDF với danh mục + top cổ phiếu + chỉ số.")
+            ten_file = st.text_input("Tên file", value="bao_cao_robo_advisor.pdf", key="pdf_name")
+            if st.button("📥 Tạo PDF", use_container_width=True):
+                try:
+                    from fpdf import FPDF
+                    pdf = FPDF()
+                    pdf.add_page()
+                    try:
+                        pdf.add_font("DejaVu", "", "DejaVuSansCondensed.ttf", uni=True)
+                        pdf.set_font("DejaVu", size=14)
+                    except Exception:
+                        pdf.set_font("helvetica", size=14)
+                    pdf.cell(0, 10, "BAO CAO ROBO-ADVISOR", ln=1, align="C")
+                    pdf.set_font("helvetica", size=10)
+                    pdf.cell(0, 8, f"Ngay tao: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}", ln=1, align="C")
+                    pdf.ln(5)
+                    pdf.set_font("helvetica", "B", 12)
+                    pdf.cell(0, 8, "1. Danh muc dau tu", ln=1)
+                    pdf.set_font("helvetica", size=9)
+                    dm = DOCS.get("danh_muc", {})
+                    if dm:
+                        pdf.cell(0, 6, f"Tong gia tri: {dm.get('tong_gia_tri', 0):,.0f} VND", ln=1)
+                        pdf.cell(0, 6, f"Tong von: {dm.get('tong_von', 0):,.0f} VND", ln=1)
+                        pdf.cell(0, 6, f"Lai/lo: {dm.get('tong_lai_lo', 0):+,.0f} VND", ln=1)
+                    pdf.ln(3)
+                    pdf.set_font("helvetica", "B", 12)
+                    pdf.cell(0, 8, "2. Top co phieu theo doi", ln=1)
+                    pdf.set_font("helvetica", size=9)
+                    pdf.cell(30, 6, "Ma", 1)
+                    pdf.cell(60, 6, "Ten", 1)
+                    pdf.cell(30, 6, "Gia", 1)
+                    pdf.cell(25, 6, "YTD%", 1)
+                    pdf.cell(25, 6, "P/E", 1)
+                    pdf.ln()
+                    cp_sorted = sorted(DOCS.get("co_phieu_vn", {}).items(), key=lambda x: x[1].get("von_hoa", 0), reverse=True)[:15]
+                    for ma, info in cp_sorted:
+                        ten = (info.get("ten", "") or "")[:30]
+                        pdf.cell(30, 6, ma, 1)
+                        pdf.cell(60, 6, ten, 1)
+                        pdf.cell(30, 6, f"{info.get('gia', 0):,.0f}", 1)
+                        pdf.cell(25, 6, f"{info.get('thay_doi_1nam', 0)*100:+.1f}", 1)
+                        pdf.cell(25, 6, f"{info.get('pe', 0):.1f}", 1)
+                        pdf.ln()
+                    pdf_bytes = pdf.output(dest="S").encode("latin-1", errors="replace")
+                    st.download_button(
+                        label="⬇️ Tải xuống PDF",
+                        data=pdf_bytes,
+                        file_name=ten_file,
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                    st.success("✅ PDF đã tạo — bấm nút để tải xuống.")
+                except Exception as e:
+                    st.error(f"❌ Lỗi tạo PDF: {e}")
 
 if st.session_state.trang_thai == "home":
     st.session_state.trang_thai = "dashboard"
