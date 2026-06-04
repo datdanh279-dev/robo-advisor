@@ -4557,6 +4557,193 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần giá thật + VN30 để tính IR decomposition.")
 
         st.write("---")
+        st.write("## 🎯 Upside/Downside Capture — Bắt trend TĂNG, né trend GIẢM")
+        if has_real and dm_equity is not None and has_vn30 and len(dm_equity) > 60:
+            common_idx4 = sorted(set(pd.Series(dm_equity).index) & set(vn30_close.index))
+            if len(common_idx4) > 60:
+                dm_r_full = pd.Series(dm_equity, index=pd.Series(dm_equity).index).pct_change().dropna()
+                vn_r_full = vn30_close.pct_change().dropna()
+                common_idx5 = sorted(set(dm_r_full.index) & set(vn_r_full.index))
+                dm_arr = dm_r_full.loc[common_idx5]
+                vn_arr = vn_r_full.loc[common_idx5]
+                up_mask = vn_arr > 0
+                dn_mask = vn_arr < 0
+                if up_mask.sum() > 0 and dn_mask.sum() > 0:
+                    up_capture = float((dm_arr[up_mask].mean() / vn_arr[up_mask].mean()) * 100)
+                    dn_capture = float((dm_arr[dn_mask].mean() / vn_arr[dn_mask].mean()) * 100)
+                    capture_ratio = up_capture / dn_capture if dn_capture != 0 else 0
+                    uc1, uc2, uc3, uc4 = st.columns(4)
+                    uc1.metric("📈 Upside Capture", f"{up_capture:.1f}%",
+                        help="DM lãi bao nhiêu % khi VN30 tăng. >100 = bắt trend tốt")
+                    uc2.metric("📉 Downside Capture", f"{dn_capture:.1f}%",
+                        help="DM lỗ bao nhiêu % khi VN30 giảm. <100 = phòng thủ tốt")
+                    uc3.metric("⚖️ Capture Ratio", f"{capture_ratio:.2f}",
+                        help="Upside/Downside. >1 = bắt tăng tốt hơn phòng thủ")
+                    uc4.metric("🎯 Phân loại",
+                        "✅ Xuất sắc" if capture_ratio > 1.2 and dn_capture < 80 else
+                        ("✅ Tốt" if capture_ratio > 1.0 and dn_capture < 100 else
+                        ("🟡 Cân bằng" if capture_ratio > 0.8 else "🔴 Yếu")))
+                    st.caption(f"📊 Tính từ {len(common_idx5)} phiên returns thật yfinance 6T. Capture ratio >1.2 + downside <80% = DM lý tưởng (ăn nhiều khi tăng, lỗ ít khi giảm).")
+            else:
+                st.info("⚠️ Không đủ dữ liệu chung với VN30.")
+        else:
+            st.info("⚠️ Cần giá thật + VN30 để tính capture ratio.")
+
+        st.write("---")
+        st.write("## 🕸️ Mạng lưới tương quan (Correlation Network)")
+        if has_real and len(real_prices) >= 3:
+            ret_dict = {}
+            for ma, info in dm.items():
+                if ma in real_prices and len(real_prices[ma]) >= 30:
+                    ret_dict[ma] = real_prices[ma].pct_change().dropna()
+            if len(ret_dict) >= 3:
+                common_n = sorted(set.intersection(*[set(r.index) for r in ret_dict.values()]))
+                if len(common_n) > 20:
+                    df_n = pd.DataFrame({ma: r.reindex(common_n) for ma, r in ret_dict.items()}).dropna()
+                    corr_n = df_n.corr()
+                    fig_net = go.Figure()
+                    n_stocks = len(corr_n)
+                    angles = np.linspace(0, 2*np.pi, n_stocks, endpoint=False)
+                    pos_x = np.cos(angles)
+                    pos_y = np.sin(angles)
+                    for i in range(n_stocks):
+                        for j in range(i+1, n_stocks):
+                            c = float(corr_n.iloc[i, j])
+                            if abs(c) > 0.5:
+                                color = "rgba(244,67,54," + str(abs(c)*0.8) + ")" if c > 0 else "rgba(76,175,80," + str(abs(c)*0.8) + ")"
+                                fig_net.add_trace(go.Scatter(x=[pos_x[i], pos_x[j]], y=[pos_y[i], pos_y[j]],
+                                    mode='lines', line=dict(color=color, width=abs(c)*5),
+                                    showlegend=False, hoverinfo='skip'))
+                    for i, ma in enumerate(corr_n.columns):
+                        fig_net.add_trace(go.Scatter(x=[pos_x[i]], y=[pos_y[i]], mode='markers+text',
+                            marker=dict(size=30, color=corr_n.columns.get_loc(ma), colorscale='Viridis', showscale=False),
+                            text=[ma], textposition='middle center', textfont=dict(color='white', size=10, family='Arial Black'),
+                            name=ma, showlegend=False, hovertemplate=f"<b>{ma}</b><br>Avg corr: {corr_n[ma].mean():.2f}<extra></extra>"))
+                    fig_net.update_layout(title=f"Mạng tương quan (đỏ = cùng chiều, xanh = ngược chiều, chỉ hiện |corr|>0.5)",
+                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        height=450, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                    st.plotly_chart(fig_net, use_container_width=True)
+                    st.caption(f"📊 Tính từ {len(df_n)} phiên returns thật yfinance 6T. Mã cùng ngành thường có corr cao (đỏ đậm). Mã khác ngành hoặc ngược chiều (xanh) giúp đa dạng hóa.")
+            else:
+                st.info("⚠️ Cần ≥3 mã có giá thật để vẽ mạng.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để vẽ correlation network.")
+
+        st.write("---")
+        st.write("## 💎 Risk-Return Bubble Chart — Hiệu suất vs Rủi ro từng mã")
+        if has_real and len(real_prices) >= 2:
+            rr_rows = []
+            for ma, info in dm.items():
+                if ma in real_prices and len(real_prices[ma]) >= 30:
+                    ki = kpi.get(ma, {})
+                    r6m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[0]) - 1) * 100
+                    v6m = float(real_prices[ma].pct_change().dropna().std() * (252**0.5) * 100)
+                    roe = float(ki.get("roe", 0) or 0) * 100
+                    pe = float(ki.get("pe", 0) or 0)
+                    mc = float(ki.get("market_cap", 0) or 0) / 1e3
+                    rr_rows.append({"Mã": ma, "Return 6M %": round(r6m, 1), "Vol %": round(v6m, 1),
+                        "ROE %": round(roe, 1), "P/E": round(pe, 1), "Vốn hóa (nghìn tỷ)": round(mc, 1),
+                        "Ngành": ki.get("nganh", "Khác") or "Khác"})
+            if rr_rows:
+                df_rr = pd.DataFrame(rr_rows)
+                fig_rr = px.scatter(df_rr, x="Vol %", y="Return 6M %", size="Vốn hóa (nghìn tỷ)",
+                    color="Ngành", hover_name="Mã", text="Mã",
+                    labels={"Vol %": "Volatility (% năm)", "Return 6M %": "Return 6 tháng (%)"},
+                    title="Risk-Return Bubble (size = vốn hóa, color = ngành)")
+                fig_rr.update_traces(textposition='top center', textfont=dict(size=9, color='white'))
+                fig_rr.update_layout(height=480, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_rr, use_container_width=True)
+                st.caption(f"📊 Trục X = Vol (rủi ro), trục Y = Return 6M (lợi nhuận). Bong bóng trên-trái = lợi nhuận cao, rủi ro thấp (lý tưởng).")
+        else:
+            st.info("⚠️ Cần giá thật 6T để vẽ risk-return bubble.")
+
+        st.write("---")
+        st.write("## 💵 Tổng return vs Price return (có cổ tức)")
+        if has_fund and len(real_fund) > 0:
+            tr_rows = []
+            for ma, info in dm.items():
+                ki = kpi.get(ma, {})
+                dy = float(ki.get("dividend_yield", 0) or 0) * 100
+                if ma in real_prices and len(real_prices[ma]) >= 30:
+                    pr6m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[0]) - 1) * 100
+                    total_ret_6m = pr6m + dy * 0.5
+                    pr1y_approx = pr6m * 2
+                    total_ret_1y = pr1y_approx + dy
+                    tr_rows.append({"Mã": ma, "Price 6M %": round(pr6m, 2),
+                        "Cổ tức/năm %": round(dy, 2), "Total Return 6M %": round(total_ret_6m, 2),
+                        "Total Return 1Y ước %": round(total_ret_1y, 2),
+                        "Cổ tức đóng góp %": round(dy / max(total_ret_1y, 0.1) * 100, 1) if total_ret_1y > 0 else 0})
+            if tr_rows:
+                df_tr = pd.DataFrame(tr_rows).sort_values("Total Return 1Y ước %", ascending=False)
+                st.dataframe(df_tr, use_container_width=True, hide_index=True)
+                top_div = tr_rows[0]
+                avg_div_contrib = sum(r["Cổ tức đóng góp %"] for r in tr_rows) / len(tr_rows)
+                st.caption(f"📊 Tính từ giá thật yfinance 6T + dividend_yield từ yfinance.info. Top cổ tức: **{top_div['Mã']}** ({top_div['Cổ tức/năm %']}%). Cổ tức TB đóng góp {avg_div_contrib:.1f}% tổng return DM.")
+        else:
+            st.info("⚠️ Cần dividend_yield từ yfinance để tính.")
+
+        st.write("---")
+        st.write("## ⚠️ Tail Risk Decomposition — Mã nào gây lỗ đuôi?")
+        if has_real and dm_equity is not None and len(real_prices) >= 2 and len(dm_equity) > 60:
+            ret_s7 = pd.Series(dm_equity).pct_change().dropna()
+            var_5_threshold = float(ret_s7.quantile(0.05))
+            tail_days = ret_s7[ret_s7 <= var_5_threshold].index
+            if len(tail_days) > 0:
+                tr_rows2 = []
+                for ma, info in dm.items():
+                    if ma in real_prices and len(real_prices[ma]) < len(tail_days) + 5: continue
+                    gia_tt = info.get("gia_thi_truong", 0)
+                    sl = info.get("so_luong", 0)
+                    if gia_tt <= 0 or sl <= 0: continue
+                    w = (gia_tt * sl) / tong_gt
+                    tail_ret_ma = real_prices[ma].pct_change().dropna().reindex(tail_days).dropna()
+                    if len(tail_ret_ma) == 0: continue
+                    avg_tail_ret = float(tail_ret_ma.mean())
+                    contr = w * avg_tail_ret * 100
+                    tr_rows2.append({"Mã": ma, "Tỷ trọng %": round(w*100, 1),
+                        "Return TB ngày tệ": f"{avg_tail_ret*100:.2f}%",
+                        "Đóng góp vào đuôi %": round(contr, 3)})
+                if tr_rows2:
+                    df_tr2 = pd.DataFrame(tr_rows2).sort_values("Đóng góp vào đuôi %")
+                    st.dataframe(df_tr2, use_container_width=True, hide_index=True)
+                    worst_ma = tr_rows2[0]
+                    st.caption(f"📊 {len(tail_days)} phiên tệ nhất (VaR 5%). Mã **{worst_ma['Mã']}** đóng góp {worst_ma['Đóng góp vào đuôi %']:+.3f}% vào đuôi (gây lỗ nhiều nhất). Tính từ returns thật yfinance 6T.")
+            else:
+                st.info("Không có phiên nào dưới VaR 5%.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để phân tích tail risk.")
+
+        st.write("---")
+        st.write("## 📉 Individual Stock Drawdown — Sụt giảm từng mã")
+        if has_real and len(real_prices) >= 1:
+            idd_rows = []
+            for ma in dm.keys():
+                if ma in real_prices and len(real_prices[ma]) >= 30:
+                    p = real_prices[ma]
+                    running_max_i = p.cummax()
+                    dd_i = (p - running_max_i) / running_max_i * 100
+                    worst_dd = float(dd_i.min())
+                    peak_idx = p.cummax().idxmax()
+                    trough_idx = dd_i.idxmin()
+                    if peak_idx <= trough_idx:
+                        in_dd_now = (float(p.iloc[-1]) / float(p.loc[peak_idx]) - 1) * 100
+                        cur_dd = float(dd_i.iloc[-1])
+                    else:
+                        in_dd_now = (float(p.iloc[-1]) / float(p.iloc[0]) - 1) * 100
+                        cur_dd = cur_dd if cur_dd < 0 else 0
+                    idd_rows.append({"Mã": ma, "Max DD %": round(worst_dd, 1),
+                        "DD hiện tại %": round(cur_dd, 1), "Return từ đỉnh %": round(in_dd_now, 1),
+                        "Trạng thái": "🔴 Dưới đỉnh" if cur_dd < -5 else ("🟡 Hồi phục" if cur_dd < 0 else "🟢 Trên đỉnh")})
+            if idd_rows:
+                df_idd = pd.DataFrame(idd_rows).sort_values("Max DD %")
+                st.dataframe(df_idd, use_container_width=True, hide_index=True)
+                worst_stock = idd_rows[0]
+                st.caption(f"📊 Tính từ giá thật yfinance 6T. **{worst_stock['Mã']}** sụt {worst_stock['Max DD %']:.1f}% từ đỉnh. Đang ở {worst_stock['DD hiện tại %']:+.1f}% so với đỉnh.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính drawdown từng mã.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
