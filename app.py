@@ -2648,6 +2648,31 @@ elif st.session_state.trang_thai == "deep_analysis":
                     pass
             return out, metas
 
+        @st.cache_data(ttl=3600, show_spinner="📊 Tải P/E, P/B, ROE thật từ yfinance...")
+        def _fetch_real_fundamentals(_symbols):
+            import yfinance as _yf
+            out = {}
+            for sym in _symbols:
+                try:
+                    t = _yf.Ticker(f"{sym}.VN")
+                    info = t.info
+                    if not info or 'symbol' not in info:
+                        continue
+                    out[sym] = {
+                        "pe": float(info.get("trailingPE") or 0) or None,
+                        "pb": float(info.get("priceToBook") or 0) or None,
+                        "roe": (float(info.get("returnOnEquity") or 0) or None),
+                        "roa": (float(info.get("returnOnAssets") or 0) or None),
+                        "dividend_yield": (float(info.get("dividendYield") or 0) or 0) / 100.0,
+                        "market_cap": float(info.get("marketCap") or 0) or None,
+                        "eps": float(info.get("epsCurrentYear") or info.get("trailingEps") or 0) or None,
+                        "beta": float(info.get("beta") or 0) or None,
+                        "current_price": float(info.get("currentPrice") or info.get("regularMarketPrice") or 0) or None,
+                    }
+                except Exception:
+                    pass
+            return out
+
         @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_vn30_proxy():
             import requests as _rq, pandas as _pd
@@ -2686,9 +2711,16 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if w52l: kpi[ma]['w52_low'] = float(w52l)
                 if cur_px and dm[ma].get('gia_thi_truong', 0) <= 0:
                     dm[ma]['gia_thi_truong'] = float(cur_px)
+        real_fund = _fetch_real_fundamentals(tuple(_ma_for_fetch))
+        for ma, fund in real_fund.items():
+            if ma in kpi and fund:
+                for k, v in fund.items():
+                    if v is not None and v != 0:
+                        kpi[ma][k] = v
         vn30_close, vn30_label = _fetch_vn30_proxy()
         has_real = len(real_prices) >= 2
         has_vn30 = vn30_close is not None
+        has_fund = len(real_fund) >= 1
         port_beta = sum(betas)
         port_return = rp
         if has_real and len(real_prices) >= 2:
