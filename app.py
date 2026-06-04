@@ -20,6 +20,14 @@ st.markdown(
     "m.setAttribute('content','vi');"
     "document.head.appendChild(m);"
     "}"
+    "(function(){"
+    "var _orig=console.error;"
+    "console.error=function(){"
+    "var s=Array.from(arguments).join(' ');"
+    "if(/segment\\.com|google-analytics|translate\\.google|translate\\.googleapis|bufferedData|cdn\\.segment|ERR_BLOCKED_BY_ADMINISTRATOR/.test(s))return;"
+    "_orig.apply(console,arguments);"
+    "};"
+    "})();"
     "</script>",
     unsafe_allow_html=True,
 )
