@@ -1,45 +1,8 @@
 import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
-import numpy as np
+import sys, traceback
 from datetime import datetime, timedelta
 
 _T0 = datetime.now()
-
-from backend.risk_profile import (
-    CAU_HOI_KHAO_SAT,
-    LOAI_NHA_DAU_TU,
-    danh_gia_rui_ro,
-    phan_bo_danh_muc,
-)
-from backend.danh_muc_metrics import tinh_return_danh_muc
-from backend.portfolio import (
-    THONG_TIN_KENH,
-    mo_phong_monte_carlo,
-    tinh_toan_danh_muc,
-    tinh_toan_phan_bo_lai_lo,
-)
-from backend.market_data import (
-    lay_thong_tin_thi_truong,
-    lay_thong_tin_quoc_te,
-    lay_co_phieu_de_xuat,
-    phan_tich_dau_tu_theo_nganh,
-    CO_PHIEU_VN,
-    DANH_SACH_NGANH,
-    cap_nhat_toan_bo,
-    cap_nhat_co_phieu_vn,
-    dinh_dang_gia_quoc_te,
-)
-from backend.chat_advisor import tim_cau_tra_loi
-from backend.calculations import (
-    phan_tich_lich_su,
-    phan_tich_danh_muc_nang_cao,
-    tinh_tuong_quan,
-)
-from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX, reset_password, _read
-_T1 = datetime.now(); print(f"[TRACE] backend imports: {(_T1-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
 
 st.set_page_config(
     page_title="Robo-Advisor AI - Đầu tư thông minh",
@@ -47,14 +10,63 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-_T2 = datetime.now(); print(f"[TRACE] set_page_config: {(_T2-_T1).total_seconds():.3f}s", file=__import__('sys').stderr)
+
+try:
+    import pandas as pd
+    import plotly.graph_objects as go
+    import plotly.express as px
+    from plotly.subplots import make_subplots
+    import numpy as np
+
+    from backend.risk_profile import (
+        CAU_HOI_KHAO_SAT,
+        LOAI_NHA_DAU_TU,
+        danh_gia_rui_ro,
+        phan_bo_danh_muc,
+    )
+    from backend.danh_muc_metrics import tinh_return_danh_muc
+    from backend.portfolio import (
+        THONG_TIN_KENH,
+        mo_phong_monte_carlo,
+        tinh_toan_danh_muc,
+        tinh_toan_phan_bo_lai_lo,
+    )
+    from backend.market_data import (
+        lay_thong_tin_thi_truong,
+        lay_thong_tin_quoc_te,
+        lay_co_phieu_de_xuat,
+        phan_tich_dau_tu_theo_nganh,
+        CO_PHIEU_VN,
+        DANH_SACH_NGANH,
+        cap_nhat_toan_bo,
+        cap_nhat_co_phieu_vn,
+        dinh_dang_gia_quoc_te,
+    )
+    from backend.chat_advisor import tim_cau_tra_loi
+    from backend.calculations import (
+        phan_tich_lich_su,
+        phan_tich_danh_muc_nang_cao,
+        tinh_tuong_quan,
+    )
+    from backend.database import save_state, load_state, save_chat, load_chat, ensure_user, count_users, register_beta_user, verify_user, is_founding_member, get_beta_progress, BETA_MAX, reset_password, _read
+except Exception as _import_err:
+    st.error(f"❌ Lỗi import backend: {_import_err}")
+    st.code(traceback.format_exc())
+    st.info("Vui lòng kiểm tra requirements.txt và phiên bản Python (runtime.txt = python-3.11).")
+    st.stop()
+
+_T1 = datetime.now(); print(f"[TRACE] backend imports: {(_T1-_T0).total_seconds():.3f}s", file=sys.stderr)
+_T2 = datetime.now(); print(f"[TRACE] set_page_config: {(_T2-_T1).total_seconds():.3f}s", file=sys.stderr)
 
 import random
 import json
 import os
 import html as html_module
-from dotenv import load_dotenv
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
 
 def _safe_html(text):
@@ -68,7 +80,6 @@ if not _GROQ_KEY:
         pass
 if not _GROQ_KEY:
     _GROQ_KEY = ''.join(chr(c) for c in [103,115,107,95,80,115,102,109,110,89,66,70,49,48,75,102,86,70,54,119,103,110,99,54,87,71,100,121,98,51,70,89,87,53,87,55,76,80,82,99,111,72,77,75,78,78,99,75,83,86,121,83,80,51,112,103])
-import sys, traceback
 _T3 = datetime.now(); print(f"[TRACE] stdlib/dotenv: {(_T3-_T2).total_seconds():.3f}s", file=sys.stderr)
 
 # Try to load data from Excel/JSON/snapshot
@@ -94,13 +105,16 @@ def _load_data_cached():
 def _ensure_data():
     global DOCS
     DOCS = _load_data_cached()
-_T4 = datetime.now(); print(f"[TRACE] data_loader import: {(_T4-_T3).total_seconds():.3f}s", file=__import__('sys').stderr)
+_T4 = datetime.now(); print(f"[TRACE] data_loader import: {(_T4-_T3).total_seconds():.3f}s", file=sys.stderr)
 
-from backend.expert_panel import hoi_dong_chuyen_gia
-_T4b = datetime.now(); print(f"[TRACE] expert_panel import: {(_T4b-_T4).total_seconds():.3f}s", file=__import__('sys').stderr)
+def hoi_dong_chuyen_gia(*args, **kwargs):
+    """Lazy import expert_panel để giảm thời gian khởi động ~0.5s"""
+    from backend.expert_panel import hoi_dong_chuyen_gia as _impl
+    return _impl(*args, **kwargs)
+_T4b = datetime.now(); print(f"[TRACE] expert_panel deferred: {(_T4b-_T4).total_seconds():.3f}s", file=sys.stderr)
 
 def _khoi_tao_dulieu():
-    print("[TRACE] _khoi_tao_dulieu called", file=__import__('sys').stderr)
+    print("[TRACE] _khoi_tao_dulieu called", file=sys.stderr)
     if "docs_loaded" not in st.session_state or not st.session_state.docs_loaded:
         _ensure_data()
         st.session_state.docs_loaded = True
@@ -108,7 +122,7 @@ def _khoi_tao_dulieu():
     else:
         DOCS.update(st.session_state.doc_data)
     cap_nhat_co_phieu_vn()
-    print("[TRACE] _khoi_tao_dulieu done", file=__import__('sys').stderr)
+    print("[TRACE] _khoi_tao_dulieu done", file=sys.stderr)
     return True
 
 if "authenticated" not in st.session_state:
@@ -425,14 +439,14 @@ if not st.session_state.authenticated:
         hien_thi_login()
     else:
         hien_thi_otp()
-    _T5 = datetime.now(); print(f"[TRACE] login rendered: {(_T5-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
+    _T5 = datetime.now(); print(f"[TRACE] login rendered: {(_T5-_T0).total_seconds():.3f}s", file=sys.stderr)
     st.stop()
 
 
-_T6 = datetime.now(); print(f"[TRACE] past login, calling _khoi_tao_dulieu: {(_T6-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
+_T6 = datetime.now(); print(f"[TRACE] past login, calling _khoi_tao_dulieu: {(_T6-_T0).total_seconds():.3f}s", file=sys.stderr)
 try:
     _khoi_tao_dulieu()
-    _T7 = datetime.now(); print(f"[TRACE] _khoi_tao_dulieu returned: {(_T7-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
+    _T7 = datetime.now(); print(f"[TRACE] _khoi_tao_dulieu returned: {(_T7-_T0).total_seconds():.3f}s", file=sys.stderr)
 except Exception as _e:
     import traceback as _tb
     _tb.print_exc()
