@@ -443,6 +443,48 @@ if not st.session_state.authenticated:
     st.stop()
 
 
+# ============================================================
+# 💎 HỆ THỐNG PHÂN QUYỀN PRO / BÌNH THƯỜNG
+# ============================================================
+if 'is_pro' not in st.session_state:
+    st.session_state.is_pro = False
+
+try:
+    PASSWORD_PRO = st.secrets.get("PRO_PASSWORD", "DatSolocodoc2026")
+except Exception:
+    PASSWORD_PRO = "DatSolocodoc2026"
+
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("🛡️ **Phân Loại Khách Hàng**")
+    user_type = st.selectbox(
+        "Bạn là nhà đầu tư:",
+        ["Nhà đầu tư mới", "Nhà đầu tư lâu năm"],
+        key="user_type_select",
+    )
+    if st.session_state.is_pro:
+        st.success("✨ Tài khoản: **GÓI PRO** (Đã mở khóa)")
+        if st.button("Đăng xuất gói PRO", key="logout_pro", use_container_width=True):
+            st.session_state.is_pro = False
+            st.rerun()
+    else:
+        st.info("📌 Tài khoản: **GÓI BÌNH THƯỜNG**")
+        with st.expander("🔑 Kích hoạt Gói PRO"):
+            input_password = st.text_input(
+                "Nhập mật khẩu cấp phép:",
+                type="password",
+                key="pro_pwd_input",
+            )
+            if st.button("Xác nhận kích hoạt", key="activate_pro", use_container_width=True):
+                if input_password == PASSWORD_PRO:
+                    st.session_state.is_pro = True
+                    st.success("✅ Kích hoạt Gói PRO thành công!")
+                    st.rerun()
+                else:
+                    st.error("❌ Mật khẩu không chính xác!")
+    st.markdown("---")
+
+
 _T6 = datetime.now(); print(f"[TRACE] past login, calling _khoi_tao_dulieu: {(_T6-_T0).total_seconds():.3f}s", file=sys.stderr)
 try:
     _khoi_tao_dulieu()
@@ -1414,6 +1456,27 @@ def _render_tonghop():
 if st.session_state.trang_thai == "home":
     st.session_state.trang_thai = "dashboard"
     st.rerun()
+
+# ============================================================
+# 💎 TRẠNG THÁI GÓI PRO (hiển thị banner đầu mỗi page)
+# ============================================================
+if st.session_state.is_pro:
+    st.markdown(
+        '<div style="background:linear-gradient(90deg,#FFD70022,#00C9A722);'
+        'border:1px solid #FFD70055;border-radius:10px;padding:8px 16px;'
+        'margin-bottom:12px;font-size:0.9rem;">'
+        '💎 <b style="color:#FFD700;">GÓI PRO</b> đang kích hoạt — toàn quyền tính năng cao cấp.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        '<div style="background:#ECE8E10a;border:1px solid #8E8E9A33;border-radius:10px;'
+        'padding:8px 16px;margin-bottom:12px;font-size:0.85rem;color:#8E8E9A;">'
+        '📌 Đang dùng <b>GÓI BÌNH THƯỜNG</b> — Kích hoạt PRO trong thanh Sidebar để mở khóa tính năng VIP.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 if st.session_state.trang_thai == "survey":
 
