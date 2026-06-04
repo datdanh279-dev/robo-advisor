@@ -2530,39 +2530,39 @@ elif st.session_state.trang_thai == "deep_analysis":
         kpi = DOCS.get("kpi", {}) or {}
         perf = DOCS.get("performance", {}) or {}
         tong_gt, tong_von, tong_lai_lo, return_pct = tinh_return_danh_muc(dm)
-
+        is_demo = False
         if not dm or tong_gt <= 0:
-            st.warning("⚠️ Chưa có dữ liệu danh mục thực tế trong hệ thống.")
-            st.info("💡 **Hướng dẫn:** Vào **Sidebar → 🔄 Cập nhật dữ liệu** để tải dữ liệu danh mục từ file Excel. Hoặc dùng danh mục mẫu bên dưới để xem trước phân tích.")
-            if st.button("📊 Dùng danh mục mẫu để xem trước", key="demo_dm", use_container_width=True):
-                st.session_state.dem_dm_active = True
-                st.rerun()
-            if st.session_state.get("dem_dm_active"):
-                dm = {
-                    "VCB": {"nganh": "Ngân hàng", "gia_thi_truong": 92000, "gia_von": 85000, "so_luong": 100, "von_hoa": 150000, "ty_trong_muc_tieu": 0.18},
-                    "FPT": {"nganh": "Công nghệ", "gia_thi_truong": 145000, "gia_von": 120000, "so_luong": 50, "von_hoa": 110000, "ty_trong_muc_tieu": 0.15},
-                    "HPG": {"nganh": "Thép", "gia_thi_truong": 27000, "gia_von": 30000, "so_luong": 500, "von_hoa": 80000, "ty_trong_muc_tieu": 0.12},
-                    "VNM": {"nganh": "Thực phẩm", "gia_thi_truong": 68000, "gia_von": 72000, "so_luong": 200, "von_hoa": 140000, "ty_trong_muc_tieu": 0.14},
-                    "MWG": {"nganh": "Bán lẻ", "gia_thi_truong": 48000, "gia_von": 55000, "so_luong": 300, "von_hoa": 70000, "ty_trong_muc_tieu": 0.10},
-                    "MBB": {"nganh": "Ngân hàng", "gia_thi_truong": 24000, "gia_von": 22000, "so_luong": 800, "von_hoa": 95000, "ty_trong_muc_tieu": 0.12},
-                    "VIC": {"nganh": "Bất động sản", "gia_thi_truong": 42000, "gia_von": 48000, "so_luong": 400, "von_hoa": 60000, "ty_trong_muc_tieu": 0.10},
-                    "CTG": {"nganh": "Ngân hàng", "gia_thi_truong": 32000, "gia_von": 30000, "so_luong": 500, "von_hoa": 85000, "ty_trong_muc_tieu": 0.09},
-                }
-                kpi = {
-                    "VCB": {"nganh": "Ngân hàng", "beta": 0.85, "roe": 0.21, "pe": 9.5, "lai_lo_pct": 0.082, "ty_trong_ht": 0.13, "ty_trong_mt": 0.18, "chenh_lech": 0.05, "upside": 15000, "var_1": 1200000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 85, "diem_ban": 30},
-                    "FPT": {"nganh": "Công nghệ", "beta": 1.15, "roe": 0.25, "pe": 18.2, "lai_lo_pct": 0.21, "ty_trong_ht": 0.10, "ty_trong_mt": 0.15, "chenh_lech": 0.05, "upside": 25000, "var_1": 1500000, "ket_luan": "MUA MẠNH", "hanh_dong": "Giữ", "diem_mua": 92, "diem_ban": 25},
-                    "HPG": {"nganh": "Thép", "beta": 1.35, "roe": 0.12, "pe": 12.0, "lai_lo_pct": -0.10, "ty_trong_ht": 0.18, "ty_trong_mt": 0.12, "chenh_lech": 0.06, "upside": 5000, "var_1": 1800000, "ket_luan": "GIỮ", "hanh_dong": "Quan sát", "diem_mua": 55, "diem_ban": 45},
-                    "VNM": {"nganh": "Thực phẩm", "beta": 0.70, "roe": 0.27, "pe": 14.5, "lai_lo_pct": -0.056, "ty_trong_ht": 0.19, "ty_trong_mt": 0.14, "chenh_lech": 0.05, "upside": 8000, "var_1": 900000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 78, "diem_ban": 32},
-                    "MWG": {"nganh": "Bán lẻ", "beta": 1.20, "roe": 0.15, "pe": 22.0, "lai_lo_pct": -0.127, "ty_trong_ht": 0.20, "ty_trong_mt": 0.10, "chenh_lech": 0.10, "upside": 6000, "var_1": 2000000, "ket_luan": "BÁN", "hanh_dong": "Giảm tỷ trọng", "diem_mua": 38, "diem_ban": 72},
-                    "MBB": {"nganh": "Ngân hàng", "beta": 0.90, "roe": 0.23, "pe": 7.2, "lai_lo_pct": 0.091, "ty_trong_ht": 0.13, "ty_trong_mt": 0.12, "chenh_lech": 0.01, "upside": 3000, "var_1": 1100000, "ket_luan": "MUA MẠNH", "hanh_dong": "Giữ", "diem_mua": 88, "diem_ban": 22},
-                    "VIC": {"nganh": "Bất động sản", "beta": 1.10, "roe": 0.08, "pe": 35.0, "lai_lo_pct": -0.125, "ty_trong_ht": 0.05, "ty_trong_mt": 0.10, "chenh_lech": 0.05, "upside": 5000, "var_1": 2500000, "ket_luan": "GIỮ", "hanh_dong": "Quan sát", "diem_mua": 50, "diem_ban": 50},
-                    "CTG": {"nganh": "Ngân hàng", "beta": 0.95, "roe": 0.18, "pe": 8.5, "lai_lo_pct": 0.067, "ty_trong_ht": 0.02, "ty_trong_mt": 0.09, "chenh_lech": 0.07, "upside": 4000, "var_1": 1000000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 75, "diem_ban": 35},
-                }
-                perf = {"Rf": 0.045, "Rm": 0.082, "Beta": 1.02, "Rp": 0.107, "phi_gd": 0.0015, "thue": 0.001}
-                tong_gt, tong_von, tong_lai_lo, return_pct = tinh_return_danh_muc(dm)
-                st.info(f"📊 Đang dùng danh mục mẫu ({len(dm)} mã, tổng GT {tong_gt:,.0f} ₫, return {return_pct:+.1f}%)")
-            else:
-                st.stop()
+            is_demo = True
+            st.markdown(
+                '<div style="background:linear-gradient(90deg,rgba(255,215,0,0.12),rgba(33,150,243,0.06));'
+                'border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px 16px;margin-bottom:14px;">'
+                '<b style="color:#FFD700;">📊 Đang hiển thị danh mục mẫu (8 mã blue-chip VN)</b> — '
+                'Vào <b>Sidebar → 🔄 Cập nhật dữ liệu</b> để dùng danh mục thực của anh.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            dm = {
+                "VCB": {"nganh": "Ngân hàng", "gia_thi_truong": 92000, "gia_von": 85000, "so_luong": 100, "von_hoa": 150000, "ty_trong_muc_tieu": 0.18},
+                "FPT": {"nganh": "Công nghệ", "gia_thi_truong": 145000, "gia_von": 120000, "so_luong": 50, "von_hoa": 110000, "ty_trong_muc_tieu": 0.15},
+                "HPG": {"nganh": "Thép", "gia_thi_truong": 27000, "gia_von": 30000, "so_luong": 500, "von_hoa": 80000, "ty_trong_muc_tieu": 0.12},
+                "VNM": {"nganh": "Thực phẩm", "gia_thi_truong": 68000, "gia_von": 72000, "so_luong": 200, "von_hoa": 140000, "ty_trong_muc_tieu": 0.14},
+                "MWG": {"nganh": "Bán lẻ", "gia_thi_truong": 48000, "gia_von": 55000, "so_luong": 300, "von_hoa": 70000, "ty_trong_muc_tieu": 0.10},
+                "MBB": {"nganh": "Ngân hàng", "gia_thi_truong": 24000, "gia_von": 22000, "so_luong": 800, "von_hoa": 95000, "ty_trong_muc_tieu": 0.12},
+                "VIC": {"nganh": "Bất động sản", "gia_thi_truong": 42000, "gia_von": 48000, "so_luong": 400, "von_hoa": 60000, "ty_trong_muc_tieu": 0.10},
+                "CTG": {"nganh": "Ngân hàng", "gia_thi_truong": 32000, "gia_von": 30000, "so_luong": 500, "von_hoa": 85000, "ty_trong_muc_tieu": 0.09},
+            }
+            kpi = {
+                "VCB": {"nganh": "Ngân hàng", "beta": 0.85, "roe": 0.21, "pe": 9.5, "lai_lo_pct": 0.082, "ty_trong_ht": 0.13, "ty_trong_mt": 0.18, "chenh_lech": 0.05, "upside": 15000, "var_1": 1200000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 85, "diem_ban": 30},
+                "FPT": {"nganh": "Công nghệ", "beta": 1.15, "roe": 0.25, "pe": 18.2, "lai_lo_pct": 0.21, "ty_trong_ht": 0.10, "ty_trong_mt": 0.15, "chenh_lech": 0.05, "upside": 25000, "var_1": 1500000, "ket_luan": "MUA MẠNH", "hanh_dong": "Giữ", "diem_mua": 92, "diem_ban": 25},
+                "HPG": {"nganh": "Thép", "beta": 1.35, "roe": 0.12, "pe": 12.0, "lai_lo_pct": -0.10, "ty_trong_ht": 0.18, "ty_trong_mt": 0.12, "chenh_lech": 0.06, "upside": 5000, "var_1": 1800000, "ket_luan": "GIỮ", "hanh_dong": "Quan sát", "diem_mua": 55, "diem_ban": 45},
+                "VNM": {"nganh": "Thực phẩm", "beta": 0.70, "roe": 0.27, "pe": 14.5, "lai_lo_pct": -0.056, "ty_trong_ht": 0.19, "ty_trong_mt": 0.14, "chenh_lech": 0.05, "upside": 8000, "var_1": 900000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 78, "diem_ban": 32},
+                "MWG": {"nganh": "Bán lẻ", "beta": 1.20, "roe": 0.15, "pe": 22.0, "lai_lo_pct": -0.127, "ty_trong_ht": 0.20, "ty_trong_mt": 0.10, "chenh_lech": 0.10, "upside": 6000, "var_1": 2000000, "ket_luan": "BÁN", "hanh_dong": "Giảm tỷ trọng", "diem_mua": 38, "diem_ban": 72},
+                "MBB": {"nganh": "Ngân hàng", "beta": 0.90, "roe": 0.23, "pe": 7.2, "lai_lo_pct": 0.091, "ty_trong_ht": 0.13, "ty_trong_mt": 0.12, "chenh_lech": 0.01, "upside": 3000, "var_1": 1100000, "ket_luan": "MUA MẠNH", "hanh_dong": "Giữ", "diem_mua": 88, "diem_ban": 22},
+                "VIC": {"nganh": "Bất động sản", "beta": 1.10, "roe": 0.08, "pe": 35.0, "lai_lo_pct": -0.125, "ty_trong_ht": 0.05, "ty_trong_mt": 0.10, "chenh_lech": 0.05, "upside": 5000, "var_1": 2500000, "ket_luan": "GIỮ", "hanh_dong": "Quan sát", "diem_mua": 50, "diem_ban": 50},
+                "CTG": {"nganh": "Ngân hàng", "beta": 0.95, "roe": 0.18, "pe": 8.5, "lai_lo_pct": 0.067, "ty_trong_ht": 0.02, "ty_trong_mt": 0.09, "chenh_lech": 0.07, "upside": 4000, "var_1": 1000000, "ket_luan": "MUA", "hanh_dong": "Tăng tỷ trọng", "diem_mua": 75, "diem_ban": 35},
+            }
+            perf = {"Rf": 0.045, "Rm": 0.082, "Beta": 1.02, "Rp": 0.107, "phi_gd": 0.0015, "thue": 0.001}
+            tong_gt, tong_von, tong_lai_lo, return_pct = tinh_return_danh_muc(dm)
 
         rf = float(perf.get("Rf", 0.045))
         rm = float(perf.get("Rm", 0.082))
