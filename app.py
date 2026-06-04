@@ -2521,8 +2521,9 @@ elif st.session_state.trang_thai == "portfolio":
         st.info("Chưa có dữ liệu danh mục. Hãy cập nhật dữ liệu trước.")
 
 elif st.session_state.trang_thai == "deep_analysis":
+    import time as _time
+    st.error(f"🆕 VERSION 3.1 — BUILD 51ba7aa+ — { _time.strftime('%H:%M:%S %d/%m/%Y') } — Nếu anh KHÔNG thấy dòng này = browser cache cũ → Ctrl+Shift+R")
     st.write("# 📊 PHÂN TÍCH CHUYÊN SÂU DANH MỤC")
-    st.write("### Phiên bản v3.0 — Cập nhật 04/06/2026")
     st.write("---")
 
     dm = DOCS.get("danh_muc", {}) or {}
