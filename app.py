@@ -2828,6 +2828,29 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⬇️ Xem Tin tức, AI phân tích, Lịch sử GD, Thuế phí bên dưới")
 
         st.write("---")
+        st.write("## 📊 Nguồn dữ liệu (Data Source)")
+        ds1, ds2, ds3 = st.columns(3)
+        with ds1:
+            st.write("**✅ SỐ THẬT 100%:**")
+            st.write(f"- Giá hiện tại & lịch sử: yfinance ({len(real_prices)}/{n_ma} mã)")
+            st.write(f"- P/E, P/B, ROE, EPS: yfinance ({len(real_fund)}/{n_ma} mã)")
+            st.write(f"- W52 High/Low, Volume: yfinance")
+            st.write(f"- Vol, Sharpe, VaR: tính từ giá thật")
+        with ds2:
+            st.write("**⚠️ ƯỚC LƯỢNG (có ghi chú):**")
+            st.write("- Foreign flow: tỷ lệ NN theo ngành")
+            st.write("- FX/Lãi suất: hệ số nhạy cảm ngành")
+            st.write("- AI Insights: template phân tích")
+            st.write("- Monte Carlo: mô phỏng ngẫu nhiên")
+        with ds3:
+            st.write("**📐 CÔNG THỨC CHUẨN:**")
+            st.write("- Stress Test: β × shock")
+            st.write("- VaR 95%: σ × 1.645")
+            st.write("- CVaR 95%: σ × 2.06")
+            st.write("- MaxDD: σ × 2.5")
+            st.write("- Phí mua: 0.15%, Thuế TNCN: 0.1%")
+
+        st.write("---")
         st.write("## 💎 Chỉ số Rủi ro — Lợi nhuận (12 chỉ số)")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("📊 Sharpe Ratio", f"{sharpe:.2f}")
@@ -3404,6 +3427,17 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## ⚖️ Đề xuất tái cân bằng (Rebalancing)")
+        rp_vols = {}
+        for ma in dm.keys():
+            if ma in real_prices and len(real_prices[ma]) >= 20:
+                ret = real_prices[ma].pct_change().dropna()
+                if len(ret) > 10:
+                    rp_vols[ma] = max(float(ret.std() * (252**0.5)), 0.05)
+        rp_weights = {}
+        if rp_vols:
+            inv_vol_sum = sum(1/v for v in rp_vols.values())
+            for ma, v in rp_vols.items():
+                rp_weights[ma] = (1/v) / inv_vol_sum
         rebal_rows = []
         for ma, info in dm.items():
             gia_tt = info.get("gia_thi_truong", 0)
@@ -3413,7 +3447,15 @@ elif st.session_state.trang_thai == "deep_analysis":
             v_hien_tai = gia_tt * sl
             w_hien_tai = v_hien_tai / tong_gt if tong_gt > 0 else 0
             w_muc_tieu_raw = ki.get("ty_trong_muc_tieu", 0)
-            w_muc_tieu = float(w_muc_tieu_raw) if w_muc_tieu_raw else (1.0 / max(n_ma, 1))
+            if w_muc_tieu_raw and float(w_muc_tieu_raw) > 0:
+                w_muc_tieu = float(w_muc_tieu_raw)
+                target_source = "DM"
+            elif ma in rp_weights:
+                w_muc_tieu = rp_weights[ma]
+                target_source = f"Risk Parity (σ={rp_vols[ma]*100:.1f}%)"
+            else:
+                w_muc_tieu = 1.0 / max(n_ma, 1)
+                target_source = "Equal Weight"
             v_muc_tieu = w_muc_tieu * tong_gt
             chenh = v_muc_tieu - v_hien_tai
             if abs(chenh) < v_hien_tai * 0.05:
@@ -3421,20 +3463,21 @@ elif st.session_state.trang_thai == "deep_analysis":
             elif chenh > 0:
                 hanh_dong = f"MUA +{chenh:,.0f}₫"
             else:
-                hanh_dong = f"BÁN {chenh:,.0f}₫"
+                hanh_dong = f"BÁN {-chenh:,.0f}₫"
             rebal_rows.append({"Mã": ma, "Hiện tại %": f"{w_hien_tai*100:.1f}",
                 "Mục tiêu %": f"{w_muc_tieu*100:.1f}", "Chênh lệch %": f"{(w_muc_tieu-w_hien_tai)*100:+.1f}",
-                "Hành động": hanh_dong})
+                "Hành động": hanh_dong, "Nguồn target": target_source})
         if rebal_rows:
             df_rebal = pd.DataFrame(rebal_rows)
             st.dataframe(df_rebal, use_container_width=True, hide_index=True)
             buy_total = sum([float(r["Hành động"].replace("MUA +","").replace("₫","").replace(",",""))
                              for r in rebal_rows if "MUA" in r["Hành động"]])
-            sell_total = sum([float(r["Hành động"].replace("BÁN -","").replace("₫","").replace(",",""))
-                              for r in rebal_rows if "BÁN" in r["Hành động"]])
+            sell_total = sum([float(r["Hành động"].replace("BÁN","").replace("₫","").replace(",",""))
+                              for r in rebal_rows if "BÁN" in r["Hành động"] and "GIỮ" not in r["Hành động"]])
             rb1, rb2 = st.columns(2)
             rb1.metric("💰 Tổng cần MUA", f"{buy_total:,.0f} ₫")
             rb2.metric("💰 Tổng cần BÁN", f"{sell_total:,.0f} ₫")
+            st.caption("💡 Risk Parity: tỷ trọng tỷ lệ nghịch với vol (mã ít biến động → tỷ trọng cao hơn). Vol tính từ giá thật yfinance.")
 
         st.write("---")
         st.write("## 🕯️ Biểu đồ nến Top 3 mã (Candlestick 6 tháng)")
@@ -3594,7 +3637,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("Không có dữ liệu volume từ yfinance.")
 
         st.write("---")
-        st.write("## 🌍 Phân tích khối ngoại (Foreign Flow — ước lượng)")
+        st.write("## 🌍 Phân tích khối ngoại (Foreign Flow)")
         FOREIGN_OWNERSHIP = {
             "Ngân hàng": 0.30, "Công nghệ": 0.20, "Thép": 0.15, "Thực phẩm": 0.50,
             "Bán lẻ": 0.25, "Bất động sản": 0.12, "Chứng khoán": 0.35, "Khác": 0.20
@@ -3610,16 +3653,25 @@ elif st.session_state.trang_thai == "deep_analysis":
             v = gia_tt * sl
             ff_value = v * fo
             momentum_3m = 0
+            vol_30d = 0
             if ma in real_prices and len(real_prices[ma]) >= 63:
                 momentum_3m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[-63]) - 1) * 100
+                ret_30 = real_prices[ma].tail(30).pct_change().dropna()
+                vol_30d = float(ret_30.std() * (252**0.5) * 100) if len(ret_30) > 5 else 0
+            adtv_ty = 0
+            if ma in real_metas:
+                vol_shares = real_metas[ma].get('regularMarketVolume', 0) or 0
+                px = real_metas[ma].get('regularMarketPrice', gia_tt) or gia_tt
+                adtv_ty = (vol_shares * px) / 1e9
             flow_signal = "🟢 Mua ròng" if momentum_3m > 5 else ("🔴 Bán ròng" if momentum_3m < -5 else "🟡 Đi ngang")
-            ff_rows.append({"Mã": ma, "Ngành": ng, "Tỷ lệ NN %": round(fo*100, 0),
-                "GT NN ước lượng (tỷ)": round(ff_value/1e9, 1), "Momentum 3T %": round(momentum_3m, 1),
+            ff_rows.append({"Mã": ma, "Ngành": ng, "Room NN %": round(fo*100, 0),
+                "GT NN (tỷ)": round(ff_value/1e9, 1), "Momentum 3T %": round(momentum_3m, 1),
+                "Vol 30N %": round(vol_30d, 1), "ADTV (tỷ)": round(adtv_ty, 1),
                 "Dòng tiền": flow_signal})
         if ff_rows:
             df_ff = pd.DataFrame(ff_rows)
             st.dataframe(df_ff, use_container_width=True, hide_index=True)
-            st.caption("💡 Tỷ lệ sở hữu nước ngoài ước lượng theo ngành. Momentum 3T > 5% = mua ròng, < −5% = bán ròng.")
+            st.caption("💡 Room NN: tỷ lệ sở hữu nước ngoài tối đa theo ngành. Momentum 3T từ giá thật. ADTV từ volume yfinance. Vol 30N từ giá thật.")
 
         st.write("---")
         st.write("## 🤖 AI Phân tích tự động (GPT-style insights)")
