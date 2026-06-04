@@ -65,3 +65,19 @@ Nếu console có `NotFoundError: Failed to execute 'removeChild' on 'Node'` tro
 - Nguyên nhân: CSS block lớn (`.main-header`, `.metric-box`, …) bị re‑emit mỗi `st.rerun()` → React reconciliation vỡ.
 - Fix: tất cả `<style>` / `<link>` blocks được inject qua flag `session_state._main_css_injected` / `_login_css_injected`, đảm bảo **chỉ inject 1 lần / session**.
 - Ngoài ra: bỏ `#root { ... }` selector (đụng React root), đổi `header[data-testid="stHeader"] { display: none; }` thành `visibility: hidden; height: 0` (giữ node trong DOM).
+
+## Vàng SJC giá sai (đã fix)
+
+Triệu chứng: tab Quốc tế hiển thị Vàng SJC ~145 triệu VND/lượng thay vì ~86 triệu.
+
+- Nguyên nhân (`backend/api_fetcher.py:80`): regex `<ratiotype="sell"…>` thiếu space giữa `ratio` và `type` → không match XML element thật `<ratio type="sell">` → luôn rơi vào nhánh fallback `int(xau * usd_vnd * 1.205 * 1.03)`.
+- Fix: đổi regex thành `<ratio\s+type="sell"…>` để match đúng cấu trúc XML từ `https://sjc.com.vn/xml/tygiavang.xml`.
+- Verify sau khi deploy: tab Quốc tế → Vàng SJC phải ~86.000.000 VND/lượng (giá SJC thật, không phải world gold * tỷ giá * 1.03).
+
+## Lưu ý khi đọc báo cáo từ AI khác
+
+Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi sửa**:
+
+- Mỗi chuỗi kỳ lạ ("103,710", "16.8%", "lặp 4 lần", …) phải tìm được trong code thật bằng `grep`/`rg` trước khi fix.
+- Ví dụ đã gặp: AI phân tích bảo "tổng lãi/lỗ 103,710₫ return 16.8%" nhưng `grep` toàn project → **0 match**. Số thật là 10.230.000₫ từ `tinh_return_danh_muc` ở `backend/danh_muc_metrics.py:4`.
+- Ví dụ đã gặp: AI bảo "Hội đồng 6 Chuyên gia" lặp 4 lần nhưng `grep "Hội đồng 6"` → **đúng 1 match** ở `app.py:1876`. 6 expert chips riêng là render riêng, không chứa title.
