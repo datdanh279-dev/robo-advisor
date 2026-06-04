@@ -483,6 +483,15 @@ _PWD_OK = {"hdfkemrrmo8490hd", "hdfkemr rmo8490hd"}
 
 with st.sidebar:
     st.markdown("---")
+    if "lang" not in st.session_state:
+        st.session_state.lang = "vi"
+    lang_now = st.radio("🌐 Ngôn ngữ / Language", ["vi", "en"], format_func=lambda x: "🇻🇳 Tiếng Việt" if x == "vi" else "🇬🇧 English", horizontal=True, key="lang_toggle", index=0 if st.session_state.lang == "vi" else 1)
+    st.session_state.lang = lang_now
+    _T = {
+        "vi": {"home": "Trang chủ", "dashboard": "Dashboard", "chat": "Chat", "tools": "Công cụ", "profile": "Hồ sơ", "logout": "Đăng xuất"},
+        "en": {"home": "Home", "dashboard": "Dashboard", "chat": "Chat", "tools": "Tools", "profile": "Profile", "logout": "Logout"},
+    }
+    st.markdown("---")
     st.markdown("🛡️ **Phân Loại Khách Hàng**")
     user_type = st.selectbox(
         "Bạn là nhà đầu tư:",
@@ -1490,7 +1499,7 @@ def _render_tonghop():
         st.markdown("### 🛠️ Bộ Công Cụ Nâng Cao")
         st.markdown("Các tính năng bổ sung: Watchlist, Cảnh báo giá, Biểu đồ kỹ thuật, So sánh cổ phiếu, Xuất PDF.")
         st.markdown("---")
-        sub_alert, sub_chart, sub_watch, sub_compare, sub_pdf, sub_news, sub_event, sub_profile, sub_backtest, sub_ai, sub_optim = st.tabs([
+        sub_alert, sub_chart, sub_watch, sub_compare, sub_pdf, sub_news, sub_event, sub_profile, sub_backtest, sub_ai, sub_optim, sub_telegram, sub_pay = st.tabs([
             "🔔 Cảnh báo giá",
             "📊 Biểu đồ kỹ thuật",
             "💼 Watchlist",
@@ -1502,6 +1511,8 @@ def _render_tonghop():
             "🧪 Backtest",
             "🤖 AI dự đoán",
             "🎯 Tối ưu DM",
+            "📞 Telegram",
+            "💳 Thanh toán",
         ])
 
         with sub_alert:
@@ -2039,6 +2050,117 @@ def _render_tonghop():
                         st.code(_tb.format_exc())
             elif len(ds_chon_op) < 2:
                 st.info("👉 Chọn ít nhất 2 mã CP để tối ưu.")
+
+        with sub_telegram:
+            st.markdown("#### 📞 Telegram Bot — Nhận cảnh báo qua Telegram")
+            st.caption("Cấu hình bot Telegram để nhận cảnh báo giá, tin tức, kết quả backtest qua tin nhắn.")
+            try:
+                _TG_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+            except Exception:
+                _TG_TOKEN = ""
+            if "telegram_config" not in st.session_state:
+                st.session_state.telegram_config = {"token": _TG_TOKEN, "chat_id": ""}
+            with st.form("tg_form"):
+                token_input = st.text_input("🤖 Bot Token (từ @BotFather)", value=st.session_state.telegram_config.get("token", ""), type="password", help="Tạo bot tại t.me/BotFather → /newbot → copy token")
+                chat_id_input = st.text_input("💬 Chat ID của bạn", value=st.session_state.telegram_config.get("chat_id", ""), help="Nhắn @userinfobot để lấy Chat ID")
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    if st.form_submit_button("💾 Lưu cấu hình", use_container_width=True):
+                        st.session_state.telegram_config = {"token": token_input, "chat_id": chat_id_input}
+                        st.success("✅ Đã lưu cấu hình Telegram")
+                with col_b:
+                    if st.form_submit_button("🧪 Gửi tin nhắn test", use_container_width=True):
+                        if not token_input or not chat_id_input:
+                            st.error("❌ Vui lòng nhập Token và Chat ID")
+                        else:
+                            try:
+                                url = f"https://api.telegram.org/bot{token_input}/sendMessage"
+                                payload = {"chat_id": chat_id_input, "text": "🎉 Robo-Advisor: Kết nối Telegram thành công!"}
+                                r = requests.post(url, json=payload, timeout=10)
+                                if r.status_code == 200:
+                                    st.success(f"✅ Đã gửi tin nhắn test! Check Telegram của anh.")
+                                else:
+                                    st.error(f"❌ Lỗi: {r.status_code} — {r.text[:200]}")
+                            except Exception as e:
+                                st.error(f"❌ Lỗi gửi: {e}")
+            st.markdown("---")
+            st.markdown("##### 📤 Gửi cảnh báo giá hiện tại qua Telegram")
+            if st.button("📨 Gửi danh sách cảnh báo", use_container_width=True, key="tg_send_alerts"):
+                cfg = st.session_state.telegram_config
+                if not cfg.get("token") or not cfg.get("chat_id"):
+                    st.error("❌ Chưa cấu hình Telegram. Vui lòng nhập Token + Chat ID.")
+                elif not st.session_state.get("price_alerts"):
+                    st.warning("⚠️ Chưa có cảnh báo nào. Thêm ở tab 🔔 Cảnh báo giá trước.")
+                else:
+                    try:
+                        msg = "🔔 *Cảnh báo giá Robo-Advisor*\n\n"
+                        for alert in st.session_state.price_alerts:
+                            gia = DOCS.get("co_phieu_vn", {}).get(alert["ma"], {}).get("gia", 0)
+                            msg += f"• {alert['ma']} {alert['loai']} {alert['nguong']:,.0f}₫ — Giá: {gia:,.0f}₫\n"
+                        url = f"https://api.telegram.org/bot{cfg['token']}/sendMessage"
+                        r = requests.post(url, json={"chat_id": cfg["chat_id"], "text": msg, "parse_mode": "Markdown"}, timeout=10)
+                        if r.status_code == 200:
+                            st.success(f"✅ Đã gửi {len(st.session_state.price_alerts)} cảnh báo qua Telegram!")
+                        else:
+                            st.error(f"❌ Lỗi: {r.text[:200]}")
+                    except Exception as e:
+                        st.error(f"❌ Lỗi: {e}")
+            st.markdown("---")
+            with st.expander("📖 Hướng dẫn tạo Telegram Bot"):
+                st.markdown("""
+1. Mở Telegram, tìm **@BotFather**
+2. Gửi `/newbot`
+3. Đặt tên bot (vd: `Robo Advisor Bot`)
+4. Đặt username (vd: `robo_advisor_vn_bot`)
+5. Copy **token** dán vào ô bên trên
+6. Nhắn tin cho bot mới tạo (bất kỳ tin nào)
+7. Mở `t.me/userinfobot` → bấm Start → copy **Chat ID**
+8. Dán vào ô Chat ID bên trên → Lưu
+                """)
+
+        with sub_pay:
+            st.markdown("#### 💳 Thanh toán Gói PRO")
+            st.caption("Kích hoạt gói PRO tự động — không cần nhập mật khẩu thủ công.")
+            st.markdown("---")
+            gia_pro = st.number_input("Giá gói PRO (₫)", value=500000, step=50000, key="pay_gia")
+            thoi_han = st.selectbox("Thời hạn", ["1 tháng", "3 tháng", "6 tháng", "12 tháng"], key="pay_th")
+            phan_tram_giam = {"1 tháng": 0, "3 tháng": 10, "6 tháng": 15, "12 tháng": 25}
+            giam = phan_tram_giam[thoi_han]
+            thanh_tien = int(gia_pro * (1 - giam/100))
+            st.markdown(f"**Thành tiền:** ~~{gia_pro:,.0f}₫~~ → **{thanh_tien:,.0f}₫** (giảm {giam}%)")
+            st.markdown("---")
+            st.markdown("##### 🏦 Thông tin chuyển khoản")
+            st.info("""
+**Ngân hàng:** MB Bank  
+**Chủ tài khoản:** DANH ĐẠT  
+**Số tài khoản:** `0358814661`  
+**Nội dung CK:** `ROBO PRO {username} {ma_don}`
+
+*(Thay `{username}` = tên đăng nhập, `{ma_don}` = mã bên dưới)*
+            """.replace("{username}", st.session_state.get("username", "khach")).replace("{ma_don}", f"PR{datetime.now().strftime('%Y%m%d%H%M%S') if 'datetime' in dir() else 'XXXX'}"))
+            st.markdown("---")
+            st.markdown("##### ✅ Xác nhận đã chuyển khoản")
+            with st.form("pay_form"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    ma_don_input = st.text_input("Mã đơn (ghi trong nội dung CK)", key="pay_ma")
+                    so_tien_ck = st.number_input("Số tiền đã CK (₫)", min_value=0, step=1000, key="pay_sotien")
+                with c2:
+                    ngan_hang_ck = st.selectbox("Ngân hàng CK", ["MB Bank", "Vietcombank", "Techcombank", "BIDV", "VietinBank", "ACB", "Khác"], key="pay_nh")
+                    thoi_gian_ck = st.text_input("Thời gian CK", placeholder="VD: 2026-06-04 14:30", key="pay_tg")
+                if st.form_submit_button("📤 Gửi yêu cầu kích hoạt", use_container_width=True):
+                    if not ma_don_input or so_tien_ck < thanh_tien * 0.95:
+                        st.error(f"❌ Mã đơn trống hoặc số tiền CK chưa đủ (tối thiểu {thanh_tien*0.95:,.0f}₫).")
+                    else:
+                        st.success(f"✅ Đã gửi yêu cầu kích hoạt! Admin sẽ xác nhận trong 24h và kích hoạt PRO cho tài khoản `{st.session_state.get('username', 'khach')}`.")
+                        st.info("💡 Trong lúc chờ, anh có thể dùng mật khẩu PRO ở Sidebar để kích hoạt ngay.")
+            st.markdown("---")
+            st.markdown("##### 📞 Liên hệ hỗ trợ")
+            st.markdown("""
+- **SĐT / Zalo:** `0358814661` (Danh Đạt)
+- **Email:** support@robo-advisor.vn
+- **Giờ hỗ trợ:** 8:00 - 22:00 mỗi ngày
+            """)
 
 if st.session_state.trang_thai == "home":
     st.session_state.trang_thai = "dashboard"
