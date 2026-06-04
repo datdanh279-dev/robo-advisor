@@ -143,12 +143,12 @@ def tao_ma_otp():
     return f"{random.randint(100000, 999999)}"
 
 LOGIN_CSS = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
-
-#root { background: linear-gradient(135deg, #02050E, #070B19, #0A111F); }
-.stApp { background: linear-gradient(135deg, #02050E, #070B19, #0A111F); }
-header[data-testid="stHeader"] { display: none; }
+.stApp { background: linear-gradient(135deg, #02050E, #070B19, #0A111F) !important; }
+header[data-testid="stHeader"] { visibility: hidden; height: 0; }
 .login-container {
     max-width: 420px; margin: 0 auto; padding-top: 12vh;
     text-align: center;
@@ -244,8 +244,16 @@ section.main [data-testid="stTabs"] {
 </style>
 """
 
+def _inject_login_css_once():
+    """Tiêm LOGIN_CSS đúng 1 lần / session để tránh React removeChild bug
+    (khi st.rerun() chạy lại, markdown blocks bị React reconcile lại — nếu
+    inject lại CSS, các <style>/<link> orphan node sẽ vỡ DOM)."""
+    if not st.session_state.get("_login_css_injected"):
+        st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+        st.session_state._login_css_injected = True
+
 def hien_thi_login():
-    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+    _inject_login_css_once()
     try:
         registered_count, max_slots = get_beta_progress()
     except Exception:
@@ -381,7 +389,7 @@ def hien_thi_login():
                             st.error(f"Đăng ký thất bại (tên đã tồn tại hoặc beta đã đầy). Còn {remaining} chỗ.")
 
 def hien_thi_otp():
-    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+    _inject_login_css_once()
     st.markdown(
         '<div class="login-container">'
         f'<div class="login-title">🔐 Xác thực 2 lớp</div>'
@@ -462,8 +470,9 @@ def mo_phong_monte_carlo_cached(so_lan=1000):
 
 
 
-st.markdown(
-    """
+if not st.session_state.get("_main_css_injected"):
+    st.markdown(
+        """
 <style>
 :root {
     --gold: #FFD700;
@@ -638,8 +647,9 @@ div[data-testid="stSidebar"] {
 }
 </style>
 """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
+    st.session_state._main_css_injected = True
 
 
 if "trang_thai" not in st.session_state:
