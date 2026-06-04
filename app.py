@@ -11,13 +11,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-if not st.session_state.get("_console_script_injected"):
-    st.session_state._console_script_injected = True
-    st.markdown(
-        '<meta http-equiv="Content-Language" content="vi">',
-        unsafe_allow_html=True,
-    )
-
 try:
     import pandas as pd
     import plotly.graph_objects as go
@@ -59,7 +52,7 @@ try:
 except Exception as _import_err:
     st.error(f"❌ Lỗi import backend: {_import_err}")
     st.code(traceback.format_exc())
-    st.info("Vui lòng kiểm tra requirements.txt và phiên bản Python (runtime.txt = python-3.11).")
+    st.info("Vui lòng kiểm tra requirements.txt và phiên bản Python trên Streamlit Cloud dashboard (Advanced settings).")
     st.stop()
 
 _T1 = datetime.now(); print(f"[TRACE] backend imports: {(_T1-_T0).total_seconds():.3f}s", file=sys.stderr)
@@ -150,12 +143,12 @@ def tao_ma_otp():
     return f"{random.randint(100000, 999999)}"
 
 LOGIN_CSS = """
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-.stApp { background: linear-gradient(135deg, #02050E, #070B19, #0A111F) !important; }
-header[data-testid="stHeader"] { visibility: hidden; height: 0; }
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+#root { background: linear-gradient(135deg, #02050E, #070B19, #0A111F); }
+.stApp { background: linear-gradient(135deg, #02050E, #070B19, #0A111F); }
+header[data-testid="stHeader"] { display: none; }
 .login-container {
     max-width: 420px; margin: 0 auto; padding-top: 12vh;
     text-align: center;
@@ -251,16 +244,8 @@ section.main [data-testid="stTabs"] {
 </style>
 """
 
-def _inject_login_css_once():
-    """Tiêm LOGIN_CSS đúng 1 lần / session để tránh React removeChild bug
-    (khi st.rerun() chạy lại, markdown blocks bị React reconcile lại — nếu
-    inject lại CSS, các <style>/<link> orphan node sẽ vỡ DOM)."""
-    if not st.session_state.get("_login_css_injected"):
-        st.markdown(LOGIN_CSS, unsafe_allow_html=True)
-        st.session_state._login_css_injected = True
-
 def hien_thi_login():
-    _inject_login_css_once()
+    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
     try:
         registered_count, max_slots = get_beta_progress()
     except Exception:
@@ -396,7 +381,7 @@ def hien_thi_login():
                             st.error(f"Đăng ký thất bại (tên đã tồn tại hoặc beta đã đầy). Còn {remaining} chỗ.")
 
 def hien_thi_otp():
-    _inject_login_css_once()
+    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
     st.markdown(
         '<div class="login-container">'
         f'<div class="login-title">🔐 Xác thực 2 lớp</div>'
@@ -477,9 +462,8 @@ def mo_phong_monte_carlo_cached(so_lan=1000):
 
 
 
-if not st.session_state.get("_main_css_injected"):
-    st.markdown(
-        """
+st.markdown(
+    """
 <style>
 :root {
     --gold: #FFD700;
@@ -654,9 +638,8 @@ div[data-testid="stSidebar"] {
 }
 </style>
 """,
-        unsafe_allow_html=True,
-    )
-    st.session_state._main_css_injected = True
+    unsafe_allow_html=True,
+)
 
 
 if "trang_thai" not in st.session_state:
