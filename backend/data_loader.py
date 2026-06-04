@@ -1175,6 +1175,7 @@ def load_all():
             s = _get_snapshot("stress") or {}
     DOCS["stress_vars"], DOCS["stress"] = sv, s
     DOCS["ngay_cap_nhat"] = _NGAY_FILE
+    kpi = DOCS.get("kpi", {})
     for _ma, _info in DOCS.get("kpi", {}).items():
         if _info.get("nganh"):
             _info["nganh"] = _chuong_hoa_tv_nganh(_info["nganh"])
