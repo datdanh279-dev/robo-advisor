@@ -1,4 +1,5 @@
 import logging
+import threading
 from .api_fetcher import (
     lay_du_lieu_thi_truong_that,
     lay_gia_co_phieu,
@@ -11,6 +12,11 @@ from .api_fetcher import (
 from .data_loader import DOCS
 
 logger = logging.getLogger(__name__)
+
+# Lock bảo vệ DU_LIEU_THI_TRUONG_VN, DU_LIEU_QUOC_TE, CO_PHIEU_VN khi
+# nhiều user cùng gọi cap_nhat_toan_bo() / _build_co_phieu_vn() — tránh
+# "nhầm nhà" khi concurrent write.
+_DATA_LOCK = threading.RLock()
 
 # 8 mã danh mục mẫu (đồng bộ TONG_HOP_v44 / danh_muc.json)
 DANH_SACH_DANH_MUC = ["FPT", "MBB", "VCB", "CTR", "MWG", "HPG", "VNM", "VIX"]
@@ -75,6 +81,12 @@ CO_PHIEU_VN = {}
 
 def _build_co_phieu_vn():
     global CO_PHIEU_VN
+    with _DATA_LOCK:
+        _build_co_phieu_vn_impl()
+
+
+def _build_co_phieu_vn_impl():
+    global CO_PHIEU_VN
     live = DOCS["live"]
     if not live:
         db_vn = DOCS.get("co_phieu_vn", {})
@@ -132,6 +144,11 @@ def cap_nhat_co_phieu_vn():
 _build_co_phieu_vn()
 
 def cap_nhat_toan_bo():
+    with _DATA_LOCK:
+        _cap_nhat_toan_bo_impl()
+
+
+def _cap_nhat_toan_bo_impl():
     # Kiểm tra giờ giao dịch: nếu ngoài giờ VN, bỏ qua cập nhật giá cổ phiếu VN (tránh NaN)
     trong_gio_vn = dang_trong_gio_giao_dich_vn()
 
@@ -203,19 +220,22 @@ def cap_nhat_toan_bo():
         logger.info("Ngoài giờ giao dịch VN — giữ nguyên giá đóng cửa gần nhất.")
 
 def lay_thong_tin_thi_truong():
-    return DU_LIEU_THI_TRUONG_VN
+    with _DATA_LOCK:
+        return dict(DU_LIEU_THI_TRUONG_VN)
 
 def lay_thong_tin_quoc_te():
-    return DU_LIEU_QUOC_TE
+    with _DATA_LOCK:
+        return dict(DU_LIEU_QUOC_TE)
 
 DANH_SACH_NGANH = sorted(set(
     info["nganh"] for info in CO_PHIEU_VN.values() if info.get("nganh")
 )) or ["Ngân hàng", "Công nghệ", "Thép", "Tiêu dùng", "Bán lẻ", "Chứng khoán", "Bất động sản", "Hạ tầng", "Dầu khí"]
 
 def lay_co_phieu_de_xuat(nganh=None):
-    if nganh and nganh != "Tất cả":
-        return {ma: info for ma, info in CO_PHIEU_VN.items() if info.get("nganh") == nganh}
-    return CO_PHIEU_VN
+    with _DATA_LOCK:
+        if nganh and nganh != "Tất cả":
+            return {ma: dict(info) for ma, info in CO_PHIEU_VN.items() if info.get("nganh") == nganh}
+        return {ma: dict(info) for ma, info in CO_PHIEU_VN.items()}
 
 def phan_tich_dau_tu_theo_nganh(so_tien, khau_vi_rui_ro):
     if khau_vi_rui_ro in ["Bảo thủ", "Thận trọng"]:

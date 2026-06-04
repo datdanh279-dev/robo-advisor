@@ -602,6 +602,19 @@ div[data-testid="stSidebar"] {
     background: rgba(8,14,26,0.95);
     border-right: 1px solid rgba(255,215,0,0.06);
 }
+
+/* Ẩn nút Download CSV và toolbar của st.dataframe để tránh lộ dữ liệu thô */
+[data-testid="stDataFrame"] [data-testid="stTableDownloadButton"],
+[data-testid="stDataFrame"] [data-testid="stDataFrameToolbar"],
+[data-testid="stDataFrame"] [data-testid="stFullScreenButton"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+[data-testid="stDataFrame"] button[aria-label="Download"],
+[data-testid="stDataFrame"] button[title="Download"] {
+    display: none !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
