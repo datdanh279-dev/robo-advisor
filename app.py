@@ -4014,6 +4014,183 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.caption("💡 Phí mua/bán = 0.15% (HOSE - biểu phí chính thức). Thuế TNCN = 0.1% trên lãi (thuế chuyển nhượng CK theo Nghị định 126/2020).")
 
         st.write("---")
+        st.write("## 📉 Underwater Drawdown — Độ sụt giảm từ đỉnh")
+        if has_real and len(dm_equity) > 30:
+            eq_series = pd.Series(dm_equity)
+            running_max = eq_series.cummax()
+            underwater = ((eq_series - running_max) / running_max * 100)
+            in_dd = underwater < 0
+            dd_starts = []
+            dd_ends = []
+            cur_start = None
+            for i, val in enumerate(in_dd):
+                if val and cur_start is None:
+                    cur_start = i
+                elif not val and cur_start is not None:
+                    dd_starts.append(cur_start)
+                    dd_ends.append(i - 1)
+                    cur_start = None
+            if cur_start is not None:
+                dd_starts.append(cur_start)
+                dd_ends.append(len(in_dd) - 1)
+            dd_periods = []
+            for s, e in zip(dd_starts, dd_ends):
+                period_underwater = underwater.iloc[s:e+1]
+                trough = float(period_underwater.min())
+                trough_idx = period_underwater.idxmin()
+                dd_periods.append({"Bắt đầu": str(eq_series.index[s])[:10],
+                    "Kết thúc": str(eq_series.index[e])[:10] if not in_dd.iloc[e] else "chưa hồi",
+                    "Đáy": str(trough_idx)[:10], "Sụt %": round(trough, 1),
+                    "Thời gian (phiên)": e - s + 1})
+            fig_uw = go.Figure()
+            fig_uw.add_trace(go.Scatter(x=eq_series.index, y=underwater.values, fill='tozeroy',
+                fillcolor='rgba(244,67,54,0.3)', line_color='#F44336', name='Drawdown %'))
+            fig_uw.update_layout(title="Underwater Plot (% từ đỉnh)", yaxis_title="Drawdown (%)",
+                height=300, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_uw, use_container_width=True)
+            if dd_periods:
+                dd_periods_sorted = sorted(dd_periods, key=lambda x: x["Sụt %"])[:5]
+                st.dataframe(pd.DataFrame(dd_periods_sorted), use_container_width=True, hide_index=True)
+                worst_dd = min(p["Sụt %"] for p in dd_periods)
+                st.caption(f"📊 Worst DD = {worst_dd:.1f}% (tính từ {len(eq_series)} phiên giá thật yfinance 6T)")
+            else:
+                st.success("✅ DM chưa từng sụt giảm từ đỉnh trong 6T qua!")
+        else:
+            st.info("⚠️ Cần giá thật 6T để vẽ underwater chart.")
+
+        st.write("---")
+        st.write("## 🧮 Risk Contribution — Đóng góp rủi ro từng mã")
+        if has_real and len(real_prices) >= 2 and tong_gt > 0:
+            weights_arr = []
+            rets_list = []
+            tickers = []
+            for ma, info in dm.items():
+                gia_tt = info.get("gia_thi_truong", 0)
+                sl = info.get("so_luong", 0)
+                if gia_tt <= 0 or sl <= 0: continue
+                if ma not in real_prices or len(real_prices[ma]) < 20: continue
+                w = (gia_tt * sl) / tong_gt
+                weights_arr.append(w)
+                tickers.append(ma)
+                rets_list.append(real_prices[ma].pct_change().dropna())
+            if len(weights_arr) >= 2 and rets_list:
+                df_rets = pd.concat(rets_list, axis=1).dropna()
+                df_rets.columns = tickers
+                w_vec = np.array(weights_arr)
+                cov = df_rets.cov().values * 252
+                port_vol = float(np.sqrt(np.dot(w_vec.T, np.dot(cov, w_vec))))
+                marginal = np.dot(cov, w_vec) / port_vol if port_vol > 0 else np.zeros(len(w_vec))
+                risk_contrib = w_vec * marginal
+                rc_pct = (risk_contrib / risk_contrib.sum() * 100) if risk_contrib.sum() > 0 else np.zeros(len(w_vec))
+                rc_rows = []
+                for i, ma in enumerate(tickers):
+                    rc_rows.append({"Mã": ma, "Trọng số %": round(w_vec[i]*100, 1),
+                        "Vol năm %": round(float(df_rets[ma].std() * (252**0.5) * 100), 1),
+                        "Risk Contrib %": round(float(rc_pct[i]), 1),
+                        "Marginal VaR %": round(float(marginal[i]) * 100 / port_vol, 1) if port_vol > 0 else 0})
+                rc_rows = sorted(rc_rows, key=lambda x: -x["Risk Contrib %"])
+                st.dataframe(pd.DataFrame(rc_rows), use_container_width=True, hide_index=True)
+                top_rc = rc_rows[0]
+                st.caption(f"📊 Tính từ covariance matrix thật ({len(df_rets)} phiên × {len(tickers)} mã, yfinance 6T). Top risk: **{top_rc['Mã']}** = {top_rc['Risk Contrib %']:.1f}% tổng rủi ro DM.")
+            else:
+                st.info("⚠️ Cần ≥2 mã có giá thật để tính.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính risk contribution.")
+
+        st.write("---")
+        st.write("## 📊 Rolling Volatility & Beta (60 phiên gần nhất)")
+        if has_real and len(dm_equity) > 60:
+            eq_s = pd.Series(dm_equity)
+            ret_s = eq_s.pct_change().dropna()
+            roll_vol = ret_s.rolling(60).std() * (252**0.5) * 100
+            fig_roll = go.Figure()
+            fig_roll.add_trace(go.Scatter(x=roll_vol.index, y=roll_vol.values, line_color='#4FC3F7',
+                name='Rolling Vol 60D (%)', fill='tozeroy', fillcolor='rgba(79,195,247,0.2)'))
+            fig_roll.add_hline(y=20, line_dash="dash", line_color="green", annotation_text="Bình thường (20%)")
+            fig_roll.add_hline(y=30, line_dash="dash", line_color="red", annotation_text="Cao (30%)")
+            fig_roll.update_layout(title="Vol 60 phiên gần nhất (%)", yaxis_title="Vol (%)",
+                height=300, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_roll, use_container_width=True)
+            current_vol = float(roll_vol.iloc[-1]) if not roll_vol.empty else 0
+            avg_vol = float(roll_vol.mean())
+            max_vol = float(roll_vol.max())
+            min_vol = float(roll_vol.min())
+            vol_regime = "🔴 Cao (Stress)" if current_vol > 30 else ("🟡 Trung bình" if current_vol > 20 else "🟢 Thấp (Yên tĩnh)")
+            rvc1, rvc2, rvc3, rvc4 = st.columns(4)
+            rvc1.metric("Vol hiện tại", f"{current_vol:.1f}%", f"Regime: {vol_regime}")
+            rvc2.metric("Vol TB 60D", f"{avg_vol:.1f}%")
+            rvc3.metric("Vol max", f"{max_vol:.1f}%")
+            rvc4.metric("Vol min", f"{min_vol:.1f}%")
+            st.caption(f"📊 Tính từ {len(ret_s)} phiên returns thật. Regime phát hiện: {'cao' if current_vol > 30 else 'trung bình' if current_vol > 20 else 'thấp'}.")
+        else:
+            st.info("⚠️ Cần ≥60 phiên giá thật để tính rolling vol.")
+
+        st.write("---")
+        st.write("## 🧬 Phân tích hệ số (Factor Analysis)")
+        if has_real and len(dm_equity) > 60:
+            eq_s2 = pd.Series(dm_equity)
+            dm_ret = eq_s2.pct_change().dropna()
+            cum_ret_1m = (eq_s2.iloc[-1] / eq_s2.iloc[-min(22, len(eq_s2))] - 1) * 100 if len(eq_s2) > 22 else 0
+            cum_ret_3m = (eq_s2.iloc[-1] / eq_s2.iloc[-min(66, len(eq_s2))] - 1) * 100 if len(eq_s2) > 66 else 0
+            cum_ret_6m = (eq_s2.iloc[-1] / eq_s2.iloc[0] - 1) * 100
+            vol_1y = float(dm_ret.std() * (252**0.5))
+            sharpe_real = (dm_ret.mean() * 252 - 0.045) / vol_1y if vol_1y > 0 else 0
+            fa_rows = []
+            fa_rows.append({"Hệ số": "📈 Beta thị trường", "Giá trị": f"{port_beta:.2f}",
+                "Diễn giải": "DM lắc lư mạnh hơn VN-Index" if port_beta > 1.1 else "DM ổn định hơn VN-Index"})
+            fa_rows.append({"Hệ số": "🚀 Momentum 1M", "Giá trị": f"{cum_ret_1m:+.1f}%",
+                "Diễn giải": "Xu hướng tăng ngắn hạn" if cum_ret_1m > 0 else "Điều chỉnh ngắn hạn"})
+            fa_rows.append({"Hệ số": "🚀 Momentum 3M", "Giá trị": f"{cum_ret_3m:+.1f}%",
+                "Diễn giải": "Xu hướng tăng trung hạn" if cum_ret_3m > 0 else "Điều chỉnh trung hạn"})
+            fa_rows.append({"Hệ số": "🚀 Momentum 6M", "Giá trị": f"{cum_ret_6m:+.1f}%",
+                "Diễn giải": "Xu hướng tăng dài hạn" if cum_ret_6m > 0 else "Yếu dài hạn"})
+            fa_rows.append({"Hệ số": "💎 Chất lượng (ROE TB)",
+                "Giá trị": f"{sum(float(kpi.get(m,{}).get('roe',0) or 0) * w for m, w in zip(dm.keys(), weights) if w > 0) * 100:.1f}%" if weights else "N/A",
+                "Diễn giải": "DM chất lượng cao" if sum(float(kpi.get(m,{}).get('roe',0) or 0) * w for m, w in zip(dm.keys(), weights) if w > 0) > 0.15 else "Chất lượng trung bình"})
+            fa_rows.append({"Hệ số": "💰 Giá trị (1/P/E TB)",
+                "Giá trị": f"{(1/sum(float(kpi.get(m,{}).get('pe',1) or 1) * w for m, w in zip(dm.keys(), weights) if w > 0)):.1f}" if weights else "N/A",
+                "Diễn giải": "DM định giá hấp dẫn" if sum(float(kpi.get(m,{}).get('pe',15) or 15) * w for m, w in zip(dm.keys(), weights) if w > 0) < 15 else "DM định giá cao"})
+            st.dataframe(pd.DataFrame(fa_rows), use_container_width=True, hide_index=True)
+            st.caption(f"📊 Tất cả hệ số tính từ returns/giá thật yfinance 6T (Beta={port_beta:.2f}, Vol={vol_1y*100:.1f}%, Sharpe={sharpe_real:.2f})")
+        else:
+            st.info("⚠️ Cần giá thật 6T để phân tích hệ số.")
+
+        st.write("---")
+        st.write("## 🎯 Performance Attribution — Đóng góp hiệu suất")
+        if has_real and len(real_prices) > 0 and len(weights) > 0:
+            attr_rows = []
+            sector_attr = {}
+            for ma, info in dm.items():
+                gia_tt = info.get("gia_thi_truong", 0)
+                sl = info.get("so_luong", 0)
+                if gia_tt <= 0 or sl <= 0: continue
+                ki = kpi.get(ma, {})
+                ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+                stock_ret_6m = 0
+                if ma in real_prices and len(real_prices[ma]) >= 30:
+                    stock_ret_6m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[0]) - 1) * 100
+                stock_ret_1m = 0
+                if ma in real_prices and len(real_prices[ma]) >= 22:
+                    stock_ret_1m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[-22]) - 1) * 100
+                v = gia_tt * sl
+                w = v / tong_gt if tong_gt > 0 else 0
+                contr = w * stock_ret_6m
+                attr_rows.append({"Mã": ma, "Ngành": ng, "Tỷ trọng %": round(w*100, 1),
+                    "Return 1M %": round(stock_ret_1m, 1), "Return 6M %": round(stock_ret_6m, 1),
+                    "Đóng góp %": round(contr, 2)})
+                sector_attr[ng] = sector_attr.get(ng, 0) + contr
+            if attr_rows:
+                df_attr = pd.DataFrame(attr_rows).sort_values("Đóng góp %", ascending=False)
+                st.dataframe(df_attr, use_container_width=True, hide_index=True)
+                st.write("**📊 Đóng góp theo ngành:**")
+                for ng, contr in sorted(sector_attr.items(), key=lambda x: -x[1]):
+                    color = "🟢" if contr > 0 else "🔴"
+                    st.write(f"  {color} **{ng}**: {contr:+.2f}%")
+                st.caption(f"📊 Tính từ returns 6T thật × tỷ trọng hiện tại. Tổng contributions ≈ Return DM 6M.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để phân tích đóng góp.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
