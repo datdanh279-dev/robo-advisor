@@ -2522,7 +2522,7 @@ elif st.session_state.trang_thai == "portfolio":
 
 elif st.session_state.trang_thai == "deep_analysis":
     import time as _time
-    st.error(f"🆕 VERSION 3.1 — BUILD 51ba7aa+ — { _time.strftime('%H:%M:%S %d/%m/%Y') } — Nếu anh KHÔNG thấy dòng này = browser cache cũ → Ctrl+Shift+R")
+    st.error(f"🆕 VERSION 4.0 — BUILD 6c570b1+ — { _time.strftime('%H:%M:%S %d/%m/%Y') } — Giá thật từ yfinance nếu có. Nếu KHÔNG thấy dòng này = browser cache cũ → Ctrl+Shift+R")
     st.write("# 📊 PHÂN TÍCH CHUYÊN SÂU DANH MỤC")
     st.write("---")
 
@@ -2583,6 +2583,37 @@ elif st.session_state.trang_thai == "deep_analysis":
     if not weights:
         st.error("Khong the tinh toan — du lieu danh muc khong hop le.")
     else:
+        @st.cache_data(ttl=3600, show_spinner="📡 Đang tải giá thật từ yfinance...")
+        def _fetch_real_prices(_symbols):
+            import yfinance as yf
+            out = {}
+            for sym in _symbols:
+                try:
+                    h = yf.Ticker(f"{sym}.VN").history(period="6mo", timeout=8)
+                    if not h.empty and 'Close' in h.columns and len(h) >= 20:
+                        out[sym] = h['Close']
+                except Exception:
+                    pass
+            return out
+
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def _fetch_vn30_proxy():
+            import yfinance as yf
+            for tk in ["E1VFVN30.VN", "FUEVFVND.VN", "FUEKIV30.VN"]:
+                try:
+                    h = yf.Ticker(tk).history(period="6mo", timeout=8)
+                    if not h.empty and len(h) >= 20:
+                        return h['Close'], tk
+                except Exception:
+                    pass
+            return None, None
+
+        _ma_for_fetch = [ma for ma, info in dm.items()
+                         if info.get("gia_thi_truong", 0) > 0 and info.get("so_luong", 0) > 0]
+        real_prices = _fetch_real_prices(tuple(_ma_for_fetch))
+        vn30_close, vn30_label = _fetch_vn30_proxy()
+        has_real = len(real_prices) >= 2
+        has_vn30 = vn30_close is not None
         port_beta = sum(betas)
         port_return = rp
         vol_proxy = 0.18
@@ -2632,6 +2663,10 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🎯 Phân tích kỹ thuật từng mã (RSI/MACD/MA20/MA50)")
+        if has_real:
+            st.caption(f"📊 Tính từ giá thật {len(real_prices)} mã (yfinance, 6 tháng)")
+        else:
+            st.caption("🎲 Mô phỏng Monte Carlo (yfinance tạm không khả dụng)")
         ta_rows = []
         for ma, info in dm.items():
             gia_tt = info.get("gia_thi_truong", 0)
@@ -2639,9 +2674,14 @@ elif st.session_state.trang_thai == "deep_analysis":
             if gia_tt <= 0 or sl <= 0: continue
             ki = kpi.get(ma, {})
             beta_ma = float(ki.get("beta", 1.0) or 1.0)
-            np.random.seed(hash(ma) % (2**31))
-            ret = np.random.normal(0.0005, 0.018, 252)
-            prices = gia_tt * np.cumprod(1 + ret * beta_ma)
+            if ma in real_prices and len(real_prices[ma]) >= 30:
+                prices = real_prices[ma].values
+                gia_hien_tai = float(prices[-1])
+            else:
+                np.random.seed(hash(ma) % (2**31))
+                ret = np.random.normal(0.0005, 0.018, 252)
+                prices = gia_tt * np.cumprod(1 + ret * beta_ma)
+                gia_hien_tai = gia_tt
             delta = np.diff(prices)
             gain = np.where(delta > 0, delta, 0)
             loss = np.where(delta < 0, -delta, 0)
@@ -2664,7 +2704,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             else: sig = "GIỮ →"
             ta_rows.append({
                 "Mã": ma,
-                "Giá": f"{gia_tt:,.0f}",
+                "Giá": f"{gia_hien_tai:,.0f}",
                 "RSI(14)": f"{rsi:.0f}",
                 "MACD": f"{macd_line:,.0f}",
                 "MA20": f"{ma20:,.0f}",
@@ -2802,12 +2842,18 @@ elif st.session_state.trang_thai == "deep_analysis":
             c1c, c2c = st.columns(2)
             with c1c:
                 st.write("**🏆 Top đóng góp tích cực:**")
-                for r in top_pos:
-                    st.write(f"- **{r[0]}**: +{r[3]*100:.2f}% (w={r[1]*100:.1f}%, ret={r[2]*100:+.1f}%)")
+                if top_pos:
+                    for r in top_pos:
+                        st.write(f"- **{r[0]}**: +{r[3]*100:.2f}% (w={r[1]*100:.1f}%, ret={r[2]*100:+.1f}%)")
+                else:
+                    st.write("- _(không có)_")
             with c2c:
                 st.write("**⚠️ Top đóng góp tiêu cực:**")
-                for r in top_neg:
-                    st.write(f"- **{r[0]}**: {r[3]*100:.2f}% (w={r[1]*100:.1f}%, ret={r[2]*100:+.1f}%)")
+                if top_neg:
+                    for r in top_neg:
+                        st.write(f"- **{r[0]}**: {r[3]*100:.2f}% (w={r[1]*100:.1f}%, ret={r[2]*100:+.1f}%)")
+                else:
+                    st.write("- ✅ _Toàn DM đang có đóng góp tích cực_")
 
         st.write("---")
         st.write("## 💡 Khuyến nghị từ hệ thống")
@@ -2830,22 +2876,51 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write(f"- {r}")
 
         st.write("---")
-        st.write("## 📈 Đường vốn (Equity Curve) 12 tháng")
-        np.random.seed(42)
-        n_days = 252
-        daily_mu = port_return / n_days
-        daily_sigma = vol_proxy / (n_days ** 0.5)
-        dm_returns = np.random.normal(daily_mu, daily_sigma, n_days)
-        vn_returns = np.random.normal((rm - rf) / n_days, 0.012, n_days)
-        dm_equity = tong_gt * np.cumprod(1 + dm_returns)
-        vn_equity = tong_gt * np.cumprod(1 + vn_returns)
-        running_max = np.maximum.accumulate(dm_equity)
-        drawdown = (dm_equity - running_max) / running_max * 100
+        st.write("## 📈 Đường vốn (Equity Curve) 6 tháng qua")
+        if has_real:
+            common_dates = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+            if len(common_dates) >= 20:
+                dm_value_ts = pd.Series(0.0, index=common_dates, dtype=float)
+                for ma, prices in real_prices.items():
+                    if ma in dm:
+                        shares = dm[ma].get("so_luong", 0)
+                        aligned = prices.reindex(common_dates).ffill().bfill()
+                        dm_value_ts += aligned.astype(float) * shares
+                dm_equity = dm_value_ts.values
+                if has_vn30:
+                    vn_aligned = vn30_close.reindex(common_dates).ffill().bfill()
+                    vn_equity = (vn_aligned / vn_aligned.iloc[0] * tong_gt).values
+                else:
+                    vn_equity = dm_equity * (1 + np.random.normal(0, 0.01, len(dm_equity))).cumprod()
+                    vn_equity = vn_equity / vn_equity[0] * tong_gt
+                n_days = len(dm_equity)
+                running_max = np.maximum.accumulate(dm_equity)
+                drawdown = (dm_equity - running_max) / running_max * 100
+                x_axis = [d.strftime("%d/%m") for d in common_dates]
+                data_source_eq = f"📊 Giá thật {len(real_prices)} mã từ yfinance"
+                if has_vn30:
+                    data_source_eq += f" + {vn30_label}"
+            else:
+                has_real = False
+        if not has_real:
+            np.random.seed(42)
+            n_days = 252
+            daily_mu = port_return / n_days
+            daily_sigma = vol_proxy / (n_days ** 0.5)
+            dm_returns = np.random.normal(daily_mu, daily_sigma, n_days)
+            vn_returns = np.random.normal((rm - rf) / n_days, 0.012, n_days)
+            dm_equity = tong_gt * np.cumprod(1 + dm_returns)
+            vn_equity = tong_gt * np.cumprod(1 + vn_returns)
+            running_max = np.maximum.accumulate(dm_equity)
+            drawdown = (dm_equity - running_max) / running_max * 100
+            x_axis = list(range(n_days))
+            data_source_eq = "🎲 Mô phỏng Monte Carlo (yfinance tạm không khả dụng)"
+        st.caption(data_source_eq)
         fig_eq = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3],
             subplot_titles=("Giá trị danh mục (₫)", "Drawdown (%)"))
-        fig_eq.add_trace(go.Scatter(x=list(range(n_days)), y=dm_equity, name="Danh mục", line=dict(color="#FFD700", width=2)), row=1, col=1)
-        fig_eq.add_trace(go.Scatter(x=list(range(n_days)), y=vn_equity, name="VN-Index", line=dict(color="#4FC3F7", width=2, dash="dash")), row=1, col=1)
-        fig_eq.add_trace(go.Scatter(x=list(range(n_days)), y=drawdown, name="Drawdown", fill="tozeroy", line=dict(color="#EF5350", width=1)), row=2, col=1)
+        fig_eq.add_trace(go.Scatter(x=x_axis, y=dm_equity, name="Danh mục", line=dict(color="#FFD700", width=2)), row=1, col=1)
+        fig_eq.add_trace(go.Scatter(x=x_axis, y=vn_equity, name="VN-Index" if has_vn30 else "VN-Index (mô phỏng)", line=dict(color="#4FC3F7", width=2, dash="dash")), row=1, col=1)
+        fig_eq.add_trace(go.Scatter(x=x_axis, y=drawdown, name="Drawdown", fill="tozeroy", line=dict(color="#EF5350", width=1)), row=2, col=1)
         fig_eq.update_layout(height=500, showlegend=True, hovermode="x unified",
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
         st.plotly_chart(fig_eq, use_container_width=True)
@@ -2883,13 +2958,19 @@ elif st.session_state.trang_thai == "deep_analysis":
         else:
             st.info("Cần ≥2 mã trong danh mục để tính ma trận tương quan.")
 
-        st.write("## 🆚 Backtest: Danh mục vs VN-Index (12 tháng)")
+        st.write("## 🆚 Backtest: Danh mục vs VN-Index (6 tháng qua)")
+        dm_ret_bt = (dm_equity[-1] / dm_equity[0] - 1) * 100
+        vn_ret_bt = (vn_equity[-1] / vn_equity[0] - 1) * 100
+        alpha_bt = dm_ret_bt - vn_ret_bt
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("📈 Return DM", f"{(dm_equity[-1]/tong_gt - 1)*100:+.2f}%")
-        c2.metric("📊 Return VN-Index", f"{(vn_equity[-1]/tong_gt - 1)*100:+.2f}%")
-        c3.metric("🏆 Alpha (DM − VN)", f"{((dm_equity[-1]/tong_gt - 1) - (vn_equity[-1]/tong_gt - 1))*100:+.2f}%")
+        c1.metric("📈 Return DM", f"{dm_ret_bt:+.2f}%")
+        c2.metric(f"📊 Return {vn30_label or 'VN-Index'}", f"{vn_ret_bt:+.2f}%")
+        c3.metric("🏆 Alpha (DM − VN)", f"{alpha_bt:+.2f}%")
         c4.metric("📉 Max Drawdown DM", f"{drawdown.min():.2f}%")
-        st.caption("⚠️ Backtest dùng Monte Carlo dựa trên kỳ vọng lợi nhuận & độ biến động (CAPM). Cần dữ liệu lịch sử vnstock/CAFEF để có kết quả chính xác 100%.")
+        if has_real and has_vn30:
+            st.caption(f"📊 Backtest thật: {len(real_prices)} mã × số lượng thực so với {vn30_label} (yfinance 6 tháng).")
+        else:
+            st.caption("🎲 Backtest mô phỏng (yfinance tạm không khả dụng).")
 
         st.write("---")
         st.write("## 🎲 Monte Carlo — 1000 kịch bản tương lai 1 năm")
@@ -2996,7 +3077,6 @@ elif st.session_state.trang_thai == "deep_analysis":
         if pl_rows:
             pl_rows.sort(key=lambda x: x[1], reverse=True)
             winners = pl_rows[:3]
-            losers = pl_rows[-3:][::-1]
             cw1, cw2 = st.columns(2)
             with cw1:
                 st.write("**🟢 Top 3 TĂNG mạnh nhất**")
@@ -3004,8 +3084,13 @@ elif st.session_state.trang_thai == "deep_analysis":
                     st.metric(f"🟢 {ma}", f"{ret:+.2f}%", f"{pnl:+,.0f} ₫")
             with cw2:
                 st.write("**🔴 Top 3 GIẢM mạnh nhất**")
-                for ma, ret, pnl in losers:
-                    st.metric(f"🔴 {ma}", f"{ret:+.2f}%", f"{pnl:+,.0f} ₫", delta_color="inverse")
+                neg_only = [r for r in pl_rows if r[1] < 0]
+                if neg_only:
+                    losers = neg_only[:3]
+                    for ma, ret, pnl in losers:
+                        st.metric(f"🔴 {ma}", f"{ret:+.2f}%", f"{pnl:+,.0f} ₫", delta_color="inverse")
+                else:
+                    st.write("✅ _Toàn DM đang lãi — không có mã lỗ_")
 
         st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
