@@ -430,8 +430,15 @@ if not st.session_state.authenticated:
 
 
 _T6 = datetime.now(); print(f"[TRACE] past login, calling _khoi_tao_dulieu: {(_T6-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
-_khoi_tao_dulieu()
-_T7 = datetime.now(); print(f"[TRACE] _khoi_tao_dulieu returned: {(_T7-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
+try:
+    _khoi_tao_dulieu()
+    _T7 = datetime.now(); print(f"[TRACE] _khoi_tao_dulieu returned: {(_T7-_T0).total_seconds():.3f}s", file=__import__('sys').stderr)
+except Exception as _e:
+    import traceback as _tb
+    _tb.print_exc()
+    st.error(f"❌ Lỗi khởi tạo dữ liệu: {_e}")
+    st.code(_tb.format_exc())
+    st.stop()
 
 
 @st.cache_data(show_spinner=False)
