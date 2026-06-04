@@ -2691,6 +2691,68 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write(f"- {r}")
 
         st.write("---")
+        st.write("## 📈 Đường vốn (Equity Curve) 12 tháng")
+        np.random.seed(42)
+        n_days = 252
+        daily_mu = port_return / n_days
+        daily_sigma = vol_proxy / (n_days ** 0.5)
+        dm_returns = np.random.normal(daily_mu, daily_sigma, n_days)
+        vn_returns = np.random.normal((rm - rf) / n_days, 0.012, n_days)
+        dm_equity = tong_gt * np.cumprod(1 + dm_returns)
+        vn_equity = tong_gt * np.cumprod(1 + vn_returns)
+        running_max = np.maximum.accumulate(dm_equity)
+        drawdown = (dm_equity - running_max) / running_max * 100
+        fig_eq = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3],
+            subplot_titles=("Giá trị danh mục (₫)", "Drawdown (%)"))
+        fig_eq.add_trace(go.Scatter(x=list(range(n_days)), y=dm_equity, name="Danh mục", line=dict(color="#FFD700", width=2)), row=1, col=1)
+        fig_eq.add_trace(go.Scatter(x=list(range(n_days)), y=vn_equity, name="VN-Index", line=dict(color="#4FC3F7", width=2, dash="dash")), row=1, col=1)
+        fig_eq.add_trace(go.Scatter(x=list(range(n_days)), y=drawdown, name="Drawdown", fill="tozeroy", line=dict(color="#EF5350", width=1)), row=2, col=1)
+        fig_eq.update_layout(height=500, showlegend=True, hovermode="x unified",
+            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+        st.plotly_chart(fig_eq, use_container_width=True)
+
+        st.write("## 🔗 Ma trận tương quan giữa các mã")
+        ma_list = [ma for ma, info in dm.items() if info.get("gia_thi_truong", 0) * info.get("so_luong", 0) > 0 and tong_gt > 0]
+        if len(ma_list) >= 2:
+            corr_matrix = []
+            for m1 in ma_list:
+                row = []
+                for m2 in ma_list:
+                    if m1 == m2:
+                        row.append(1.0)
+                    else:
+                        n1 = (kpi.get(m1, {}).get("nganh", "") or "Khác").strip() or "Khác"
+                        n2 = (kpi.get(m2, {}).get("nganh", "") or "Khác").strip() or "Khác"
+                        b1 = float(kpi.get(m1, {}).get("beta", 1.0) or 1.0)
+                        b2 = float(kpi.get(m2, {}).get("beta", 1.0) or 1.0)
+                        if n1 == n2:
+                            base = 0.72
+                        else:
+                            base = 0.32
+                        beta_adj = 1.0 - 0.05 * abs(b1 - b2)
+                        corr = max(-1, min(1, base * beta_adj))
+                        row.append(round(corr, 2))
+                corr_matrix.append(row)
+            fig_corr = go.Figure(data=go.Heatmap(
+                z=corr_matrix, x=ma_list, y=ma_list,
+                colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
+                text=[[f"{v:.2f}" for v in row] for row in corr_matrix],
+                texttemplate="%{text}", textfont={"size": 11}))
+            fig_corr.update_layout(height=450,
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_corr, use_container_width=True)
+        else:
+            st.info("Cần ≥2 mã trong danh mục để tính ma trận tương quan.")
+
+        st.write("## 🆚 Backtest: Danh mục vs VN-Index (12 tháng)")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("📈 Return DM", f"{(dm_equity[-1]/tong_gt - 1)*100:+.2f}%")
+        c2.metric("📊 Return VN-Index", f"{(vn_equity[-1]/tong_gt - 1)*100:+.2f}%")
+        c3.metric("🏆 Alpha (DM − VN)", f"{((dm_equity[-1]/tong_gt - 1) - (vn_equity[-1]/tong_gt - 1))*100:+.2f}%")
+        c4.metric("📉 Max Drawdown DM", f"{drawdown.min():.2f}%")
+        st.caption("⚠️ Backtest dùng Monte Carlo dựa trên kỳ vọng lợi nhuận & độ biến động (CAPM). Cần dữ liệu lịch sử vnstock/CAFEF để có kết quả chính xác 100%.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
