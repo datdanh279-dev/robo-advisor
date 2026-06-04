@@ -1,15 +1,22 @@
-# Chạy app
+# Web chính thức (deploy - DÙNG DUY NHẤT URL NÀY)
+
+**LUÔN DÙNG:** https://robo-advisor-jkp9byppflcdsrgapbm4vd.streamlit.app/
+**KHÔNG** dùng localhost, **KHÔNG** mở web khác. Mọi hướng dẫn/test phải trỏ về URL này.
+
+> User chỉ dùng web deploy, không cài local. Sau khi push lên `main`, đợi 1-3 phút rồi F5 web.
+
+## Chạy local (CHỈ khi user yêu cầu debug trực tiếp)
 
 ```powershell
 cd C:\Users\ACER\robo-advisor
 python -m streamlit run app.py
 ```
 
-App chạy tại http://localhost:8501
+Local: http://localhost:8501
 
-## Nếu app chết
+### Nếu app chết
 
-1. Kill hết python cũ:
+1. Kill python cũ:
 ```powershell
 Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
@@ -18,14 +25,9 @@ Get-Process -Name python -ErrorAction SilentlyContinue | Stop-Process -Force
 python -m streamlit run app.py
 ```
 
-## Sau khi code thay đổi
+### Sau khi code thay đổi (local)
 
-Chỉ cần F5 refresh browser là đủ, Streamlit tự reload.
-
-## Web chính thức (deploy)
-
-Luôn dùng web này, KHÔNG dùng localhost:
-https://robo-advisor-jkp9byppflcdsrgapbm4vd.streamlit.app/
+F5 refresh browser là đủ, Streamlit tự reload.
 
 ## Deploy lên Streamlit Cloud
 
