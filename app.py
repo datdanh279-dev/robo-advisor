@@ -5307,6 +5307,264 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần dữ liệu thị trường.")
 
         st.write("---")
+        st.write("## 📊 Market Breadth — Sức mạnh thị trường toàn diện")
+        if market_data and len(market_data) >= 5:
+            n_up = sum(1 for d in market_data if d["thay_doi"] > 0)
+            n_dn = sum(1 for d in market_data if d["thay_doi"] < 0)
+            n_flat = sum(1 for d in market_data if d["thay_doi"] == 0)
+            total_scanned = len(market_data)
+            pct_up = n_up / total_scanned * 100 if total_scanned > 0 else 0
+            avg_change = float(np.mean([d["thay_doi"] for d in market_data]))
+            median_change = float(np.median([d["thay_doi"] for d in market_data]))
+            mb1, mb2, mb3, mb4, mb5 = st.columns(5)
+            mb1.metric("🟢 Mã tăng", f"{n_up}/{total_scanned}", f"{pct_up:.0f}%")
+            mb2.metric("🔴 Mã giảm", f"{n_dn}/{total_scanned}", f"{100-pct_up:.0f}%")
+            mb3.metric("🟡 Mã đi ngang", f"{n_flat}/{total_scanned}")
+            mb4.metric("📊 TB thay đổi", f"{avg_change:+.2f}%")
+            mb5.metric("📊 Median thay đổi", f"{median_change:+.2f}%")
+            breadth_status = "🟢 Rất tích cực" if pct_up > 70 else ("🟢 Tích cực" if pct_up > 55 else \
+                          ("🟡 Trung lập" if pct_up > 45 else ("🔴 Tiêu cực" if pct_up > 30 else "🔴 Rất tiêu cực")))
+            st.write(f"**Trạng thái thị trường:** {breadth_status}")
+            fig_mb = go.Figure()
+            fig_mb.add_trace(go.Histogram(x=[d["thay_doi"] for d in market_data], nbinsx=30,
+                marker_color=['#4CAF50' if d["thay_doi"] > 0 else '#F44336' for d in market_data],
+                opacity=0.7, name='Phân phối'))
+            fig_mb.add_vline(x=0, line_dash="dash", line_color='#FFD700', annotation_text="0%")
+            fig_mb.add_vline(x=avg_change, line_dash="dot", line_color='#2196F3', annotation_text=f"TB={avg_change:+.2f}%")
+            fig_mb.update_layout(title=f"Phân phối thay đổi hôm nay ({total_scanned} mã)",
+                xaxis_title="% Thay đổi", yaxis_title="Số mã",
+                height=300, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_mb, use_container_width=True)
+            st.caption(f"📊 Quét {total_scanned} mã từ yfinance chart API. Market breadth > 70% mã tăng = rất tích cực (bull market), < 30% = bear market.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường đã quét.")
+
+        st.write("---")
+        st.write("## 🎯 52-Week High/Low Scanner — Mã gần đỉnh/đáy 52 tuần")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=3600)
+            def _get_52w_data(symbols):
+                import requests as _rq_52
+                out = []
+                for s in symbols:
+                    try:
+                        r = _rq_52.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=1y&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            data = r.json()
+                            result = data.get("chart", {}).get("result", [{}])[0]
+                            meta = result.get("meta", {})
+                            closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            if closes and len(closes) > 5:
+                                cur = float(meta.get("regularMarketPrice", closes[-1] or 0))
+                                hi_52 = float(meta.get("fiftyTwoWeekHigh", max([c for c in closes if c])))
+                                lo_52 = float(meta.get("fiftyTwoWeekLow", min([c for c in closes if c])))
+                                pos_52w = ((cur - lo_52) / (hi_52 - lo_52) * 100) if (hi_52 - lo_52) > 0 else 50
+                                out.append({"ma": s, "gia": cur, "w52h": hi_52, "w52l": lo_52, "pos_52w": pos_52w})
+                    except Exception:
+                        continue
+                return out
+            with st.spinner(f"📡 Lấy 52W cho {len(df_mkt['ma'].tolist())} mã..."):
+                w52_data = _get_52w_data(tuple(df_mkt["ma"].tolist()))
+            if w52_data:
+                df_52 = pd.DataFrame(w52_data)
+                nl1, nl2 = st.columns(2)
+                with nl1:
+                    st.write("**🚀 Gần đỉnh 52W (pos > 80%):**")
+                    near_hi = df_52[df_52["pos_52w"] > 80].sort_values("pos_52w", ascending=False).head(10)
+                    st.dataframe(near_hi, use_container_width=True, hide_index=True)
+                    if len(near_hi) == 0:
+                        st.info("Không có mã nào gần đỉnh 52W.")
+                with nl2:
+                    st.write("**💀 Gần đáy 52W (pos < 20%):**")
+                    near_lo = df_52[df_52["pos_52w"] < 20].sort_values("pos_52w").head(10)
+                    st.dataframe(near_lo, use_container_width=True, hide_index=True)
+                    if len(near_lo) == 0:
+                        st.info("Không có mã nào gần đáy 52W.")
+                avg_pos = float(df_52["pos_52w"].mean())
+                st.metric("📊 Vị trí TB thị trường trong 52W", f"{avg_pos:.0f}%",
+                    help="0% = tất cả ở đáy 52W, 100% = tất cả ở đỉnh 52W")
+                st.caption(f"📊 Tính từ 52-week high/low của {len(df_52)} mã từ yfinance chart API. pos_52w = (giá - low) / (high - low) × 100.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 📈 RSI Heatmap toàn thị trường — Tín hiệu quá mua/quá bán")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=1800)
+            def _compute_rsi_market(symbols):
+                import requests as _rq_rsi
+                out = []
+                for s in symbols:
+                    try:
+                        r = _rq_rsi.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=6mo&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            data = r.json()
+                            result = data.get("chart", {}).get("result", [{}])[0]
+                            closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            if closes and len(closes) > 20:
+                                p = pd.Series([c for c in closes if c])
+                                delta = p.diff().dropna()
+                                gain = delta.where(delta > 0, 0).rolling(14).mean()
+                                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                                rs = gain / loss.replace(0, 1e-10)
+                                rsi = float((100 - 100 / (1 + rs.iloc[-1])).item() if hasattr((100 - 100 / (1 + rs.iloc[-1])), 'item') else (100 - 100 / (1 + rs.iloc[-1])))
+                                if 0 <= rsi <= 100:
+                                    out.append({"ma": s, "gia": float(p.iloc[-1]), "rsi": rsi})
+                    except Exception:
+                        continue
+                return out
+            with st.spinner(f"📡 Tính RSI cho {len(df_mkt['ma'].tolist())} mã..."):
+                rsi_data = _compute_rsi_market(tuple(df_mkt["ma"].tolist()))
+            if rsi_data:
+                df_rsi = pd.DataFrame(rsi_data).sort_values("rsi", ascending=False)
+                st.write(f"**📊 RSI Heatmap ({len(df_rsi)} mã):**")
+                fig_rsi = go.Figure()
+                colors = ['#F44336' if r > 70 else ('#4CAF50' if r < 30 else '#FFD700') for r in df_rsi["rsi"]]
+                fig_rsi.add_trace(go.Bar(x=df_rsi["ma"], y=df_rsi["rsi"], marker_color=colors, name='RSI'))
+                fig_rsi.add_hline(y=70, line_dash="dash", line_color="#F44336", annotation_text="Quá mua (70)")
+                fig_rsi.add_hline(y=30, line_dash="dash", line_color="#4CAF50", annotation_text="Quá bán (30)")
+                fig_rsi.update_layout(title="RSI 14 phiên toàn thị trường",
+                    xaxis_title="Mã CP", yaxis_title="RSI",
+                    height=380, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_rsi, use_container_width=True)
+                rsi1, rsi2, rsi3 = st.columns(3)
+                rsi1.metric("🔴 Quá mua (RSI>70)", f"{(df_rsi['rsi']>70).sum()} mã")
+                rsi2.metric("🟡 Trung tính (30-70)", f"{((df_rsi['rsi']>=30) & (df_rsi['rsi']<=70)).sum()} mã")
+                rsi3.metric("🟢 Quá bán (RSI<30)", f"{(df_rsi['rsi']<30).sum()} mã")
+                st.caption(f"📊 RSI 14 phiên tính từ {len(rsi_data)} mã giá thật yfinance 6T. RSI>70 = quá mua (cẩn thận điều chỉnh), RSI<30 = quá bán (cơ hội mua).")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 🔀 Volatility Ranking toàn thị trường — Vol 6 tháng")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=1800)
+            def _compute_vol_market(symbols):
+                import requests as _rq_v
+                out = []
+                for s in symbols:
+                    try:
+                        r = _rq_v.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=6mo&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            data = r.json()
+                            result = data.get("chart", {}).get("result", [{}])[0]
+                            closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            if closes and len(closes) > 30:
+                                p = pd.Series([c for c in closes if c])
+                                ret = p.pct_change().dropna()
+                                if len(ret) > 20:
+                                    vol = float(ret.std() * (252**0.5) * 100)
+                                    out.append({"ma": s, "gia": float(p.iloc[-1]), "vol": vol,
+                                        "ret_6m": (float(p.iloc[-1]) / float(p.iloc[0]) - 1) * 100})
+                    except Exception:
+                        continue
+                return out
+            with st.spinner(f"📡 Tính Vol cho {len(df_mkt['ma'].tolist())} mã..."):
+                vol_data = _compute_vol_market(tuple(df_mkt["ma"].tolist()))
+            if vol_data:
+                df_vol = pd.DataFrame(vol_data)
+                nl1, nl2 = st.columns(2)
+                with nl1:
+                    st.write("**🔥 Top 10 Vol cao nhất (rủi ro cao):**")
+                    top_vol = df_vol.nlargest(10, "vol")[["ma", "gia", "vol", "ret_6m"]]
+                    top_vol["vol"] = top_vol["vol"].round(1)
+                    st.dataframe(top_vol, use_container_width=True, hide_index=True)
+                with nl2:
+                    st.write("**❄️ Top 10 Vol thấp nhất (ổn định):**")
+                    low_vol = df_vol.nsmallest(10, "vol")[["ma", "gia", "vol", "ret_6m"]]
+                    low_vol["vol"] = low_vol["vol"].round(1)
+                    st.dataframe(low_vol, use_container_width=True, hide_index=True)
+                avg_vol_mkt = float(df_vol["vol"].mean())
+                st.metric("📊 Vol TB toàn thị trường", f"{avg_vol_mkt:.1f}%/năm",
+                    help="Vol trung bình của tất cả mã quét được")
+                st.caption(f"📊 Vol annualized tính từ {len(df_vol)} mã giá thật yfinance 6T. Vol cao = biến động mạnh, Vol thấp = ổn định.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 💰 Market Cap Distribution — Phân phối vốn hóa")
+        if market_data and len(market_data) >= 5:
+            cap_data = [d for d in market_data if d.get("von_hoa") and d["von_hoa"] > 0]
+            if cap_data:
+                df_cap = pd.DataFrame(cap_data)
+                df_cap["von_hoa_ty"] = df_cap["von_hoa"] / 1e9
+                df_cap = df_cap.sort_values("von_hoa_ty", ascending=False)
+                total_cap = float(df_cap["von_hoa_ty"].sum())
+                top5_cap = float(df_cap.head(5)["von_hoa_ty"].sum())
+                top5_pct = top5_cap / total_cap * 100 if total_cap > 0 else 0
+                mc1, mc2, mc3, mc4 = st.columns(4)
+                mc1.metric("💰 Tổng vốn hóa", f"{total_cap:,.0f} tỷ VND",
+                    help=f"Tổng vốn hóa của {len(cap_data)} mã quét được")
+                mc2.metric("🏆 Top 5 chiếm", f"{top5_pct:.1f}%", help="Tỷ lệ tập trung vốn hóa")
+                mc3.metric("📊 TB vốn hóa", f"{total_cap/len(cap_data):,.0f} tỷ VND")
+                mc4.metric("📊 Median vốn hóa", f"{float(df_cap['von_hoa_ty'].median()):,.0f} tỷ VND")
+                st.write("**Top 10 mã vốn hóa lớn nhất:**")
+                st.dataframe(df_cap.head(10)[["ma", "ten", "gia", "von_hoa_ty"]].round(1),
+                    use_container_width=True, hide_index=True)
+                fig_cap = px.bar(df_cap.head(20), x="ma", y="von_hoa_ty",
+                    color="von_hoa_ty", color_continuous_scale="Viridis",
+                    labels={"ma": "Mã CP", "von_hoa_ty": "Vốn hóa (tỷ VND)"},
+                    title="Top 20 mã vốn hóa lớn nhất (tỷ VND)")
+                fig_cap.update_layout(height=350, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_cap, use_container_width=True)
+                st.caption(f"📊 Tính từ marketCap của {len(cap_data)} mã từ yfinance.info. Tổng vốn hóa ≈ quy mô thị trường. Top 5 = blue chips chiếm {top5_pct:.1f}%.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường có vốn hóa.")
+
+        st.write("---")
+        st.write("## 📏 Average Daily Range — Biên độ giao động trung bình")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=1800)
+            def _compute_range_market(symbols):
+                import requests as _rq_rg
+                out = []
+                for s in symbols:
+                    try:
+                        r = _rq_rg.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=1mo&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            data = r.json()
+                            result = data.get("chart", {}).get("result", [{}])[0]
+                            quote = result.get("indicators", {}).get("quote", [{}])[0]
+                            closes = quote.get("close", [])
+                            highs = quote.get("high", [])
+                            lows = quote.get("low", [])
+                            if closes and len(closes) > 5:
+                                ranges = []
+                                for i in range(len(closes)):
+                                    if highs[i] and lows[i] and lows[i] > 0:
+                                        ranges.append((highs[i] - lows[i]) / lows[i] * 100)
+                                if ranges:
+                                    avg_r = float(np.mean(ranges))
+                                    out.append({"ma": s, "gia": float([c for c in closes if c][-1]),
+                                        "avg_range_1m": avg_r,
+                                        "max_range": max(ranges),
+                                        "vol": avg_r * 15.87})
+                    except Exception:
+                        continue
+                return out
+            with st.spinner(f"📡 Tính biên độ ngày cho {len(df_mkt['ma'].tolist())} mã..."):
+                range_data = _compute_range_market(tuple(df_mkt["ma"].tolist()))
+            if range_data:
+                df_rng = pd.DataFrame(range_data).sort_values("avg_range_1m", ascending=False)
+                nl1, nl2 = st.columns(2)
+                with nl1:
+                    st.write("**🔥 Top 10 biên độ rộng nhất (dao động mạnh):**")
+                    st.dataframe(df_rng.head(10)[["ma", "gia", "avg_range_1m", "max_range"]].round(2),
+                        use_container_width=True, hide_index=True)
+                with nl2:
+                    st.write("**❄️ Top 10 biên độ hẹp nhất (ổn định):**")
+                    st.dataframe(df_rng.tail(10)[["ma", "gia", "avg_range_1m", "max_range"]].round(2),
+                        use_container_width=True, hide_index=True)
+                avg_rng = float(df_rng["avg_range_1m"].mean())
+                st.caption(f"📊 Tính từ high/low hàng ngày của {len(range_data)} mã từ yfinance 1T. Biên độ TB thị trường: {avg_rng:.2f}%/ngày. Biên độ rộng = cơ hội trading ngắn hạn.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
