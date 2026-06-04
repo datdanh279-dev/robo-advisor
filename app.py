@@ -13,6 +13,7 @@ st.set_page_config(
 
 st.markdown(
     "<script>"
+    "try{console.clear();}catch(e){}"
     "document.documentElement.lang='vi';"
     "if(!document.querySelector('meta[http-equiv=\\\"Content-Language\\\"]')){"
     "var m=document.createElement('meta');"
@@ -26,6 +27,11 @@ st.markdown(
     "var s=Array.from(arguments).join(' ');"
     "if(/segment\\.com|google-analytics|translate\\.google|translate\\.googleapis|bufferedData|cdn\\.segment|ERR_BLOCKED_BY_ADMINISTRATOR|removeChild|routes-[A-Za-z0-9_-]+\\.js|NotFoundError/.test(s))return;"
     "_orig.apply(console,arguments);"
+    "};"
+    "var _f=window.fetch;"
+    "window.fetch=function(u,o){"
+    "if(typeof u==='string'&&/segment\\.com|google-analytics|translate\\.google/.test(u))return Promise.resolve(new Response());"
+    "return _f.apply(this,arguments);"
     "};"
     "})();"
     "</script>",
