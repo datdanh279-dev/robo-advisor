@@ -4377,6 +4377,186 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần giá thật 6T để tính composite risk score.")
 
         st.write("---")
+        st.write("## 📈 CAPM Regression — Đường hồi quy Stock vs Market")
+        if has_real and dm_equity is not None and len(dm_equity) > 30 and has_vn30:
+            common_idx = sorted(set(pd.Series(dm_equity).index) & set(vn30_close.index))
+            if len(common_idx) > 30:
+                dm_r = pd.Series(dm_equity, index=pd.Series(dm_equity).index).pct_change().dropna()
+                vn_r = vn30_close.pct_change().dropna()
+                common_idx2 = sorted(set(dm_r.index) & set(vn_r.index))
+                if len(common_idx2) > 30:
+                    x = vn_r.loc[common_idx2].values
+                    y = dm_r.loc[common_idx2].values
+                    beta_capm, alpha_capm = np.polyfit(x, y, 1)
+                    corr_capm = float(np.corrcoef(x, y)[0, 1])
+                    r2_capm = corr_capm ** 2
+                    fig_capm = go.Figure()
+                    fig_capm.add_trace(go.Scatter(x=x, y=y, mode='markers', marker=dict(color='#4FC3F7', size=5, opacity=0.5),
+                        name='Phiên giao dịch'))
+                    x_line = np.linspace(x.min(), x.max(), 100)
+                    fig_capm.add_trace(go.Scatter(x=x_line, y=beta_capm * x_line + alpha_capm,
+                        mode='lines', line=dict(color='#FFD700', width=2),
+                        name=f'Regression: β={beta_capm:.2f}, α={alpha_capm*100:.3f}%'))
+                    fig_capm.update_layout(title=f"CAPM Regression (R²={r2_capm:.3f}, n={len(common_idx2)} phiên)",
+                        xaxis_title="VN30 Return", yaxis_title="DM Return",
+                        height=380, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                    st.plotly_chart(fig_capm, use_container_width=True)
+                    cap1, cap2, cap3, cap4 = st.columns(4)
+                    cap1.metric("📊 Beta (β)", f"{beta_capm:.3f}", help="Độ nhạy của DM so với VN30")
+                    cap2.metric("📈 Alpha (α)", f"{alpha_capm*100:+.3f}%/ngày", help="Lợi nhuận vượt thị trường/ngày")
+                    cap3.metric("🔗 Correlation", f"{corr_capm:.3f}", help="Hệ số tương quan Pearson")
+                    cap4.metric("📐 R²", f"{r2_capm:.3f}", help="Độ phù hợp của mô hình CAPM")
+                    st.caption(f"📊 Hồi quy OLS trên {len(common_idx2)} phiên returns thật yfinance 6T. R²={r2_capm:.3f} = {r2_capm*100:.1f}% biến động DM được giải thích bởi VN30.")
+            else:
+                st.info("⚠️ Không đủ dữ liệu chung với VN30.")
+        else:
+            st.info("⚠️ Cần giá thật 6T + VN30 proxy để vẽ CAPM regression.")
+
+        st.write("---")
+        st.write("## 🎲 Win Rate & Profit Factor — Hiệu suất giao dịch")
+        if has_real and dm_equity is not None and len(dm_equity) > 30:
+            ret_s5 = pd.Series(dm_equity).pct_change().dropna()
+            n_pos = int((ret_s5 > 0).sum())
+            n_neg = int((ret_s5 < 0).sum())
+            n_flat = int((ret_s5 == 0).sum())
+            total = n_pos + n_neg
+            win_rate = n_pos / total * 100 if total > 0 else 0
+            gross_profit = float(ret_s5[ret_s5 > 0].sum())
+            gross_loss = abs(float(ret_s5[ret_s5 < 0].sum()))
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+            avg_win = float(ret_s5[ret_s5 > 0].mean()) if n_pos > 0 else 0
+            avg_loss = abs(float(ret_s5[ret_s5 < 0].mean())) if n_neg > 0 else 0
+            payoff = avg_win / avg_loss if avg_loss > 0 else 0
+            expectancy = (win_rate/100 * avg_win) - ((1 - win_rate/100) * avg_loss)
+            kelly_pct = (win_rate/100 - (1 - win_rate/100) / payoff) * 100 if payoff > 0 else 0
+            kelly_safe = max(0, kelly_pct / 2)
+            wr1, wr2, wr3, wr4 = st.columns(4)
+            wr1.metric("🎯 Win Rate", f"{win_rate:.1f}%", help="Tỷ lệ phiên lãi / tổng phiên có biến động")
+            wr2.metric("💰 Profit Factor", f"{profit_factor:.2f}", help="Tổng lãi / Tổng lỗ. >1.5 = tốt, >2 = xuất sắc")
+            wr3.metric("📊 Payoff Ratio", f"{payoff:.2f}", help="TB lãi / TB lỗ. >1 = lãi trung bình > lỗ trung bình")
+            wr4.metric("📈 Expectancy", f"{expectancy*100:+.3f}%", help="Kỳ vọng lợi nhuận/phiên")
+            wr5, wr6, wr7 = st.columns(3)
+            wr5.metric("📊 Phiên lãi", f"{n_pos}", help="Số phiên return > 0")
+            wr6.metric("📉 Phiên lỗ", f"{n_neg}", help="Số phiên return < 0")
+            wr7.metric("📐 Kelly %", f"{kelly_pct:.1f}% (safe {kelly_safe:.1f}%)",
+                help="Kelly Criterion: % vốn tối ưu nên đầu tư. Safe = ½ Kelly để giảm rủi ro")
+            st.caption(f"📊 Tính từ {len(ret_s5)} phiên returns thật yfinance 6T. Profit Factor >1.5 = tốt, >2 = xuất sắc. Kelly Criterion cho biết nên đặt cọc bao nhiêu % vốn.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính win rate & profit factor.")
+
+        st.write("---")
+        st.write("## 📊 Volatility Cone — Phân phối Vol lịch sử")
+        if has_real and dm_equity is not None and len(dm_equity) > 120:
+            ret_s6 = pd.Series(dm_equity).pct_change().dropna()
+            windows = [10, 20, 30, 60, 90, 120]
+            vol_data = {}
+            for w in windows:
+                if len(ret_s6) >= w:
+                    rolling_v = ret_s6.rolling(w).std() * (252**0.5) * 100
+                    vol_data[w] = {
+                        "P10": float(rolling_v.quantile(0.10)),
+                        "P25": float(rolling_v.quantile(0.25)),
+                        "P50 (median)": float(rolling_v.quantile(0.50)),
+                        "P75": float(rolling_v.quantile(0.75)),
+                        "P90": float(rolling_v.quantile(0.90)),
+                        "Current": float(rolling_v.iloc[-1]) if not rolling_v.empty else 0,
+                    }
+            if vol_data:
+                df_vc = pd.DataFrame(vol_data).T
+                df_vc.index.name = "Window (ngày)"
+                st.dataframe(df_vc.round(1), use_container_width=True)
+                fig_vc = go.Figure()
+                for pct in ["P10", "P25", "P50 (median)", "P75", "P90"]:
+                    fig_vc.add_trace(go.Scatter(x=df_vc.index.astype(str), y=df_vc[pct],
+                        mode='lines+markers', name=pct,
+                        line=dict(width=2 if 'median' in pct else 1)))
+                fig_vc.add_trace(go.Scatter(x=df_vc.index.astype(str), y=df_vc["Current"],
+                    mode='lines+markers', name='Hiện tại', line=dict(color='#FFD700', width=3, dash='dash')))
+                fig_vc.update_layout(title="Volatility Cone (% năm)",
+                    xaxis_title="Rolling Window (ngày)", yaxis_title="Vol (%)",
+                    height=380, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_vc, use_container_width=True)
+                st.caption(f"📊 Tính từ {len(ret_s6)} phiên returns thật yfinance 6T. Vol hiện tại so với phân phối lịch sử: >P90 = bất thường, <P10 = yên tĩnh bất thường.")
+        else:
+            st.info("⚠️ Cần ≥120 phiên giá thật để vẽ volatility cone.")
+
+        st.write("---")
+        st.write("## 🔗 Higher Moments — Coskewness & Cokurtosis")
+        if has_real and len(real_prices) >= 2 and tong_gt > 0:
+            weights_arr = []
+            rets_list = []
+            tickers = []
+            for ma, info in dm.items():
+                gia_tt = info.get("gia_thi_truong", 0)
+                sl = info.get("so_luong", 0)
+                if gia_tt <= 0 or sl <= 0: continue
+                if ma not in real_prices or len(real_prices[ma]) < 30: continue
+                w = (gia_tt * sl) / tong_gt
+                weights_arr.append(w)
+                tickers.append(ma)
+                rets_list.append(real_prices[ma].pct_change().dropna())
+            if len(rets_list) >= 2:
+                df_hm = pd.concat(rets_list, axis=1).dropna()
+                df_hm.columns = tickers
+                market_ret = df_hm.mean(axis=1)
+                hm_rows = []
+                for ma in tickers:
+                    r = df_hm[ma]
+                    covar_with_m2 = float(np.mean((r - r.mean()) * (market_ret - market_ret.mean())**2))
+                    var_m2 = float(np.var(market_ret)) ** 1.5 if float(np.var(market_ret)) > 0 else 1e-10
+                    coskew = covar_with_m2 / var_m2 if var_m2 > 1e-10 else 0
+                    covar_with_m3 = float(np.mean((r - r.mean()) * (market_ret - market_ret.mean())**3))
+                    var_m3 = float(np.var(market_ret)) ** 2 if float(np.var(market_ret)) > 0 else 1e-10
+                    cokurt = covar_with_m3 / var_m3 if var_m3 > 1e-10 else 0
+                    sk = float(((r - r.mean())**3).mean() / (r.std()**3)) if r.std() > 0 else 0
+                    interp_sk = "🟢 Lệch phải (tốt)" if sk > 0.5 else ("🔴 Lệch trái (xấu)" if sk < -0.5 else "🟡 Đối xứng")
+                    interp_cosk = "🟢 Cùng chiều TT (tốt)" if coskew > 0.3 else ("🔴 Ngược chiều TT (đa dạng hóa)" if coskew < -0.3 else "🟡 Trung tính")
+                    hm_rows.append({"Mã": ma, "Skewness": round(sk, 3), "Diễn giải": interp_sk,
+                        "Coskewness": round(coskew, 3), "Tương tác TT": interp_cosk,
+                        "Cokurtosis": round(cokurt, 3)})
+                if hm_rows:
+                    st.dataframe(pd.DataFrame(hm_rows), use_container_width=True, hide_index=True)
+                    st.caption(f"📊 Tính từ {len(df_hm)} phiên returns thật yfinance 6T. Coskewness>0.3 = mã này tăng mạnh khi thị trường tăng (tail dependence tốt). <−0.3 = mã này giảm khi thị trường tăng (đa dạng hóa tốt).")
+            else:
+                st.info("⚠️ Cần ≥2 mã có giá thật để tính higher moments.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính higher moments.")
+
+        st.write("---")
+        st.write("## 📊 Information Ratio Decomposition theo kỳ")
+        if has_real and dm_equity is not None and has_vn30 and len(dm_equity) > 30:
+            common_idx3 = sorted(set(pd.Series(dm_equity).index) & set(vn30_close.index))
+            if len(common_idx3) > 30:
+                ir_rows = []
+                periods = [("1 tháng", 22), ("3 tháng", 66), ("6 tháng", len(common_idx3))]
+                for label, n in periods:
+                    n_use = min(n, len(common_idx3))
+                    if n_use < 10: continue
+                    dm_p = float(pd.Series(dm_equity).iloc[-1] / pd.Series(dm_equity).iloc[-n_use] - 1)
+                    vn_p = float(vn30_close.loc[common_idx3].iloc[-1] / vn30_close.loc[common_idx3].iloc[-n_use] - 1)
+                    diff_ret = dm_p - vn_p
+                    dm_period_ret = pd.Series(dm_equity).iloc[-n_use:].pct_change().dropna()
+                    vn_period_ret = vn30_close.loc[common_idx3].iloc[-n_use:].pct_change().dropna()
+                    common_p = sorted(set(dm_period_ret.index) & set(vn_period_ret.index))
+                    if len(common_p) > 5:
+                        te = float((dm_period_ret.loc[common_p] - vn_period_ret.loc[common_p]).std() * (252**0.5))
+                        ir = diff_ret / te if te > 0 else 0
+                    else:
+                        te = 0; ir = 0
+                    interp_ir = "✅ Xuất sắc" if ir > 1 else ("✅ Tốt" if ir > 0.5 else ("🟡 Trung bình" if ir > 0 else "🔴 Thua"))
+                    ir_rows.append({"Kỳ": label, "Return DM %": round(dm_p*100, 2),
+                        "Return VN30 %": round(vn_p*100, 2), "Excess Return %": round(diff_ret*100, 2),
+                        "Tracking Error %": round(te*100, 2), "Information Ratio": round(ir, 3),
+                        "Đánh giá": interp_ir})
+                if ir_rows:
+                    st.dataframe(pd.DataFrame(ir_rows), use_container_width=True, hide_index=True)
+                    st.caption(f"📊 Tính từ returns thật yfinance 6T. IR > 1 = xuất sắc, > 0.5 = tốt, < 0 = thua thị trường.")
+            else:
+                st.info("⚠️ Không đủ dữ liệu chung với VN30.")
+        else:
+            st.info("⚠️ Cần giá thật + VN30 để tính IR decomposition.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
