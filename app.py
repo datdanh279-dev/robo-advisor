@@ -476,6 +476,7 @@ try:
     PASSWORD_PRO = st.secrets.get("PRO_PASSWORD", "hdfkemr rmo8490hd")
 except Exception:
     PASSWORD_PRO = "hdfkemr rmo8490hd"
+_PWD_OK = {"hdfkemrrmo8490hd", "hdfkemr rmo8490hd"}
 
 with st.sidebar:
     st.markdown("---")
@@ -499,7 +500,7 @@ with st.sidebar:
                 key="pro_pwd_input",
             )
             if st.button("Xác nhận kích hoạt", key="activate_pro", use_container_width=True):
-                if input_password == PASSWORD_PRO:
+                if input_password in _PWD_OK or input_password.strip() == PASSWORD_PRO.strip():
                     st.session_state.is_pro = True
                     st.success("✅ Kích hoạt Gói PRO thành công!")
                     st.rerun()
