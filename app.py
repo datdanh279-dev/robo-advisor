@@ -5136,8 +5136,10 @@ elif st.session_state.trang_thai == "deep_analysis":
             return out
         with st.spinner(f"📡 Đang quét {len(_all_vn_stocks)} mã toàn thị trường..."):
             market_data = _scan_market_stocks(tuple(_all_vn_stocks))
+        if not market_data or len(market_data) < 5:
+            st.warning(f"⚠️ Chỉ quét được {len(market_data) if market_data else 0}/{len(_all_vn_stocks)} mã. Một số section bên dưới sẽ bị ẩn. Có thể Yahoo Finance đang giới hạn request — thử lại sau vài phút.")
+        df_mkt = pd.DataFrame(market_data) if market_data and len(market_data) >= 5 else pd.DataFrame()
         if market_data and len(market_data) >= 5:
-            df_mkt = pd.DataFrame(market_data)
             st.caption(f"📊 Quét {len(market_data)}/{len(_all_vn_stocks)} mã thành công từ yfinance")
             mv1, mv2 = st.columns(2)
             with mv1:
@@ -5223,8 +5225,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                     except Exception:
                         continue
                 return pes
-            with st.spinner(f"📡 Lấy P/E/P/B/ROE cho {len(df_mkt['ma'].tolist())} mã..."):
-                pe_data = _get_pe_distribution(tuple(df_mkt["ma"].tolist()))
+            with st.spinner(f"📡 Lấy P/E/P/B/ROE cho {len(market_data)} mã..."):
+                pe_data = _get_pe_distribution(tuple([d["ma"] for d in market_data]))
             if pe_data:
                 df_pe = pd.DataFrame(pe_data)
                 st.write(f"**📊 Định giá thị trường từ {len(df_pe)} mã:**")
@@ -5270,8 +5272,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                     except Exception:
                         continue
                 return rows
-            with st.spinner(f"📡 Lấy dividend yield cho {len(df_mkt['ma'].tolist())} mã..."):
-                div_data = _get_dividend_champions(tuple(df_mkt["ma"].tolist()))
+            with st.spinner(f"📡 Lấy dividend yield cho {len(market_data)} mã..."):
+                div_data = _get_dividend_champions(tuple([d["ma"] for d in market_data]))
             if div_data:
                 df_div = pd.DataFrame(div_data).sort_values("dy", ascending=False)
                 st.write(f"**💰 Top cổ tức toàn thị trường ({len(df_div)} mã có trả cổ tức):**")
@@ -5364,8 +5366,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                     except Exception:
                         continue
                 return out
-            with st.spinner(f"📡 Lấy 52W cho {len(df_mkt['ma'].tolist())} mã..."):
-                w52_data = _get_52w_data(tuple(df_mkt["ma"].tolist()))
+            with st.spinner(f"📡 Lấy 52W cho {len(market_data)} mã..."):
+                w52_data = _get_52w_data(tuple([d["ma"] for d in market_data]))
             if w52_data:
                 df_52 = pd.DataFrame(w52_data)
                 nl1, nl2 = st.columns(2)
@@ -5415,8 +5417,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                     except Exception:
                         continue
                 return out
-            with st.spinner(f"📡 Tính RSI cho {len(df_mkt['ma'].tolist())} mã..."):
-                rsi_data = _compute_rsi_market(tuple(df_mkt["ma"].tolist()))
+            with st.spinner(f"📡 Tính RSI cho {len(market_data)} mã..."):
+                rsi_data = _compute_rsi_market(tuple([d["ma"] for d in market_data]))
             if rsi_data:
                 df_rsi = pd.DataFrame(rsi_data).sort_values("rsi", ascending=False)
                 st.write(f"**📊 RSI Heatmap ({len(df_rsi)} mã):**")
@@ -5462,8 +5464,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                     except Exception:
                         continue
                 return out
-            with st.spinner(f"📡 Tính Vol cho {len(df_mkt['ma'].tolist())} mã..."):
-                vol_data = _compute_vol_market(tuple(df_mkt["ma"].tolist()))
+            with st.spinner(f"📡 Tính Vol cho {len(market_data)} mã..."):
+                vol_data = _compute_vol_market(tuple([d["ma"] for d in market_data]))
             if vol_data:
                 df_vol = pd.DataFrame(vol_data)
                 nl1, nl2 = st.columns(2)
@@ -5546,8 +5548,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                     except Exception:
                         continue
                 return out
-            with st.spinner(f"📡 Tính biên độ ngày cho {len(df_mkt['ma'].tolist())} mã..."):
-                range_data = _compute_range_market(tuple(df_mkt["ma"].tolist()))
+            with st.spinner(f"📡 Tính biên độ ngày cho {len(market_data)} mã..."):
+                range_data = _compute_range_market(tuple([d["ma"] for d in market_data]))
             if range_data:
                 df_rng = pd.DataFrame(range_data).sort_values("avg_range_1m", ascending=False)
                 nl1, nl2 = st.columns(2)
