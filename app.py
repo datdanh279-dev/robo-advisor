@@ -3108,6 +3108,16 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🎲 Monte Carlo — 1000 kịch bản tương lai 1 năm")
+        if has_real and len(dm_equity) > 20:
+            daily_returns_real = pd.Series(dm_equity).pct_change().dropna().values
+            daily_mu = float(np.mean(daily_returns_real))
+            daily_sigma = float(np.std(daily_returns_real))
+            vol_source = f"📊 Tính từ {len(daily_returns_real)} phiên giá thật (yfinance 6T)"
+        else:
+            daily_mu = port_return / 252
+            daily_sigma = vol_proxy / (252 ** 0.5)
+            vol_source = "🎲 Ước lượng CAPM (vol_proxy 18%)"
+        st.caption(f"Vol daily: μ={daily_mu*100:+.4f}%, σ={daily_sigma*100:.3f}% — {vol_source}")
         np.random.seed(123)
         n_sims = 1000
         n_days_mc = 252
