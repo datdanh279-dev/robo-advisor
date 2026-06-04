@@ -1982,27 +1982,24 @@ elif st.session_state.trang_thai == "chat":
             submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
             if submitted and cau_hoi:
                 try:
-                    with st.status("🧠 Đang hỏi các chuyên gia...", expanded=True) as status:
+                    with st.spinner("🧠 Đang hỏi các chuyên gia AI..."):
                         st.write("📡 Bộ phân loại AI đang đánh giá độ phức tạp của câu hỏi...")
                         results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
-                        if results:
-                            st.session_state.expert_results = results
-                            mode = results.get("mode", "cao_cap")
-                            mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
-                            st.write(f"✅ Đã nhận phản hồi. Chế độ: {mode_labels.get(mode, mode)}")
-                            if results.get("chairman"):
-                                st.write("👑 Chủ tịch Hội đồng đang đưa ra kết luận...")
-                            status.update(label="✅ Hoàn tất!", state="complete")
-                        else:
-                            status.update(label="❌ Thất bại", state="error")
-                            st.error("Không thể kết nối với các chuyên gia. Kiểm tra API keys.")
+                    if results:
+                        st.session_state.expert_results = results
+                        mode = results.get("mode", "cao_cap")
+                        mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
+                        st.success(f"✅ Đã nhận phản hồi. Chế độ: {mode_labels.get(mode, mode)}")
+                        if results.get("chairman"):
+                            st.info("👑 Chủ tịch Hội đồng đang đưa ra kết luận...")
+                    else:
+                        st.error("❌ Không thể kết nối với các chuyên gia. Kiểm tra API keys.")
                 except Exception as _expert_err:
                     st.error(f"❌ Lỗi khi gọi Hội đồng Chuyên gia: {_expert_err}")
                     st.info("Vui lòng thử lại hoặc dùng tab Chat bên cạnh.")
                     import traceback as _tb
                     with st.expander("Chi tiết lỗi (debug)"):
                         st.code(_tb.format_exc())
-                st.rerun()
 
         if st.session_state.expert_results:
             results = st.session_state.expert_results
