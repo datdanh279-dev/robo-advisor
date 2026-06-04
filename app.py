@@ -2695,6 +2695,17 @@ elif st.session_state.trang_thai == "deep_analysis":
                 pass
             return None
 
+        def _fetch_vn_bond_yield():
+            import yfinance as _yf
+            for sym in ["^VN10Y", "VN10Y=X", "VNI10Y=X", "^GSPC"]:
+                try:
+                    h = _yf.Ticker(sym).history(period="6mo", timeout=8)
+                    if not h.empty and len(h) > 20:
+                        return h['Close']
+                except Exception:
+                    continue
+            return None
+
         @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_vn30_proxy():
             import requests as _rq, pandas as _pd
@@ -2744,6 +2755,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         has_vn30 = vn30_close is not None
         has_fund = len(real_fund) >= 1
         usdvnd_close = _fetch_usdvnd()
+        vn_bond_close = _fetch_vn_bond_yield()
         port_beta = sum(betas)
         port_return = rp
         if has_real and len(real_prices) >= 2:
@@ -3709,7 +3721,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.caption("💡 NN nắm giữ % từ yfinance.major_holders (institutionsPercentHeld). Momentum/Vol/ADTV đều từ giá & volume thật. Nguồn ghi rõ từng dòng.")
 
         st.write("---")
-        st.write("## 🤖 AI Phân tích tự động (GPT-style insights)")
+        st.write("## 🤖 AI Phân tích tự động (Dynamic từ dữ liệu thật)")
         ai_insights = []
         if sharpe < 0.5: ai_insights.append("⚠️ **Sharpe thấp** — Lợi nhuận chưa tương xứng rủi ro. Cân nhắc cắt mã yếu hoặc tăng tỷ trọng mã chất lượng cao (ROE>20%, P/E<15).")
         if sharpe >= 1: ai_insights.append("✅ **Sharpe tốt** — DM đang sinh lời hiệu quả. Duy trì chiến lược hiện tại.")
@@ -3720,8 +3732,29 @@ elif st.session_state.trang_thai == "deep_analysis":
         if diversification > 0.8: ai_insights.append("✅ **Đa dạng hóa xuất sắc** — DM cân bằng giữa nhiều mã/ngành. Rủi ro tập trung thấp.")
         if nganh_count < 3: ai_insights.append(f"⚠️ Chỉ **{nganh_count} ngành** — Nên thêm 2-3 ngành khác để giảm rủi ro ngành.")
         if vol_proxy > 0.25: ai_insights.append("⚠️ **Volatility > 25%** — DM biến động mạnh. Phù hợp nhà đầu tư chấp nhận rủi ro cao.")
-        for r in recs[:3]: ai_insights.append(f"📌 {r}")
-        if not ai_insights: ai_insights.append("✅ DM hiện tại đạt các tiêu chí cơ bản. Tiếp tục theo dõi và tái cân bằng định kỳ.")
+        if has_fund and len(real_fund) > 0:
+            for ma, fd in real_fund.items():
+                pe = fd.get("pe")
+                roe = fd.get("roe")
+                pb = fd.get("pb")
+                if pe is not None and pe > 0:
+                    if pe > 25:
+                        gia_tt = next((dm[m].get("gia_thi_truong", 0) * dm[m].get("so_luong", 0) for m in [ma] if m in dm), 0)
+                        w = (gia_tt / tong_gt * 100) if tong_gt > 0 and gia_tt > 0 else 0
+                        ai_insights.append(f"⚠️ **{ma}** P/E={pe:.1f} (>25) — định giá cao. Chiếm {w:.0f}% DM. Cân nhắc chốt lời một phần.")
+                    elif pe < 10 and roe is not None and roe > 0.15:
+                        ai_insights.append(f"✅ **{ma}** P/E={pe:.1f} (<10) + ROE={roe*100:.1f}% (>15%) — rẻ + chất lượng. Cân nhắc tăng tỷ trọng.")
+                if roe is not None and roe < 0.08 and pe is not None and pe > 0:
+                    ai_insights.append(f"🔴 **{ma}** ROE={roe*100:.1f}% (<8%) — chất lượng thấp. Xem xét cắt nếu không có catalyst.")
+                if pb is not None and pb > 5:
+                    ai_insights.append(f"⚠️ **{ma}** P/B={pb:.1f} (>5) — đắt so với book value.")
+        if usdvnd_close is not None and len(usdvnd_close) > 5:
+            usd_change_3m = (float(usdvnd_close.iloc[-1]) / float(usdvnd_close.iloc[-min(60, len(usdvnd_close))]) - 1) * 100
+            if usd_change_3m > 2:
+                ai_insights.append(f"💵 **USD/VND +{usd_change_3m:.1f}%** 3T — VNĐ mất giá. Cổ phiếu xuất khẩu hưởng lợi.")
+            elif usd_change_3m < -2:
+                ai_insights.append(f"💵 **USD/VND {usd_change_3m:.1f}%** 3T — VNĐ tăng giá. Cổ phiếu nhập khẩu bị ảnh hưởng.")
+        if not ai_insights: ai_insights.append("✅ DM hiện tại đạt các tiêu chí cơ bản. Tiếp tục they dõi và tái cân bằng định kỳ.")
         for ins in ai_insights[:8]:
             st.write(f"- {ins}")
 
@@ -3790,21 +3823,41 @@ elif st.session_state.trang_thai == "deep_analysis":
                 fx_impact += w * sens * 0.02 * 100
             fx_source = "⚠️ Ước lượng theo ngành (yfinance USD/VND tạm không khả dụng)"
         NH_SENSITIVITY = {"Ngân hàng": 0.8, "Bất động sản": 0.6, "Thép": 0.3, "Thực phẩm": 0.2, "Bán lẻ": 0.2, "Công nghệ": 0.1, "Khác": 0.2}
-        rate_impact = 0
-        for ma, info in dm.items():
-            gia_tt = info.get("gia_thi_truong", 0)
-            sl = info.get("so_luong", 0)
-            if gia_tt <= 0 or sl <= 0: continue
-            ki = kpi.get(ma, {})
-            ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
-            sens = NH_SENSITIVITY.get(ng, 0.2)
-            w = (gia_tt * sl) / tong_gt if tong_gt > 0 else 0
-            rate_impact += w * sens * 0.05 * 100
+        if vn_bond_close is not None and len(vn_bond_close) > 20:
+            bond_ret = vn_bond_close.pct_change().dropna()
+            rate_impact = 0
+            rate_source = f"📊 Tính từ correlation thật với lãi suất 10Y ({vn_bond_close.iloc[-1]:.2f}%, yfinance 6T)"
+            for ma, info in dm.items():
+                gia_tt = info.get("gia_thi_truong", 0)
+                sl = info.get("so_luong", 0)
+                if gia_tt <= 0 or sl <= 0: continue
+                w = (gia_tt * sl) / tong_gt if tong_gt > 0 else 0
+                if ma in real_prices and len(real_prices[ma]) > 20:
+                    common = sorted(set(bond_ret.index) & set(real_prices[ma].index))
+                    if len(common) > 15:
+                        stock_ret = real_prices[ma].reindex(common).pct_change().dropna()
+                        b_ret = bond_ret.reindex(common).dropna()
+                        common2 = sorted(set(stock_ret.index) & set(b_ret.index))
+                        if len(common2) > 10:
+                            corr = float(stock_ret.loc[common2].corr(b_ret.loc[common2]))
+                            rate_impact += w * corr * 0.01 * 100
+        else:
+            rate_impact = 0
+            rate_source = "⚠️ Ước lượng theo ngành (yfinance VN bond tạm không khả dụng)"
+            for ma, info in dm.items():
+                gia_tt = info.get("gia_thi_truong", 0)
+                sl = info.get("so_luong", 0)
+                if gia_tt <= 0 or sl <= 0: continue
+                ki = kpi.get(ma, {})
+                ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+                sens = NH_SENSITIVITY.get(ng, 0.2)
+                w = (gia_tt * sl) / tong_gt if tong_gt > 0 else 0
+                rate_impact += w * sens * 0.05 * 100
         fc1, fc2, fc3 = st.columns(3)
         fc1.metric("💵 Tỷ giá +2% → DM", f"{fx_impact:+.2f}%", help="VNĐ mất giá 2% so với USD")
-        fc2.metric("📈 Lãi suất +1% → DM", f"{-rate_impact:+.2f}%", help="NHNN tăng lãi suất 1% (ước lượng)")
+        fc2.metric("📈 Lãi suất +1% → DM", f"{rate_impact:+.2f}%", help="Lãi suất 10Y tăng 1%")
         fc3.metric("🏭 Ngành nhạy cảm LS", max(NH_SENSITIVITY, key=NH_SENSITIVITY.get))
-        st.caption(fx_source)
+        st.caption(f"{fx_source} | {rate_source}")
 
         st.write("---")
         st.write("## 🆚 So sánh với VN30 / HNX-Index")
