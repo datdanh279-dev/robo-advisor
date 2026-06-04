@@ -169,9 +169,8 @@ LOGIN_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
 
-#root { background: linear-gradient(135deg, #02050E, #070B19, #0A111F); }
 .stApp { background: linear-gradient(135deg, #02050E, #070B19, #0A111F); }
-header[data-testid="stHeader"] { display: none; }
+header[data-testid="stHeader"] { visibility: hidden; height: 0; }
 .login-container {
     max-width: 420px; margin: 0 auto; padding-top: 12vh;
     text-align: center;
@@ -268,7 +267,9 @@ section.main [data-testid="stTabs"] {
 """
 
 def hien_thi_login():
-    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+    if not st.session_state.get("_login_css_injected"):
+        st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+        st.session_state._login_css_injected = True
     try:
         registered_count, max_slots = get_beta_progress()
     except Exception:
@@ -404,7 +405,9 @@ def hien_thi_login():
                             st.error(f"Đăng ký thất bại (tên đã tồn tại hoặc beta đã đầy). Còn {remaining} chỗ.")
 
 def hien_thi_otp():
-    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+    if not st.session_state.get("_login_css_injected"):
+        st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+        st.session_state._login_css_injected = True
     st.markdown(
         '<div class="login-container">'
         f'<div class="login-title">🔐 Xác thực 2 lớp</div>'
@@ -528,8 +531,10 @@ def mo_phong_monte_carlo_cached(so_lan=1000):
 
 
 
-st.markdown(
-    """
+if not st.session_state.get("_main_css_injected"):
+    st.session_state._main_css_injected = True
+    st.markdown(
+        """
 <style>
 :root {
     --gold: #FFD700;
@@ -704,8 +709,8 @@ div[data-testid="stSidebar"] {
 }
 </style>
 """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
 
 
 if "trang_thai" not in st.session_state:
