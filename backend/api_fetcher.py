@@ -77,7 +77,7 @@ def lay_gia_vang_sjc():
     try:
         r = requests.get("https://sjc.com.vn/xml/tygiavang.xml", timeout=10)
         r.encoding = 'utf-8'
-        match = re.search(r'<ratiotype="sell"[^>]*>([\d,]+)</ratio>', r.text)
+        match = re.search(r'<ratio\s+type="sell"[^>]*>([\d,]+)</ratio>', r.text)
         if match:
             return _cache_set("vang_sjc", int(match.group(1).replace(',', '')))
     except Exception as e:
