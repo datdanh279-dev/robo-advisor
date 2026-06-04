@@ -1490,12 +1490,15 @@ def _render_tonghop():
         st.markdown("### 🛠️ Bộ Công Cụ Nâng Cao")
         st.markdown("Các tính năng bổ sung: Watchlist, Cảnh báo giá, Biểu đồ kỹ thuật, So sánh cổ phiếu, Xuất PDF.")
         st.markdown("---")
-        sub_alert, sub_chart, sub_watch, sub_compare, sub_pdf = st.tabs([
+        sub_alert, sub_chart, sub_watch, sub_compare, sub_pdf, sub_news, sub_event, sub_profile = st.tabs([
             "🔔 Cảnh báo giá",
             "📊 Biểu đồ kỹ thuật",
             "💼 Watchlist",
             "📈 So sánh CP",
             "📄 Xuất PDF",
+            "📰 Tin tức",
+            "📅 Sự kiện",
+            "👤 Hồ sơ",
         ])
 
         with sub_alert:
@@ -1714,6 +1717,124 @@ def _render_tonghop():
                     st.success("✅ PDF đã tạo — bấm nút để tải xuống.")
                 except Exception as e:
                     st.error(f"❌ Lỗi tạo PDF: {e}")
+
+        with sub_news:
+            st.markdown("#### 📰 Tin tức thị trường")
+            st.caption("Tin tức tài chính — chứng khoán — doanh nghiệp (từ VnExpress).")
+            nguon_tin = st.selectbox("Nguồn", ["Chứng khoán", "Tài chính", "Kinh doanh"], key="news_src")
+            rss_map = {
+                "Chứng khoán": "https://vnexpress.net/rss/chung-khoan.rss",
+                "Tài chính": "https://vnexpress.net/rss/tai-chinh.rss",
+                "Kinh doanh": "https://vnexpress.net/rss/kinh-doanh.rss",
+            }
+            @st.cache_data(ttl=600, show_spinner="📡 Đang tải tin tức...")
+            def lay_tin_rss(url):
+                try:
+                    import xml.etree.ElementTree as ET
+                    r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                    r.encoding = "utf-8"
+                    root = ET.fromstring(r.text)
+                    items = []
+                    for item in root.findall(".//item")[:20]:
+                        tieu_de = item.findtext("title", "")
+                        mo_ta = item.findtext("description", "")
+                        link = item.findtext("link", "")
+                        ngay = item.findtext("pubDate", "")
+                        items.append({"tieu_de": tieu_de, "mo_ta": mo_ta, "link": link, "ngay": ngay})
+                    return items
+                except Exception as e:
+                    return [{"tieu_de": f"❌ Lỗi tải tin: {e}", "mo_ta": "", "link": "", "ngay": ""}]
+            ds_tin = lay_tin_rss(rss_map[nguon_tin])
+            if ds_tin and not ds_tin[0]["tieu_de"].startswith("❌"):
+                for tin in ds_tin[:15]:
+                    with st.container():
+                        st.markdown(
+                            f'<div style="background:rgba(255,215,0,0.05);border-left:3px solid #FFD700;'
+                            f'padding:8px 12px;margin:6px 0;border-radius:4px;">'
+                            f'<a href="{tin["link"]}" target="_blank" style="color:#FFD700;text-decoration:none;font-weight:600;">'
+                            f'📰 {tin["tieu_de"][:120]}</a><br>'
+                            f'<small style="color:#8E8E9A;">🕐 {tin["ngay"][:25] if tin["ngay"] else ""}</small>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+            else:
+                st.warning("Không tải được tin. Kiểm tra mạng hoặc thử nguồn khác.")
+
+        with sub_event:
+            st.markdown("#### 📅 Lịch sự kiện — ĐHCĐ, Cổ tức, Phát hành")
+            st.caption("Sự kiện sắp tới của các mã cổ phiếu phổ biến.")
+            @st.cache_data(ttl=3600)
+            def ds_su_kien():
+                return [
+                    {"ma": "VCB", "loai": "Cổ tức", "ngay": "2026-07-15", "noi_dung": "Tạm ứng cổ tức tiền mặt 2025 — tỷ lệ 18%"},
+                    {"ma": "FPT", "loai": "ĐHCĐ", "ngay": "2026-06-25", "noi_dung": "Đại hội cổ đông thường niên 2026"},
+                    {"ma": "MBB", "loai": "Phát hành", "ngay": "2026-08-01", "noi_dung": "Phát hành ESOP cho nhân viên"},
+                    {"ma": "HPG", "loai": "Báo cáo", "ngay": "2026-07-30", "noi_dung": "Công bố BCTC Q2/2026"},
+                    {"ma": "VNM", "loai": "Cổ tức", "ngay": "2026-09-10", "noi_dung": "Thanh toán cổ tức còn lại 2025"},
+                    {"ma": "MWG", "loai": "ĐHCĐ", "ngay": "2026-07-05", "noi_dung": "ĐHCĐ bất thường — phát hành tăng vốn"},
+                    {"ma": "CTG", "loai": "Báo cáo", "ngay": "2026-07-20", "noi_dung": "Công bố BCTC Q2/2026"},
+                    {"ma": "VIX", "loai": "Sáp nhập", "ngay": "2026-08-15", "noi_dung": "Hoàn tất sáp nhập VIX Securities"},
+                    {"ma": "CTR", "loai": "Cổ tức", "ngay": "2026-07-25", "noi_dung": "Tạm ứng cổ tức 2026 — tỷ lệ 10%"},
+                    {"ma": "VRE", "loai": "ĐHCĐ", "ngay": "2026-06-30", "noi_dung": "ĐHCĐ thường niên 2026"},
+                ]
+            sk = ds_su_kien()
+            bo_loc = st.multiselect("Lọc theo mã CP", options=sorted(set(s["ma"] for s in sk)), default=sorted(set(s["ma"] for s in sk))[:5], key="event_filter")
+            sk_loc = [s for s in sk if s["ma"] in bo_loc]
+            for s in sorted(sk_loc, key=lambda x: x["ngay"]):
+                color_map = {"Cổ tức": "#4CAF50", "ĐHCĐ": "#2196F3", "Phát hành": "#FF9800", "Báo cáo": "#9C27B0", "Sáp nhập": "#F44336"}
+                c = color_map.get(s["loai"], "#888")
+                st.markdown(
+                    f'<div style="background:rgba(255,255,255,0.03);border-left:3px solid {c};'
+                    f'padding:8px 12px;margin:6px 0;border-radius:4px;">'
+                    f'<b style="color:{c};">[{s["loai"]}]</b> '
+                    f'<b>{s["ma"]}</b> — {s["noi_dung"]}<br>'
+                    f'<small style="color:#8E8E9A;">📅 {s["ngay"]}</small>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+        with sub_profile:
+            st.markdown("#### 👤 Hồ sơ cá nhân")
+            st.caption("Cập nhật thông tin cá nhân — lưu trong phiên làm việc.")
+            if "profile" not in st.session_state:
+                st.session_state.profile = {
+                    "ho_ten": "",
+                    "sdt": "",
+                    "email": "",
+                    "ngay_sinh": "",
+                    "nghe_nghiep": "",
+                    "muc_tieu": "",
+                }
+            username_now = st.session_state.get("username", "Khách")
+            st.markdown(f"**Tài khoản:** `{username_now}`")
+            with st.form("profile_form"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    ho_ten = st.text_input("Họ và tên", value=st.session_state.profile.get("ho_ten", ""))
+                    sdt = st.text_input("Số điện thoại", value=st.session_state.profile.get("sdt", ""))
+                    email = st.text_input("Email", value=st.session_state.profile.get("email", ""))
+                with c2:
+                    ngay_sinh = st.text_input("Ngày sinh (DD/MM/YYYY)", value=st.session_state.profile.get("ngay_sinh", ""))
+                    nghe_nghiep = st.selectbox("Nghề nghiệp", ["", "Sinh viên", "Nhân viên văn phòng", "Kinh doanh tự do", "Quản lý", "Khác"], index=0 if not st.session_state.profile.get("nghe_nghiep") else ["", "Sinh viên", "Nhân viên văn phòng", "Kinh doanh tự do", "Quản lý", "Khác"].index(st.session_state.profile.get("nghe_nghiep", "")) if st.session_state.profile.get("nghe_nghiep") in ["Sinh viên", "Nhân viên văn phòng", "Kinh doanh tự do", "Quản lý", "Khác"] else 0)
+                    muc_tieu = st.selectbox("Mục tiêu đầu tư", ["", "Tăng thu nhập thụ động", "Tích lũy dài hạn 5-10 năm", "Mua nhà / xe", "Nghỉ hưu sớm", "Khác"], index=0 if not st.session_state.profile.get("muc_tieu") else 1)
+                if st.form_submit_button("💾 Lưu hồ sơ", use_container_width=True):
+                    st.session_state.profile = {
+                        "ho_ten": ho_ten, "sdt": sdt, "email": email,
+                        "ngay_sinh": ngay_sinh, "nghe_nghiep": nghe_nghiep,
+                        "muc_tieu": muc_tieu,
+                    }
+                    st.success("✅ Đã lưu hồ sơ.")
+            if any(st.session_state.profile.values()):
+                st.markdown("---")
+                st.markdown("##### 📋 Hồ sơ hiện tại")
+                p = st.session_state.profile
+                for k, v in p.items():
+                    if v:
+                        label_map = {
+                            "ho_ten": "Họ tên", "sdt": "SĐT", "email": "Email",
+                            "ngay_sinh": "Ngày sinh", "nghe_nghiep": "Nghề nghiệp", "muc_tieu": "Mục tiêu"
+                        }
+                        st.markdown(f"- **{label_map.get(k, k)}:** {v}")
 
 if st.session_state.trang_thai == "home":
     st.session_state.trang_thai = "dashboard"
