@@ -29,7 +29,10 @@ https://robo-advisor-jkp9byppflcdsrgapbm4vd.streamlit.app/
 
 ## Deploy lên Streamlit Cloud
 
-- `runtime.txt` = `python-3.11` (KHÔNG đổi sang 3.13/3.14, sẽ vỡ wheel)
-- `requirements.txt` để `streamlit>=1.40,<2` (KHÔNG pin cứng 1.58.0)
-- `.streamlit/config.toml` KHÔNG để `address = "0.0.0.0"` (Cloud sẽ tự bind)
-- Push lên `main` → Streamlit Cloud auto-redeploy ~1–3 phút.
+- **QUAN TRỌNG**: Streamlit Cloud **không đọc** `runtime.txt` / `.python-version` — phải vào **Advanced settings** trên dashboard để chọn Python version.
+- Cloud hiện default **Python 3.14.x**, nên `requirements.txt` phải pin **minimum** đủ mới để có wheel 3.14:
+  - `pandas>=2.2`, `numpy>=2.0`, `scipy>=1.13`, `scikit-learn>=1.4`
+  - `aiohttp>=3.10`, `lxml>=5.0`, `yfinance>=0.2` (KHÔNG đặt `<1`, sẽ vỡ trên 3.14)
+  - `streamlit>=1.50,<2`
+- `.streamlit/config.toml` KHÔNG để `address = "0.0.0.0"` (Cloud sẽ tự bind).
+- Push lên `main` → Streamlit Cloud auto‑redeploy ~1–3 phút.
