@@ -2691,7 +2691,27 @@ elif st.session_state.trang_thai == "deep_analysis":
         has_vn30 = vn30_close is not None
         port_beta = sum(betas)
         port_return = rp
-        vol_proxy = 0.18
+        if has_real and len(real_prices) >= 2:
+            try:
+                common_dates = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                if len(common_dates) > 20:
+                    dm_value_ts = pd.Series(0.0, index=common_dates, dtype=float)
+                    for ma, prices in real_prices.items():
+                        if ma in dm:
+                            shares = dm[ma].get("so_luong", 0)
+                            aligned = prices.reindex(common_dates).ffill().bfill()
+                            dm_value_ts += aligned.astype(float) * shares
+                    daily_ret_real = dm_value_ts.pct_change().dropna()
+                    if len(daily_ret_real) > 20:
+                        vol_proxy = float(daily_ret_real.std() * (252 ** 0.5))
+                    else:
+                        vol_proxy = 0.18
+                else:
+                    vol_proxy = 0.18
+            except Exception:
+                vol_proxy = 0.18
+        else:
+            vol_proxy = 0.18
         sharpe = (port_return - rf) / vol_proxy if vol_proxy > 0 else 0
         alpha = rp - (rf + port_beta * (rm - rf))
         treynor = (port_return - rf) / port_beta if port_beta > 0 else 0
