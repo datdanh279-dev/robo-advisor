@@ -2962,7 +2962,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("- VaR 95%: σ × 1.645")
             st.write("- CVaR 95%: σ × 2.06")
             st.write("- MaxDD: σ × 2.5")
-            st.write("- Phí mua: 0.15%, Thuế TNCN: 0.1%")
+            st.write("- Phí mua: 0.15% (HOSE chính thức), Thuế TNCN: 0.1% (NĐ 126/2020)")
 
         st.write("---")
         st.write("## 💎 Chỉ số Rủi ro — Lợi nhuận (12 chỉ số)")
@@ -4011,7 +4011,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             tx2.metric("📊 Phí TB/mã", f"{total_phi/max(len(tx_rows),1):,.0f} ₫")
             thue_ban = tong_lai_lo * thue_tncn if tong_lai_lo > 0 else 0
             tx3.metric("💰 Thuế TNCN (nếu bán)", f"{thue_ban:,.0f} ₫", help="0.1% trên lãi (thuế chuyển nhượng CK)")
-            st.caption("💡 Phí mua = 0.15% (HOSE). Thuế TNCN = 0.1% trên lãi (nếu bán có lãi). Phí bán = 0.15% + 0.1% thuế.")
+            st.caption("💡 Phí mua/bán = 0.15% (HOSE - biểu phí chính thức). Thuế TNCN = 0.1% trên lãi (thuế chuyển nhượng CK theo Nghị định 126/2020).")
 
         st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
