@@ -2658,6 +2658,16 @@ elif st.session_state.trang_thai == "deep_analysis":
                     info = t.info
                     if not info or 'symbol' not in info:
                         continue
+                    inst_pct = None
+                    try:
+                        mh = t.major_holders
+                        if mh is not None and not mh.empty:
+                            for _, row in mh.iterrows():
+                                if 'institutionsPercentHeld' in str(row.get('Breakdown', '')):
+                                    inst_pct = float(row.get('Value', 0) or 0)
+                                    break
+                    except Exception:
+                        pass
                     out[sym] = {
                         "pe": float(info.get("trailingPE") or 0) or None,
                         "pb": float(info.get("priceToBook") or 0) or None,
@@ -2668,10 +2678,22 @@ elif st.session_state.trang_thai == "deep_analysis":
                         "eps": float(info.get("epsCurrentYear") or info.get("trailingEps") or 0) or None,
                         "beta": float(info.get("beta") or 0) or None,
                         "current_price": float(info.get("currentPrice") or info.get("regularMarketPrice") or 0) or None,
+                        "institutions_pct": inst_pct,
                     }
                 except Exception:
                     pass
             return out
+
+        @st.cache_data(ttl=3600, show_spinner="💵 Tải tỷ giá USD/VND thật...")
+        def _fetch_usdvnd():
+            import yfinance as _yf
+            try:
+                h = _yf.Ticker("USDVND=X").history(period="6mo", timeout=10)
+                if not h.empty and len(h) > 20:
+                    return h['Close']
+            except Exception:
+                pass
+            return None
 
         @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_vn30_proxy():
@@ -2721,6 +2743,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         has_real = len(real_prices) >= 2
         has_vn30 = vn30_close is not None
         has_fund = len(real_fund) >= 1
+        usdvnd_close = _fetch_usdvnd()
         port_beta = sum(betas)
         port_return = rp
         if has_real and len(real_prices) >= 2:
@@ -3182,21 +3205,27 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.caption("🎲 Backtest mô phỏng (yfinance tạm không khả dụng).")
 
         st.write("---")
-        st.write("## 🎲 Monte Carlo — 1000 kịch bản tương lai 1 năm")
+        st.write("## 🎲 Monte Carlo — 1000 kịch bản tương lai 1 năm (Bootstrap từ giá thật)")
         if has_real and len(dm_equity) > 20:
             daily_returns_real = pd.Series(dm_equity).pct_change().dropna().values
             daily_mu = float(np.mean(daily_returns_real))
             daily_sigma = float(np.std(daily_returns_real))
-            vol_source = f"📊 Tính từ {len(daily_returns_real)} phiên giá thật (yfinance 6T)"
+            vol_source = f"📊 Bootstrap từ {len(daily_returns_real)} phiên giá thật (yfinance 6T)"
+            np.random.seed(123)
+            n_sims = 1000
+            n_days_mc = 252
+            sims = np.random.choice(daily_returns_real, size=(n_sims, n_days_mc), replace=True)
+            mc_method = "Bootstrap (lấy mẫu có hoàn lại từ returns thật)"
         else:
             daily_mu = port_return / 252
             daily_sigma = vol_proxy / (252 ** 0.5)
-            vol_source = "🎲 Ước lượng CAPM (vol_proxy 18%)"
-        st.caption(f"Vol daily: μ={daily_mu*100:+.4f}%, σ={daily_sigma*100:.3f}% — {vol_source}")
-        np.random.seed(123)
-        n_sims = 1000
-        n_days_mc = 252
-        sims = np.random.normal(daily_mu, daily_sigma, (n_sims, n_days_mc))
+            vol_source = "🎲 Random normal (yfinance tạm không khả dụng)"
+            np.random.seed(123)
+            n_sims = 1000
+            n_days_mc = 252
+            sims = np.random.normal(daily_mu, daily_sigma, (n_sims, n_days_mc))
+            mc_method = "Random normal (ước lượng CAPM)"
+        st.caption(f"Vol daily: μ={daily_mu*100:+.4f}%, σ={daily_sigma*100:.3f}% — {vol_source} — Phương pháp: {mc_method}")
         sims_equity = tong_gt * np.prod(1 + sims, axis=1)
         p5, p50, p95 = np.percentile(sims_equity, [5, 50, 95])
         prob_profit = (sims_equity > tong_gt).mean() * 100
@@ -3638,10 +3667,6 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🌍 Phân tích khối ngoại (Foreign Flow)")
-        FOREIGN_OWNERSHIP = {
-            "Ngân hàng": 0.30, "Công nghệ": 0.20, "Thép": 0.15, "Thực phẩm": 0.50,
-            "Bán lẻ": 0.25, "Bất động sản": 0.12, "Chứng khoán": 0.35, "Khác": 0.20
-        }
         ff_rows = []
         for ma, info in dm.items():
             gia_tt = info.get("gia_thi_truong", 0)
@@ -3649,7 +3674,17 @@ elif st.session_state.trang_thai == "deep_analysis":
             if gia_tt <= 0 or sl <= 0: continue
             ki = kpi.get(ma, {})
             ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
-            fo = FOREIGN_OWNERSHIP.get(ng, 0.20)
+            inst_real = ki.get("institutions_pct")
+            if inst_real is not None and inst_real > 0:
+                fo = inst_real
+                fo_source = "yfinance"
+            else:
+                FOREIGN_OWNERSHIP = {
+                    "Ngân hàng": 0.30, "Công nghệ": 0.20, "Thép": 0.15, "Thực phẩm": 0.50,
+                    "Bán lẻ": 0.25, "Bất động sản": 0.12, "Chứng khoán": 0.35, "Khác": 0.20
+                }
+                fo = FOREIGN_OWNERSHIP.get(ng, 0.20)
+                fo_source = f"ước lượng ngành"
             v = gia_tt * sl
             ff_value = v * fo
             momentum_3m = 0
@@ -3664,14 +3699,14 @@ elif st.session_state.trang_thai == "deep_analysis":
                 px = real_metas[ma].get('regularMarketPrice', gia_tt) or gia_tt
                 adtv_ty = (vol_shares * px) / 1e9
             flow_signal = "🟢 Mua ròng" if momentum_3m > 5 else ("🔴 Bán ròng" if momentum_3m < -5 else "🟡 Đi ngang")
-            ff_rows.append({"Mã": ma, "Ngành": ng, "Room NN %": round(fo*100, 0),
+            ff_rows.append({"Mã": ma, "Ngành": ng, "NN nắm giữ %": round(fo*100, 1),
                 "GT NN (tỷ)": round(ff_value/1e9, 1), "Momentum 3T %": round(momentum_3m, 1),
                 "Vol 30N %": round(vol_30d, 1), "ADTV (tỷ)": round(adtv_ty, 1),
-                "Dòng tiền": flow_signal})
+                "Dòng tiền": flow_signal, "Nguồn": fo_source})
         if ff_rows:
             df_ff = pd.DataFrame(ff_rows)
             st.dataframe(df_ff, use_container_width=True, hide_index=True)
-            st.caption("💡 Room NN: tỷ lệ sở hữu nước ngoài tối đa theo ngành. Momentum 3T từ giá thật. ADTV từ volume yfinance. Vol 30N từ giá thật.")
+            st.caption("💡 NN nắm giữ % từ yfinance.major_holders (institutionsPercentHeld). Momentum/Vol/ADTV đều từ giá & volume thật. Nguồn ghi rõ từng dòng.")
 
         st.write("---")
         st.write("## 🤖 AI Phân tích tự động (GPT-style insights)")
@@ -3723,8 +3758,38 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 💱 Phân tích rủi ro tỷ giá & lãi suất")
+        if usdvnd_close is not None and len(usdvnd_close) > 20:
+            usdvnd_ret = usdvnd_close.pct_change().dropna()
+            fx_impact = 0
+            for ma, info in dm.items():
+                gia_tt = info.get("gia_thi_truong", 0)
+                sl = info.get("so_luong", 0)
+                if gia_tt <= 0 or sl <= 0: continue
+                w = (gia_tt * sl) / tong_gt if tong_gt > 0 else 0
+                if ma in real_prices and len(real_prices[ma]) > 20:
+                    common = sorted(set(usdvnd_ret.index) & set(real_prices[ma].index))
+                    if len(common) > 15:
+                        stock_ret = real_prices[ma].reindex(common).pct_change().dropna()
+                        fx_ret = usdvnd_ret.reindex(common).dropna()
+                        common2 = sorted(set(stock_ret.index) & set(fx_ret.index))
+                        if len(common2) > 10:
+                            corr = float(stock_ret.loc[common2].corr(fx_ret.loc[common2]))
+                            fx_impact += w * corr * 0.02 * 100
+            fx_source = f"📊 Tính từ correlation thật USD/VND × {len(real_prices)} mã (yfinance 6T)"
+        else:
+            NH_SENSITIVITY = {"Ngân hàng": 0.8, "Bất động sản": 0.6, "Thép": 0.3, "Thực phẩm": 0.2, "Bán lẻ": 0.2, "Công nghệ": 0.1, "Khác": 0.2}
+            fx_impact = 0
+            for ma, info in dm.items():
+                gia_tt = info.get("gia_thi_truong", 0)
+                sl = info.get("so_luong", 0)
+                if gia_tt <= 0 or sl <= 0: continue
+                ki = kpi.get(ma, {})
+                ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+                sens = NH_SENSITIVITY.get(ng, 0.2)
+                w = (gia_tt * sl) / tong_gt if tong_gt > 0 else 0
+                fx_impact += w * sens * 0.02 * 100
+            fx_source = "⚠️ Ước lượng theo ngành (yfinance USD/VND tạm không khả dụng)"
         NH_SENSITIVITY = {"Ngân hàng": 0.8, "Bất động sản": 0.6, "Thép": 0.3, "Thực phẩm": 0.2, "Bán lẻ": 0.2, "Công nghệ": 0.1, "Khác": 0.2}
-        fx_impact = 0
         rate_impact = 0
         for ma, info in dm.items():
             gia_tt = info.get("gia_thi_truong", 0)
@@ -3734,13 +3799,12 @@ elif st.session_state.trang_thai == "deep_analysis":
             ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
             sens = NH_SENSITIVITY.get(ng, 0.2)
             w = (gia_tt * sl) / tong_gt if tong_gt > 0 else 0
-            fx_impact += w * sens * 0.02
-            rate_impact += w * sens * 0.05
+            rate_impact += w * sens * 0.05 * 100
         fc1, fc2, fc3 = st.columns(3)
-        fc1.metric("💵 Tỷ giá +2% → DM", f"{fx_impact*100:+.2f}%", help="VNĐ mất giá 2% so với USD")
-        fc2.metric("📈 Lãi suất +1% → DM", f"{-rate_impact*100:+.2f}%", help="NHNN tăng lãi suất 1%")
-        fc3.metric("🏭 Ngành nhạy cảm nhất", max(NH_SENSITIVITY, key=NH_SENSITIVITY.get))
-        st.caption("💡 Ngân hàng & BĐS nhạy cảm nhất với lãi suất. Xuất khẩu nhạy cảm với tỷ giá. Công nghệ ít bị ảnh hưởng.")
+        fc1.metric("💵 Tỷ giá +2% → DM", f"{fx_impact:+.2f}%", help="VNĐ mất giá 2% so với USD")
+        fc2.metric("📈 Lãi suất +1% → DM", f"{-rate_impact:+.2f}%", help="NHNN tăng lãi suất 1% (ước lượng)")
+        fc3.metric("🏭 Ngành nhạy cảm LS", max(NH_SENSITIVITY, key=NH_SENSITIVITY.get))
+        st.caption(fx_source)
 
         st.write("---")
         st.write("## 🆚 So sánh với VN30 / HNX-Index")
