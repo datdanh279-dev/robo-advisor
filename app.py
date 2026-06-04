@@ -11,7 +11,18 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown('<meta http-equiv="Content-Language" content="vi">', unsafe_allow_html=True)
+st.markdown(
+    "<script>"
+    "document.documentElement.lang='vi';"
+    "if(!document.querySelector('meta[http-equiv=\\\"Content-Language\\\"]')){"
+    "var m=document.createElement('meta');"
+    "m.setAttribute('http-equiv','Content-Language');"
+    "m.setAttribute('content','vi');"
+    "document.head.appendChild(m);"
+    "}"
+    "</script>",
+    unsafe_allow_html=True,
+)
 
 try:
     import pandas as pd
