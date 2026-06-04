@@ -4647,10 +4647,17 @@ elif st.session_state.trang_thai == "deep_analysis":
                         "Ngành": ki.get("nganh", "Khác") or "Khác"})
             if rr_rows:
                 df_rr = pd.DataFrame(rr_rows)
-                fig_rr = px.scatter(df_rr, x="Vol %", y="Return 6M %", size="Vốn hóa (nghìn tỷ)",
-                    color="Ngành", hover_name="Mã", text="Mã",
-                    labels={"Vol %": "Volatility (% năm)", "Return 6M %": "Return 6 tháng (%)"},
-                    title="Risk-Return Bubble (size = vốn hóa, color = ngành)")
+                df_rr["Vốn hóa (nghìn tỷ)"] = df_rr["Vốn hóa (nghìn tỷ)"].clip(lower=0.1)
+                if df_rr["Ngành"].nunique() <= 1:
+                    fig_rr = px.scatter(df_rr, x="Vol %", y="Return 6M %", size="Vốn hóa (nghìn tỷ)",
+                        hover_name="Mã", text="Mã",
+                        labels={"Vol %": "Volatility (% năm)", "Return 6M %": "Return 6 tháng (%)"},
+                        title="Risk-Return Bubble (size = vốn hóa)", size_max=40)
+                else:
+                    fig_rr = px.scatter(df_rr, x="Vol %", y="Return 6M %", size="Vốn hóa (nghìn tỷ)",
+                        color="Ngành", hover_name="Mã", text="Mã",
+                        labels={"Vol %": "Volatility (% năm)", "Return 6M %": "Return 6 tháng (%)"},
+                        title="Risk-Return Bubble (size = vốn hóa, color = ngành)", size_max=40)
                 fig_rr.update_traces(textposition='top center', textfont=dict(size=9, color='white'))
                 fig_rr.update_layout(height=480, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
                 st.plotly_chart(fig_rr, use_container_width=True)
