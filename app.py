@@ -5120,17 +5120,20 @@ elif st.session_state.trang_thai == "deep_analysis":
                         closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
                         volumes = result.get("indicators", {}).get("quote", [{}])[0].get("volume", [])
                         if closes and len(closes) > 5:
-                            cur = float(meta.get("regularMarketPrice", closes[-1] or 0))
+                            cur = float(meta.get("regularMarketPrice") or (closes[-1] if closes[-1] else 0) or 0)
+                            if cur <= 0:
+                                continue
                             prev = float(closes[-2]) if len(closes) > 1 and closes[-2] else cur
                             chg_pct = (cur / prev - 1) * 100 if prev > 0 else 0
                             ret_3m = (cur / float(closes[-min(66, len(closes))]) - 1) * 100 if len(closes) > 5 else 0
-                            vol_today = volumes[-1] if volumes and volumes[-1] else 0
-                            avg_vol_20 = float(np.mean([v for v in volumes[-20:] if v])) if len(volumes) >= 5 else 0
+                            vol_today = float(volumes[-1]) if volumes and volumes[-1] else 0
+                            avg_vol_20 = float(np.mean([v for v in volumes[-20:] if v])) if len(volumes) >= 5 and any(v for v in volumes[-20:] if v) else 0
                             vol_ratio = vol_today / avg_vol_20 if avg_vol_20 > 0 else 0
-                            out.append({"ma": sym, "ten": meta.get("longName", sym)[:30],
-                                "nganh": meta.get("industry", "Khác") or "Khác",
-                                "gia": cur, "thay_doi": chg_pct, "ret_3m": ret_3m,
-                                "vol": vol_today, "vol_ratio": vol_ratio, "von_hoa": meta.get("marketCap", 0)})
+                            if not (vol_ratio != vol_ratio) and not (chg_pct != chg_pct) and not (ret_3m != ret_3m):
+                                out.append({"ma": sym, "ten": (meta.get("longName", sym) or sym)[:30],
+                                    "nganh": (meta.get("industry") or "Khác"),
+                                    "gia": cur, "thay_doi": chg_pct, "ret_3m": ret_3m,
+                                    "vol": vol_today, "vol_ratio": vol_ratio, "von_hoa": float(meta.get("marketCap") or 0)})
                 except Exception:
                     continue
             return out
@@ -5358,11 +5361,15 @@ elif st.session_state.trang_thai == "deep_analysis":
                             meta = result.get("meta", {})
                             closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
                             if closes and len(closes) > 5:
-                                cur = float(meta.get("regularMarketPrice", closes[-1] or 0))
-                                hi_52 = float(meta.get("fiftyTwoWeekHigh", max([c for c in closes if c])))
-                                lo_52 = float(meta.get("fiftyTwoWeekLow", min([c for c in closes if c])))
-                                pos_52w = ((cur - lo_52) / (hi_52 - lo_52) * 100) if (hi_52 - lo_52) > 0 else 50
-                                out.append({"ma": s, "gia": cur, "w52h": hi_52, "w52l": lo_52, "pos_52w": pos_52w})
+                                cur = float(meta.get("regularMarketPrice") or closes[-1] or 0)
+                                valid_closes = [c for c in closes if c]
+                                if not valid_closes:
+                                    continue
+                                hi_52 = float(meta.get("fiftyTwoWeekHigh") or max(valid_closes))
+                                lo_52 = float(meta.get("fiftyTwoWeekLow") or min(valid_closes))
+                                if hi_52 > 0 and lo_52 > 0 and hi_52 > lo_52:
+                                    pos_52w = (cur - lo_52) / (hi_52 - lo_52) * 100
+                                    out.append({"ma": s, "gia": cur, "w52h": hi_52, "w52l": lo_52, "pos_52w": pos_52w})
                     except Exception:
                         continue
                 return out
@@ -5410,10 +5417,13 @@ elif st.session_state.trang_thai == "deep_analysis":
                                 delta = p.diff().dropna()
                                 gain = delta.where(delta > 0, 0).rolling(14).mean()
                                 loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-                                rs = gain / loss.replace(0, 1e-10)
-                                rsi = float((100 - 100 / (1 + rs.iloc[-1])).item() if hasattr((100 - 100 / (1 + rs.iloc[-1])), 'item') else (100 - 100 / (1 + rs.iloc[-1])))
-                                if 0 <= rsi <= 100:
-                                    out.append({"ma": s, "gia": float(p.iloc[-1]), "rsi": rsi})
+                                if len(gain) > 0 and len(loss) > 0 and not pd.isna(gain.iloc[-1]) and not pd.isna(loss.iloc[-1]):
+                                    g_v = float(gain.iloc[-1]) if gain.iloc[-1] != 0 else 0.0
+                                    l_v = float(loss.iloc[-1]) if loss.iloc[-1] != 0 else 1e-10
+                                    rs = g_v / l_v
+                                    rsi = 100 - 100 / (1 + rs)
+                                    if 0 <= rsi <= 100 and not (rsi != rsi):
+                                        out.append({"ma": s, "gia": float(p.iloc[-1]), "rsi": float(rsi)})
                     except Exception:
                         continue
                 return out
@@ -5457,10 +5467,11 @@ elif st.session_state.trang_thai == "deep_analysis":
                             if closes and len(closes) > 30:
                                 p = pd.Series([c for c in closes if c])
                                 ret = p.pct_change().dropna()
-                                if len(ret) > 20:
-                                    vol = float(ret.std() * (252**0.5) * 100)
-                                    out.append({"ma": s, "gia": float(p.iloc[-1]), "vol": vol,
-                                        "ret_6m": (float(p.iloc[-1]) / float(p.iloc[0]) - 1) * 100})
+                                if len(ret) > 20 and not ret.isna().all():
+                                    vol_v = ret.std() * (252**0.5) * 100
+                                    if pd.notna(vol_v) and vol_v > 0:
+                                        out.append({"ma": s, "gia": float(p.iloc[-1]), "vol": float(vol_v),
+                                            "ret_6m": (float(p.iloc[-1]) / float(p.iloc[0]) - 1) * 100})
                     except Exception:
                         continue
                 return out
@@ -5536,15 +5547,15 @@ elif st.session_state.trang_thai == "deep_analysis":
                             lows = quote.get("low", [])
                             if closes and len(closes) > 5:
                                 ranges = []
-                                for i in range(len(closes)):
-                                    if highs[i] and lows[i] and lows[i] > 0:
+                                for i in range(min(len(highs), len(lows), len(closes))):
+                                    if highs[i] and lows[i] and lows[i] > 0 and highs[i] > 0:
                                         ranges.append((highs[i] - lows[i]) / lows[i] * 100)
                                 if ranges:
                                     avg_r = float(np.mean(ranges))
-                                    out.append({"ma": s, "gia": float([c for c in closes if c][-1]),
-                                        "avg_range_1m": avg_r,
-                                        "max_range": max(ranges),
-                                        "vol": avg_r * 15.87})
+                                    if avg_r > 0 and not (avg_r != avg_r):
+                                        out.append({"ma": s, "gia": float([c for c in closes if c][-1]),
+                                            "avg_range_1m": avg_r,
+                                            "max_range": float(max(ranges))})
                     except Exception:
                         continue
                 return out
