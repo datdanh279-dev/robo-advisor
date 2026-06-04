@@ -11,6 +11,29 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+if not st.session_state.get("_pwa_tags_injected"):
+    st.session_state._pwa_tags_injected = True
+    st.markdown(
+        '<link rel="manifest" href="/static/manifest.webmanifest">'
+        '<meta name="theme-color" content="#FFD700">'
+        '<meta name="apple-mobile-web-app-capable" content="yes">'
+        '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+        '<meta name="apple-mobile-web-app-title" content="Robo-Advisor">'
+        '<link rel="apple-touch-icon" href="/static/icon-192.png">'
+        '<meta http-equiv="Content-Language" content="vi">',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<script>"
+        "if('serviceWorker' in navigator){"
+        "window.addEventListener('load',function(){"
+        "navigator.serviceWorker.register('/static/sw.js').catch(function(){});"
+        "});"
+        "}"
+        "</script>",
+        unsafe_allow_html=True,
+    )
+
 try:
     import pandas as pd
     import plotly.graph_objects as go

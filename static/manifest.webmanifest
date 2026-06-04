@@ -1,0 +1,27 @@
+{
+  "name": "Robo-Advisor AI - Đầu tư Thông minh",
+  "short_name": "Robo-Advisor",
+  "description": "Công cụ phân tích đầu tư & quản lý danh mục cho nhà đầu tư Việt",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#02050E",
+  "theme_color": "#FFD700",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "productivity", "business"],
+  "lang": "vi",
+  "dir": "ltr"
+}
