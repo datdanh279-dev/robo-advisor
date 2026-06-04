@@ -37,13 +37,26 @@ https://robo-advisor-jkp9byppflcdsrgapbm4vd.streamlit.app/
 - `.streamlit/config.toml` KHÔNG để `address = "0.0.0.0"` (Cloud sẽ tự bind).
 - Push lên `main` → Streamlit Cloud auto‑redeploy ~1–3 phút.
 
-## Console noise (chỉ trên mạng công ty / ad-block)
+## Console noise (KHÔNG THỂ sửa triệt để từ app)
 
-Nếu DevTools → Console có các lỗi dưới đây, **KHÔNG phải bug app** — chỉ là network bị chặn:
+**Bản chất vấn đề**: Streamlit Cloud **hardcode** Segment analytics (`cdn.segment.com/analytics.js/v1/GI7vYWHNmWwHbyFjBrvL0jOBA1TpZOXC/analytics.min.js`) vào mọi app thông qua host page JS, kể cả khi `[browser] gatherUsageStats = false`. Trên mạng công ty (có firewall/proxy chặn external services), browser tải Segment script sẽ fail với `ERR_BLOCKED_BY_ADMINISTRATOR`.
 
-- `cdn.segment.com/analytics.js` / `www.google-analytics.com/analytics.js` → đã được tắt bằng `[browser] gatherUsageStats = false` trong `.streamlit/config.toml`. Nếu vẫn còn, kiểm tra file `config.toml` đã push lên `main` chưa.
-- `translate.google.com/gen204` / `translate.googleapis.com/element/log` → Chrome auto‑offer dịch vì page chưa khai báo ngôn ngữ. Đã fix bằng `<meta http-equiv="Content-Language" content="vi">` trong `app.py` (ngay sau `set_page_config`).
-- `bufferedData-*.js:5 INITIAL -> (10, 0, ) -> ERROR` → state machine của Streamlit gửi Segment events fail do network block. Không ảnh hưởng render app.
+**Đã làm** (không thể fix gốc, chỉ giảm noise):
+- `[browser] gatherUsageStats = false` trong `.streamlit/config.toml` (giảm event gửi đi).
+- `<script>` set `document.documentElement.lang='vi'` + thêm `<meta Content-Language>` trong head.
+- Console filter override `console.error` / `console.warn` / `console.log` chặn 12 pattern (segment, GA, translate, bufferedData, routes-*.js, removeChild, NotFoundError, …).
+- `fetch` + `XMLHttpRequest` override chặn request mới.
+- `console.clear()` chạy đầu + `setInterval(console.clear, 2000)` xóa log cũ.
+
+**Cách chắc chắn 100% ẩn lỗi khỏi console**:
+1. Mở DevTools (F12) → tab Console.
+2. Click vào ô **Filter** (có icon phễu ∇, phía trên danh sách log).
+3. Gõ: `-ERR_BLOCKED` rồi Enter.
+4. Hoặc filter mạnh hơn: `-ERR_BLOCKED -bufferedData -translate -segment -analytics`
+
+**Cách giải quyết tận gốc** (ngoài phạm vi app):
+- Dùng mạng khác (4G/5G, wifi nhà) không chặn segment.com/google.com.
+- Hoặc nhờ IT công ty whitelist `cdn.segment.com`, `www.google-analytics.com`, `translate.google.com`.
 
 ## React removeChild bug (đã fix)
 
