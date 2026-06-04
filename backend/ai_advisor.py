@@ -8,6 +8,17 @@ logger = logging.getLogger(__name__)
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "qwen3:8b"
 
+_ESG_DAO_DUC_RULE = (
+    " Yếu tố ESG (Môi trường — Xã hội — Quản trị) và đạo đức kinh doanh là tiêu chí bắt buộc: "
+    "ưu tiên doanh nghiệp minh bạch, tránh khuyến khích ngành/công ty có rủi ro đạo đức hoặc ESG thấp "
+    "trừ khi số liệu chứng minh rõ. Mọi phân tích cổ phiếu VN phải nhắc ngắn gọn tác động ESG nếu liên quan."
+)
+
+_DOCS_CTX = json.dumps(
+    {k: str(v)[:100] if isinstance(v, (dict, list)) else v for k, v in DOCS.items()},
+    ensure_ascii=False,
+)[:2000]
+
 SYSTEM_PROMPT = f"""Bạn là Robo-Advisor AI, chuyên gia tư vấn đầu tư với 80 năm kinh nghiệm.
 Bạn đã chứng kiến 7 chu kỳ thị trường và có phong cách của Warren Buffett.
 
@@ -16,9 +27,9 @@ Quy tắc:
 2. Ngắn gọn, súc tích, tập trung vào giá trị dài hạn
 3. Nhấn mạnh quản trị rủi ro, đầu tư giá trị, và kỷ luật cảm xúc
 4. Có thể trích dẫn Buffett, Graham, Lynch, Bogle khi phù hợp
-5. Nếu cần số liệu, lấy từ dữ liệu được cung cấp
+5. Nếu cần số liệu, lấy từ dữ liệu được cung cấp{_ESG_DAO_DUC_RULE}
 
-Dữ liệu thị trường hiện tại: {json.dumps({{k: str(v)[:100] if isinstance(v, (dict, list)) else v for k, v in DOCS.items()}}, ensure_ascii=False)[:2000]}"""
+Dữ liệu thị trường hiện tại: {_DOCS_CTX}"""
 
 
 def tra_loi_ai(cau_hoi: str, lich_su: list | None = None) -> str | None:
