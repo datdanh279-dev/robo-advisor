@@ -4191,6 +4191,190 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần giá thật 6T để phân tích đóng góp.")
 
         st.write("---")
+        st.write("## 🔬 Chỉ số rủi ro nâng cao (Pain / Ulcer / Tail)")
+        if has_real and len(dm_equity) > 30:
+            eq_s3 = pd.Series(dm_equity)
+            running_max3 = eq_s3.cummax()
+            dd_pct = ((eq_s3 - running_max3) / running_max3 * 100)
+            pain_idx = float(np.sqrt((dd_pct ** 2).mean()))
+            ulcer_idx = float(np.sqrt(((dd_pct[dd_pct < 0]) ** 2).mean())) if (dd_pct < 0).any() else 0
+            ret_s3 = eq_s3.pct_change().dropna()
+            pos_ret = ret_s3[ret_s3 > 0]
+            neg_ret = ret_s3[ret_s3 < 0]
+            if len(pos_ret) > 5 and len(neg_ret) > 5:
+                tail_ratio = float(np.percentile(pos_ret, 95) / abs(np.percentile(neg_ret, 5)))
+            else:
+                tail_ratio = 0
+            alpha_95 = float(np.percentile(ret_s3, 5))
+            alpha_99 = float(np.percentile(ret_s3, 1))
+            avg_dd = float(dd_pct[dd_pct < 0].mean()) if (dd_pct < 0).any() else 0
+            max_dd_dur = 0
+            cur_dur = 0
+            for v in dd_pct:
+                if v < 0:
+                    cur_dur += 1
+                    max_dd_dur = max(max_dd_dur, cur_dur)
+                else:
+                    cur_dur = 0
+            ulc1, ulc2, ulc3, ulc4 = st.columns(4)
+            ulc1.metric("🩹 Pain Index", f"{pain_idx:.2f}",
+                help="Căn bậc 2 trung bình DD². Cao = DM đau nhiều")
+            ulc2.metric("🩹 Ulcer Index", f"{ulcer_idx:.2f}",
+                help="Tương tự Pain nhưng chỉ tính DD âm")
+            ulc3.metric("⚖️ Tail Ratio", f"{tail_ratio:.2f}",
+                help="P95 right tail / |P5 left tail|. >1 = phải đuôi dài hơn (tốt)")
+            ulc4.metric("⏱️ Max DD Duration", f"{max_dd_dur} phiên",
+                help="Đợt sụt dài nhất từ đỉnh đến khi hồi phục")
+            ulc5, ulc6 = st.columns(2)
+            ulc5.metric("📉 Avg DD (âm)", f"{avg_dd:.2f}%",
+                help="Trung bình các đợt sụt giảm")
+            ulc6.metric("☠️ Alpha 99% (CVaR tail)", f"{alpha_99*100:.2f}%",
+                help="1% phiên tệ nhất lỗ bao nhiêu")
+            st.caption(f"📊 Tính từ {len(ret_s3)} phiên giá thật yfinance 6T. Các chỉ số này đo 'cảm giác đau' thực tế của nhà đầu tư.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính chỉ số rủi ro nâng cao.")
+
+        st.write("---")
+        st.write("## 🔄 Sector Rotation — Phát hiện ngành nóng/lạnh")
+        if has_real and len(real_prices) > 0:
+            sec_rows = []
+            ng_ret = {}
+            for ma, info in dm.items():
+                if ma not in real_prices or len(real_prices[ma]) < 30: continue
+                ki = kpi.get(ma, {})
+                ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+                r1m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[-min(22, len(real_prices[ma]))]) - 1) * 100
+                r3m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[-min(66, len(real_prices[ma]))]) - 1) * 100
+                v = info.get("gia_thi_truong", 0) * info.get("so_luong", 0)
+                w = v / tong_gt if tong_gt > 0 else 0
+                ng_ret.setdefault(ng, []).append((r1m, r3m, w, ma))
+            for ng, lst in ng_ret.items():
+                wg_ret_1m = sum(r1m * w for r1m, r3m, w, ma in lst)
+                wg_ret_3m = sum(r3m * w for r1m, r3m, w, ma in lst)
+                hot = "🔥 Nóng" if wg_ret_1m > 5 and wg_ret_3m > 10 else ("❄️ Lạnh" if wg_ret_1m < -5 and wg_ret_3m < -10 else "🟡 Đi ngang")
+                sec_rows.append({"Ngành": ng, "Số mã": len(lst),
+                    "Return 1M %": round(wg_ret_1m, 1), "Return 3M %": round(wg_ret_3m, 1),
+                    "Trạng thái": hot})
+            if sec_rows:
+                sec_df = pd.DataFrame(sec_rows).sort_values("Return 1M %", ascending=False)
+                st.dataframe(sec_df, use_container_width=True, hide_index=True)
+                st.caption(f"📊 Tính từ returns 1M/3M thật yfinance × tỷ trọng từng mã trong DM. 'Nóng' = 1M>5% & 3M>10%. 'Lạnh' = 1M<-5% & 3M<-10%.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để phân tích sector rotation.")
+
+        st.write("---")
+        st.write("## 💰 Earnings Yield vs Lãi suất — Định giá tương đối")
+        if has_real and len(dm_equity) > 0 and len(weights) > 0:
+            weighted_pe = 0
+            weighted_eps_yield = 0
+            for ma, w in zip(dm.keys(), weights):
+                if w <= 0: continue
+                ki = kpi.get(ma, {})
+                pe_v = float(ki.get("pe", 0) or 0)
+                if pe_v > 0:
+                    weighted_pe += pe_v * w
+                    weighted_eps_yield += (1/pe_v) * w
+            bond_yield_now = 0
+            if vn_bond_close is not None and len(vn_bond_close) > 0:
+                bond_yield_now = float(vn_bond_close.iloc[-1]) if vn_bond_close.iloc[-1] > 1 else float(vn_bond_close.iloc[-1]) * 100
+            if bond_yield_now > 0 and weighted_eps_yield > 0:
+                equity_risk_premium = (weighted_eps_yield - bond_yield_now) * 100
+                verdict = "✅ Hấp dẫn" if equity_risk_premium > 3 else ("🟡 Hợp lý" if equity_risk_premium > 0 else "🔴 Đắt")
+                erp1, erp2, erp3 = st.columns(3)
+                erp1.metric("📊 P/E TB DM", f"{weighted_pe:.1f}", help="Trung bình có trọng số theo tỷ trọng DM")
+                erp2.metric("💵 Earnings Yield", f"{weighted_eps_yield*100:.2f}%", help="1/P/E — lợi suất từ lợi nhuận")
+                erp3.metric("🏦 Lãi suất TPCP 10Y", f"{bond_yield_now:.2f}%", help="Từ yfinance ^VN10Y/VNI10Y")
+                erp4, erp5 = st.columns(2)
+                erp4.metric("⚖️ Equity Risk Premium", f"{equity_risk_premium:+.2f}%",
+                    help="Earnings Yield - Bond Yield. >3% = CP hấp dẫn, <0 = CP đắt hơn TPCP")
+                erp5.metric("🎯 Kết luận", verdict)
+                st.caption(f"📊 Earnings yield TB có trọng số vs TPCP 10Y thật (yfinance). ERP = {equity_risk_premium:+.2f}%.")
+            else:
+                st.info("⚠️ Cần P/E các mã + lãi suất TPCP để tính ERP.")
+        else:
+            st.info("⚠️ Cần giá + KPI thật để tính earnings yield.")
+
+        st.write("---")
+        st.write("## 📊 Phân phối Returns — Skewness & Kurtosis")
+        if has_real and len(dm_equity) > 30:
+            from scipy import stats as _stats
+            ret_s4 = pd.Series(dm_equity).pct_change().dropna()
+            sk = float(_stats.skew(ret_s4))
+            kurt = float(_stats.kurtosis(ret_s4))
+            jarque_bera = _stats.jarque_bera(ret_s4)
+            skew_interp = "✅ Đối xứng" if abs(sk) < 0.5 else ("🟢 Lệch phải (nhiều phiên tăng mạnh)" if sk > 0.5 else "🔴 Lệch trái (nhiều phiên giảm mạnh)")
+            kurt_interp = "✅ Phân phối chuẩn" if abs(kurt) < 1 else ("🔴 Đuôi dày (nhiều extreme events)" if kurt > 1 else "🟢 Đuôi mỏng")
+            dist1, dist2, dist3 = st.columns(3)
+            dist1.metric("📐 Skewness", f"{sk:+.3f}", help="Độ lệch phân phối. 0 = chuẩn, >0 = lệch phải, <0 = lệch trái")
+            dist2.metric("📐 Kurtosis (excess)", f"{kurt:+.3f}", help="Độ nhọn. 0 = chuẩn, >0 = đuôi dày, <0 = đuôi mỏng")
+            dist3.metric("📊 Jarque-Bera p-value", f"{jarque_bera.pvalue:.4f}",
+                help="Test phân phối chuẩn. p<0.05 = KHÔNG chuẩn (có outliers)")
+            st.write(f"**Diễn giải:** Skewness = {skew_interp}. Kurtosis = {kurt_interp}.")
+            fig_hist = go.Figure()
+            fig_hist.add_trace(go.Histogram(x=ret_s4.values, nbinsx=40, marker_color="#4FC3F7",
+                opacity=0.7, name="Returns", histnorm='probability density'))
+            x_norm = np.linspace(ret_s4.min(), ret_s4.max(), 100)
+            fig_hist.add_trace(go.Scatter(x=x_norm, y=_stats.norm.pdf(x_norm, ret_s4.mean(), ret_s4.std()),
+                line_color="#FFD700", name="Phân phối chuẩn (lý thuyết)"))
+            fig_hist.update_layout(title="Phân phối Returns vs Normal (từ giá thật)",
+                xaxis_title="Daily Return", yaxis_title="Mật độ",
+                height=300, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_hist, use_container_width=True)
+            st.caption(f"📊 Tính từ {len(ret_s4)} phiên returns thật yfinance 6T. Skewness/Kurtosis cho biết DM có 'lệch' hay 'đuôi dày' (rủi ro cực đoan) hay không.")
+        else:
+            st.info("⚠️ Cần ≥30 phiên giá thật để phân tích phân phối.")
+
+        st.write("---")
+        st.write("## 🏆 Xếp hạng rủi ro tổng hợp (Composite Risk Score)")
+        if has_real and len(dm_equity) > 30:
+            score = 0
+            score_max = 100
+            details = []
+            vol_1y_v = float(pd.Series(dm_equity).pct_change().dropna().std() * (252**0.5))
+            if vol_1y_v < 0.15:
+                score += 25; details.append("✅ Vol <15% (rất ổn định): +25")
+            elif vol_1y_v < 0.25:
+                score += 15; details.append("🟡 Vol 15-25% (bình thường): +15")
+            else:
+                score += 0; details.append("🔴 Vol >25% (rủi ro cao): +0")
+            sharpe_v = sharpe
+            if sharpe_v > 1.5:
+                score += 25; details.append(f"✅ Sharpe {sharpe_v:.2f} >1.5: +25")
+            elif sharpe_v > 0.5:
+                score += 15; details.append(f"🟡 Sharpe {sharpe_v:.2f} 0.5-1.5: +15")
+            else:
+                details.append(f"🔴 Sharpe {sharpe_v:.2f} <0.5: +0")
+            if top_w < 0.2:
+                score += 20; details.append(f"✅ Tập trung {top_w*100:.0f}% <20%: +20")
+            elif top_w < 0.4:
+                score += 10; details.append(f"🟡 Tập trung {top_w*100:.0f}% 20-40%: +10")
+            else:
+                details.append(f"🔴 Tập trung {top_w*100:.0f}% >40%: +0")
+            if nganh_count >= 4:
+                score += 15; details.append(f"✅ Đa ngành {nganh_count} ≥4: +15")
+            elif nganh_count >= 3:
+                score += 10; details.append(f"🟡 {nganh_count} ngành: +10")
+            else:
+                details.append(f"🔴 Chỉ {nganh_count} ngành: +0")
+            if port_beta < 1.0:
+                score += 15; details.append(f"✅ Beta {port_beta:.2f} <1.0: +15")
+            elif port_beta < 1.3:
+                score += 10; details.append(f"🟡 Beta {port_beta:.2f} 1.0-1.3: +10")
+            else:
+                details.append(f"🔴 Beta {port_beta:.2f} >1.3: +0")
+            grade = "A+ Xuất sắc" if score >= 85 else ("A Tốt" if score >= 70 else ("B+ Khá" if score >= 55 else ("B Trung bình" if score >= 40 else ("C Yếu" if score >= 25 else "D Rủi ro cao"))))
+            color_g = "#4CAF50" if score >= 70 else ("#FFD700" if score >= 40 else "#F44336")
+            crs1, crs2 = st.columns([1, 2])
+            with crs1:
+                st.markdown(f'<div style="text-align:center;background:{color_g};border-radius:15px;padding:1.5rem;color:white;"><h1 style="margin:0;font-size:3rem;">{score}</h1><h3 style="margin:0;">/ 100</h3><h2 style="margin:0.5rem 0 0 0;">{grade}</h2></div>', unsafe_allow_html=True)
+            with crs2:
+                for d in details:
+                    st.write(f"  {d}")
+                st.caption(f"📊 Tính từ {len(dm_equity)} phiên giá thật + 5 tiêu chí rủi ro (Vol, Sharpe, Tập trung, Đa ngành, Beta).")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính composite risk score.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
