@@ -2599,7 +2599,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             "VIC": {"nganh": "Bất động sản", "gia_thi_truong": 42000, "gia_von": 48000, "so_luong": 400},
             "CTG": {"nganh": "Ngân hàng", "gia_thi_truong": 32000, "gia_von": 30000, "so_luong": 500},
         }
-        kpi = {
+        _demo_fb = {
             "VCB": {"nganh": "Ngân hàng", "beta": 0.85, "roe": 0.21, "roa": 0.018, "pe": 9.5, "pb": 2.1, "eps": 9680, "dividend_yield": 0.025, "market_cap": 150000, "w52_high": 98000, "w52_low": 78000},
             "FPT": {"nganh": "Công nghệ", "beta": 1.15, "roe": 0.25, "roa": 0.12, "pe": 18.2, "pb": 4.5, "eps": 7967, "dividend_yield": 0.015, "market_cap": 110000, "w52_high": 152000, "w52_low": 95000},
             "HPG": {"nganh": "Thép", "beta": 1.35, "roe": 0.12, "roa": 0.07, "pe": 12.0, "pb": 1.4, "eps": 2250, "dividend_yield": 0.012, "market_cap": 80000, "w52_high": 31000, "w52_low": 21500},
@@ -2609,6 +2609,9 @@ elif st.session_state.trang_thai == "deep_analysis":
             "VIC": {"nganh": "Bất động sản", "beta": 1.10, "roe": 0.08, "roa": 0.03, "pe": 35.0, "pb": 2.8, "eps": 1200, "dividend_yield": 0.0, "market_cap": 60000, "w52_high": 52000, "w52_low": 38000},
             "CTG": {"nganh": "Ngân hàng", "beta": 0.95, "roe": 0.18, "roa": 0.015, "pe": 8.5, "pb": 1.6, "eps": 3765, "dividend_yield": 0.022, "market_cap": 85000, "w52_high": 35000, "w52_low": 25000},
         }
+        kpi = {k: dict(v) for k, v in _demo_fb.items()}
+        for _k in kpi:
+            kpi[_k]["_source"] = "demo fallback (sẽ bị yfinance thật override bên dưới)"
         perf = {"Rf": 0.045, "Rm": 0.082, "Beta": 1.02, "Rp": 0.107}
         tong_gt, tong_von, tong_lai_lo, return_pct = tinh_return_danh_muc(dm)
 
@@ -2638,7 +2641,7 @@ elif st.session_state.trang_thai == "deep_analysis":
     if not weights:
         st.error("Khong the tinh toan — du lieu danh muc khong hop le.")
     else:
-        SECTOR_DEFAULTS = {
+        SECTOR_DEFAULTS_FALLBACK = {
             "Ngân hàng": {"pe": 9.5, "pb": 1.8, "roe": 0.20, "roa": 0.015, "dividend_yield": 0.02, "beta": 0.9, "eps": 4500},
             "Công nghệ": {"pe": 18.0, "pb": 3.5, "roe": 0.22, "roa": 0.12, "dividend_yield": 0.015, "beta": 1.1, "eps": 5000},
             "Thép": {"pe": 12.0, "pb": 1.5, "roe": 0.13, "roa": 0.07, "dividend_yield": 0.012, "beta": 1.3, "eps": 2500},
@@ -2648,13 +2651,33 @@ elif st.session_state.trang_thai == "deep_analysis":
             "Chứng khoán": {"pe": 10.0, "pb": 1.5, "roe": 0.15, "roa": 0.02, "dividend_yield": 0.03, "beta": 1.2, "eps": 3000},
             "Khác": {"pe": 15.0, "pb": 2.5, "roe": 0.15, "roa": 0.08, "dividend_yield": 0.02, "beta": 1.0, "eps": 3500},
         }
+        _sector_medians = {}
+        for _ma, _ki in kpi.items():
+            _ng = (_ki.get("nganh", "") or "Khác").strip() or "Khác"
+            _sector_medians.setdefault(_ng, []).append(_ki)
+        SECTOR_DEFAULTS = {}
+        for _ng, _stocks in _sector_medians.items():
+            _vals = {"pe": [], "pb": [], "roe": [], "roa": [], "dividend_yield": [], "beta": [], "eps": []}
+            for _s in _stocks:
+                for _fld in _vals:
+                    _v = _s.get(_fld)
+                    if _v is not None and _v > 0:
+                        _vals[_fld].append(float(_v))
+            SECTOR_DEFAULTS[_ng] = {f: (sum(v) / len(v)) if v else 0 for f, v in _vals.items()}
 
         def _fill_kpi_for_real(ma, info, ki):
             ng = (ki.get("nganh", "") or info.get("nganh", "") or "Khác").strip() or "Khác"
-            defaults = SECTOR_DEFAULTS.get(ng, SECTOR_DEFAULTS["Khác"])
-            for k, v in defaults.items():
+            sector_real_med = SECTOR_DEFAULTS.get(ng, {})
+            sector_fallback = SECTOR_DEFAULTS_FALLBACK.get(ng, SECTOR_DEFAULTS_FALLBACK["Khác"])
+            for k, v_real in sector_real_med.items():
+                if (k not in ki or ki.get(k) is None or ki.get(k) == 0) and v_real > 0:
+                    ki[k] = v_real
+                    ki[f"{k}_source"] = "median ngành (yfinance thật)"
+            for k, v_fb in sector_fallback.items():
                 if k not in ki or ki.get(k) is None or ki.get(k) == 0:
-                    ki[k] = v
+                    ki[k] = v_fb
+                    if f"{k}_source" not in ki:
+                        ki[f"{k}_source"] = "ước lượng cuối (yfinance miss toàn ngành)"
             if "w52_high" not in ki or ki.get("w52_high", 0) <= 0:
                 gia_tt = info.get("gia_thi_truong", 0)
                 ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
@@ -3052,6 +3075,16 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("---")
         st.write("## 📊 Phân tích cơ bản từng mã (P/E, P/B, ROE, EPS, Cổ tức)")
         fa_rows = []
+        _all_roe = [float(ki.get("roe", 0) or 0) for ki in kpi.values() if float(ki.get("roe", 0) or 0) > 0]
+        _all_pe = [float(ki.get("pe", 0) or 0) for ki in kpi.values() if float(ki.get("pe", 0) or 0) > 0]
+        _all_pb = [float(ki.get("pb", 0) or 0) for ki in kpi.values() if float(ki.get("pb", 0) or 0) > 0]
+        _all_dy = [float(ki.get("dividend_yield", 0) or 0) for ki in kpi.values() if float(ki.get("dividend_yield", 0) or 0) > 0]
+        _roe_p75 = float(np.percentile(_all_roe, 75)) if len(_all_roe) >= 4 else 0.20
+        _roe_p50 = float(np.percentile(_all_roe, 50)) if len(_all_roe) >= 4 else 0.15
+        _roe_p25 = float(np.percentile(_all_roe, 25)) if len(_all_roe) >= 4 else 0.10
+        _pe_p25 = float(np.percentile(_all_pe, 25)) if len(_all_pe) >= 4 else 15.0
+        _pe_p50 = float(np.percentile(_all_pe, 50)) if len(_all_pe) >= 4 else 20.0
+        _dy_p50 = float(np.percentile(_all_dy, 50)) if len(_all_dy) >= 4 else 0.02
         for ma, info in dm.items():
             gia_tt = info.get("gia_thi_truong", 0)
             sl = info.get("so_luong", 0)
@@ -3067,9 +3100,9 @@ elif st.session_state.trang_thai == "deep_analysis":
             w52h = float(ki.get("w52_high", 0) or 0)
             w52l = float(ki.get("w52_low", 0) or 0)
             pos_52w = ((gia_tt - w52l) / max(w52h - w52l, 1)) * 100 if w52h > w52l else 50
-            if roe >= 0.20 and pe < 15 and dy >= 0.02: quality = "⭐ Xuất sắc"
-            elif roe >= 0.15 and pe < 20: quality = "✅ Tốt"
-            elif roe >= 0.10: quality = "🟡 Trung bình"
+            if roe >= _roe_p75 and pe <= _pe_p25 and dy >= _dy_p50: quality = "⭐ Xuất sắc"
+            elif roe >= _roe_p50 and pe <= _pe_p50: quality = "✅ Tốt"
+            elif roe >= _roe_p25: quality = "🟡 Trung bình"
             else: quality = "🔴 Yếu"
             fa_rows.append({
                 "Mã": ma,
@@ -3086,7 +3119,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         if fa_rows:
             df_fa = pd.DataFrame(fa_rows)
             st.dataframe(df_fa, use_container_width=True, hide_index=True)
-            st.caption("💡 ROE ≥20% + P/E <15 + Cổ tức ≥2% = Xuất sắc. Vị trí 52W: 0% = đáy, 100% = đỉnh.")
+            st.caption(f"💡 Chất lượng tính theo percentile thật từ {len(_all_roe)} mã: ROE≥P{(_roe_p75*100):.0f}% + P/E≤P25 ({_pe_p25:.1f}) + Cổ tức≥{_dy_p50*100:.1f}% = Xuất sắc. Vị trí 52W: 0% = đáy, 100% = đỉnh.")
 
         st.write("---")
         st.write("## 🔮 Kịch bản dự phóng 1 năm")
@@ -3756,6 +3789,13 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("---")
         st.write("## 🌍 Phân tích khối ngoại (Foreign Flow)")
         ff_rows = []
+        _sector_inst_avg = {}
+        for _ma_ff, _ki_ff in kpi.items():
+            _ng_ff = (_ki_ff.get("nganh", "") or "Khác").strip() or "Khác"
+            _inst = _ki_ff.get("institutions_pct")
+            if _inst is not None and _inst > 0:
+                _sector_inst_avg.setdefault(_ng_ff, []).append(float(_inst))
+        _sector_inst_med = {ng: (sum(v) / len(v)) for ng, v in _sector_inst_avg.items() if v}
         for ma, info in dm.items():
             gia_tt = info.get("gia_thi_truong", 0)
             sl = info.get("so_luong", 0)
@@ -3766,15 +3806,14 @@ elif st.session_state.trang_thai == "deep_analysis":
             if inst_real is not None and inst_real > 0:
                 fo = inst_real
                 fo_source = "yfinance"
+            elif ng in _sector_inst_med:
+                fo = _sector_inst_med[ng]
+                fo_source = f"TB ngành ({len(_sector_inst_avg.get(ng, []))} mã có data thật)"
             else:
-                FOREIGN_OWNERSHIP = {
-                    "Ngân hàng": 0.30, "Công nghệ": 0.20, "Thép": 0.15, "Thực phẩm": 0.50,
-                    "Bán lẻ": 0.25, "Bất động sản": 0.12, "Chứng khoán": 0.35, "Khác": 0.20
-                }
-                fo = FOREIGN_OWNERSHIP.get(ng, 0.20)
-                fo_source = f"ước lượng ngành"
+                fo = 0
+                fo_source = "Không có data (yfinance miss)"
             v = gia_tt * sl
-            ff_value = v * fo
+            ff_value = v * fo if fo > 0 else 0
             momentum_3m = 0
             vol_30d = 0
             if ma in real_prices and len(real_prices[ma]) >= 63:
