@@ -26,3 +26,10 @@ Chỉ cần F5 refresh browser là đủ, Streamlit tự reload.
 
 Luôn dùng web này, KHÔNG dùng localhost:
 https://robo-advisor-jkp9byppflcdsrgapbm4vd.streamlit.app/
+
+## Deploy lên Streamlit Cloud
+
+- `runtime.txt` = `python-3.11` (KHÔNG đổi sang 3.13/3.14, sẽ vỡ wheel)
+- `requirements.txt` để `streamlit>=1.40,<2` (KHÔNG pin cứng 1.58.0)
+- `.streamlit/config.toml` KHÔNG để `address = "0.0.0.0"` (Cloud sẽ tự bind)
+- Push lên `main` → Streamlit Cloud auto-redeploy ~1–3 phút.
