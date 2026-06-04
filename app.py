@@ -11,39 +11,42 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown(
-    "<script>"
-    "try{console.clear();}catch(e){}"
-    "document.documentElement.lang='vi';"
-    "if(!document.querySelector('meta[http-equiv=\\\"Content-Language\\\"]')){"
-    "var m=document.createElement('meta');"
-    "m.setAttribute('http-equiv','Content-Language');"
-    "m.setAttribute('content','vi');"
-    "document.head.appendChild(m);"
-    "}"
-    "(function(){"
-    "var _orig=console.error,_warn=console.warn,_log=console.log;"
-    "var _filter=function(){"
-    "var s=Array.from(arguments).map(function(x){try{return typeof x==='string'?x:(x&&x.message)||JSON.stringify(x)||''}catch(e){return''}}).join(' ');"
-    "return /segment\\.com|google-analytics|translate\\.google|translate\\.googleapis|bufferedData|cdn\\.segment|ERR_BLOCKED|removeChild|routes-[A-Za-z0-9_-]+\\.js|NotFoundError|analytics-next|Chính sách CSP|Đang chuyển về|Không thể tải Write Key|Failed to load Analytics/.test(s);"
-    "};"
-    "console.error=function(){if(!_filter.apply(null,arguments))_orig.apply(console,arguments);};"
-    "console.warn=function(){if(!_filter.apply(null,arguments))_warn.apply(console,arguments);};"
-    "console.log=function(){if(!_filter.apply(null,arguments))_log.apply(console,arguments);};"
-    "var _f=window.fetch;"
-    "window.fetch=function(u,o){"
-    "if(typeof u==='string'&&/segment\\.com|google-analytics|translate\\.google/.test(u))return Promise.resolve(new Response());"
-    "return _f.apply(this,arguments);"
-    "};"
-    "var _xo=XMLHttpRequest.prototype.open;"
-    "XMLHttpRequest.prototype.open=function(m,u){this._blocked=/segment\\.com|google-analytics|translate\\.google/.test(u);return _xo.apply(this,arguments);};"
-    "var _xs=XMLHttpRequest.prototype.send;"
-    "XMLHttpRequest.prototype.send=function(){if(this._blocked)return;return _xs.apply(this,arguments);};"
-    "setInterval(function(){try{console.clear();}catch(e){}},2000);"
-    "})();"
-    "</script>",
-    unsafe_allow_html=True,
-)
+if not st.session_state.get("_console_script_injected"):
+    st.session_state._console_script_injected = True
+    st.markdown(
+        "<script>"
+        "try{console.clear();}catch(e){}"
+        "document.documentElement.lang='vi';"
+        "if(!document.querySelector('meta[http-equiv=\\\"Content-Language\\\"]')){"
+        "var m=document.createElement('meta');"
+        "m.setAttribute('http-equiv','Content-Language');"
+        "m.setAttribute('content','vi');"
+        "document.head.appendChild(m);"
+        "}"
+        "(function(){"
+        "if(window.__roboFilterInit)return;window.__roboFilterInit=true;"
+        "var _orig=console.error,_warn=console.warn,_log=console.log;"
+        "var _filter=function(){"
+        "var s=Array.from(arguments).map(function(x){try{return typeof x==='string'?x:(x&&x.message)||JSON.stringify(x)||''}catch(e){return''}}).join(' ');"
+        "return /segment\\.com|google-analytics|translate\\.google|translate\\.googleapis|bufferedData|cdn\\.segment|ERR_BLOCKED|removeChild|routes-[A-Za-z0-9_-]+\\.js|NotFoundError|analytics-next|Chính sách CSP|Đang chuyển về|Không thể tải Write Key|Failed to load Analytics/.test(s);"
+        "};"
+        "console.error=function(){if(!_filter.apply(null,arguments))_orig.apply(console,arguments);};"
+        "console.warn=function(){if(!_filter.apply(null,arguments))_warn.apply(console,arguments);};"
+        "console.log=function(){if(!_filter.apply(null,arguments))_log.apply(console,arguments);};"
+        "var _f=window.fetch;"
+        "window.fetch=function(u,o){"
+        "if(typeof u==='string'&&/segment\\.com|google-analytics|translate\\.google/.test(u))return Promise.resolve(new Response());"
+        "return _f.apply(this,arguments);"
+        "};"
+        "var _xo=XMLHttpRequest.prototype.open;"
+        "XMLHttpRequest.prototype.open=function(m,u){this._blocked=/segment\\.com|google-analytics|translate\\.google/.test(u);return _xo.apply(this,arguments);};"
+        "var _xs=XMLHttpRequest.prototype.send;"
+        "XMLHttpRequest.prototype.send=function(){if(this._blocked)return;return _xs.apply(this,arguments);};"
+        "setInterval(function(){try{console.clear();}catch(e){}},2000);"
+        "})();"
+        "</script>",
+        unsafe_allow_html=True,
+    )
 
 try:
     import pandas as pd
