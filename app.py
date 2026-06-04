@@ -3093,6 +3093,285 @@ elif st.session_state.trang_thai == "deep_analysis":
                     st.write("✅ _Toàn DM đang lãi — không có mã lỗ_")
 
         st.write("---")
+        st.write("## 🛡️ Chỉ số rủi ro nâng cao (Sortino/Calmar/Tracking Error)")
+        if has_real and 'dm_value_ts' in dir() and len(dm_equity) > 20:
+            daily_ret_real = pd.Series(dm_equity).pct_change().dropna().values
+            downside = daily_ret_real[daily_ret_real < 0]
+            downside_dev = float(np.std(downside)) if len(downside) > 0 else vol_proxy / (252**0.5)
+            sortino = (port_return - rf) / (downside_dev * (252**0.5)) if downside_dev > 0 else 0
+            calmar = port_return / (abs(drawdown.min()/100) + 0.001) if drawdown.min() < 0 else 0
+            if has_vn30 and len(vn_equity) == len(dm_equity):
+                te = float(np.std(daily_ret_real - pd.Series(vn_equity).pct_change().dropna().values) * (252**0.5))
+            else:
+                te = vol_proxy * 0.5
+            skew = float(pd.Series(daily_ret_real).skew())
+            kurt = float(pd.Series(daily_ret_real).kurtosis())
+        else:
+            np.random.seed(99)
+            daily_sim = np.random.normal(port_return/252, vol_proxy/(252**0.5), 252)
+            downside = daily_sim[daily_sim < 0]
+            downside_dev = float(np.std(downside)) if len(downside) > 0 else vol_proxy/(252**0.5)
+            sortino = (port_return - rf) / (downside_dev*(252**0.5))
+            calmar = port_return / (vol_proxy*2.5 + 0.001)
+            te = vol_proxy * 0.5
+            skew = 0.0
+            kurt = 3.0
+        sr1, sr2, sr3, sr4, sr5 = st.columns(5)
+        sr1.metric("📐 Sortino", f"{sortino:.2f}", help=">1: tốt | >2: rất tốt (chỉ tính downside)")
+        sr2.metric("📐 Calmar", f"{calmar:.2f}", help="Return / |Max DD|")
+        sr3.metric("📐 Tracking Err", f"{te*100:.1f}%", help="Sai lệch so với benchmark")
+        sr4.metric("📐 Skewness", f"{skew:+.2f}", help=">0: lệch phải (lợi nhuận)")
+        sr5.metric("📐 Kurtosis", f"{kurt:.2f}", help=">3: đuôi dày (rủi ro đuôi cao)")
+
+        st.write("---")
+        st.write("## 🎯 Phân tích tập trung (Concentration)")
+        if weights:
+            sorted_w = sorted(weights, reverse=True)
+            top1 = sorted_w[0] * 100
+            top3 = sum(sorted_w[:3]) * 100
+            top5 = sum(sorted_w[:5]) * 100
+            max_sector = max(sector_exp.values()) * 100 if sector_exp else 0
+            max_sector_name = max(sector_exp.items(), key=lambda x: x[1])[0] if sector_exp else "N/A"
+            cn1, cn2, cn3, cn4 = st.columns(4)
+            cn1.metric("🏆 Top 1 mã", f"{top1:.1f}%", help=top_ma)
+            cn2.metric("🏆 Top 3 mã", f"{top3:.1f}%")
+            cn3.metric("🏆 Top 5 mã", f"{top5:.1f}%")
+            cn4.metric("🏭 Ngành lớn nhất", f"{max_sector:.1f}%", help=max_sector_name)
+            if top1 > 30: st.warning(f"⚠️ Tập trung cao: Top 1 = {top1:.0f}%")
+            elif top1 > 20: st.info(f"ℹ️ Top 1 = {top1:.0f}% — cân nhắc đa dạng thêm")
+            else: st.success(f"✅ Tập trung hợp lý: Top 1 = {top1:.0f}%")
+
+        st.write("---")
+        st.write("## 📈 Momentum từng mã (Returns 1M / 3M / 6M từ giá thật)")
+        mom_rows = []
+        for ma in dm.keys():
+            if ma in real_prices and len(real_prices[ma]) >= 20:
+                p = real_prices[ma]
+                last = float(p.iloc[-1])
+                r1m = (last / float(p.iloc[-21]) - 1) * 100 if len(p) >= 21 else None
+                r3m = (last / float(p.iloc[-63]) - 1) * 100 if len(p) >= 63 else None
+                r6m = (last / float(p.iloc[0]) - 1) * 100
+                mom_rows.append({"Mã": ma, "1 tháng %": round(r1m, 1) if r1m is not None else "—",
+                    "3 tháng %": round(r3m, 1) if r3m is not None else "—", "6 tháng %": round(r6m, 1)})
+            else:
+                info = dm.get(ma, {})
+                gia_tt = info.get("gia_thi_truong", 0)
+                gia_von = info.get("gia_von", 0)
+                if gia_tt > 0 and gia_von > 0:
+                    ret_total = (gia_tt - gia_von) / gia_von * 100
+                    mom_rows.append({"Mã": ma, "1 tháng %": "—", "3 tháng %": "—", "6 tháng %": round(ret_total, 1)})
+        if mom_rows:
+            df_mom = pd.DataFrame(mom_rows)
+            st.dataframe(df_mom, use_container_width=True, hide_index=True)
+            st.caption("📊 Dùng giá thật từ yfinance. '—' = chưa đủ dữ liệu lịch sử.")
+            mom_leaders = [r for r in mom_rows if isinstance(r.get("3 tháng %"), (int, float)) and r["3 tháng %"] > 0]
+            mom_laggards = [r for r in mom_rows if isinstance(r.get("3 tháng %"), (int, float)) and r["3 tháng %"] < 0]
+            if mom_leaders:
+                best_3m = max(mom_leaders, key=lambda x: x["3 tháng %"])
+                st.success(f"🚀 Momentum tốt nhất 3T: **{best_3m['Mã']}** ({best_3m['3 tháng %']:+.1f}%)")
+            if mom_laggards:
+                worst_3m = min(mom_laggards, key=lambda x: x["3 tháng %"])
+                st.warning(f"⚠️ Momentum yếu nhất 3T: **{worst_3m['Mã']}** ({worst_3m['3 tháng %']:+.1f}%)")
+
+        st.write("---")
+        st.write("## 🎯 Target Price & Stop Loss (Khuyến nghị giá mục tiêu / cắt lỗ)")
+        tgt_rows = []
+        for ma, info in dm.items():
+            gia_tt = info.get("gia_thi_truong", 0)
+            if gia_tt <= 0: continue
+            ki = kpi.get(ma, {})
+            w52h = float(ki.get("w52_high", 0) or 0)
+            w52l = float(ki.get("w52_low", 0) or 0)
+            beta_ma = float(ki.get("beta", 1.0) or 1.0)
+            roe = float(ki.get("roe", 0) or 0)
+            if w52h > 0 and w52l > 0:
+                target = w52h * 1.05
+                stop = max(w52l * 1.02, gia_tt * (1 - 0.08 * beta_ma))
+            else:
+                target = gia_tt * (1 + 0.15 * roe * 10)
+                stop = gia_tt * 0.92
+            upside = (target - gia_tt) / gia_tt * 100
+            risk_dn = (gia_tt - stop) / gia_tt * 100
+            rr = abs(upside / risk_dn) if risk_dn > 0 else 0
+            if rr >= 2: rating = "⭐ Rất tốt"
+            elif rr >= 1.5: rating = "✅ Tốt"
+            elif rr >= 1: rating = "🟡 Hòa"
+            else: rating = "🔴 Xấu"
+            tgt_rows.append({"Mã": ma, "Giá hiện tại": f"{gia_tt:,.0f}",
+                "Target (+5% W52H)": f"{target:,.0f}", "Upside %": f"{upside:+.1f}",
+                "Stop Loss": f"{stop:,.0f}", "Risk %": f"-{risk_dn:.1f}",
+                "R/R": f"{rr:.2f}", "Đánh giá": rating})
+        if tgt_rows:
+            df_tgt = pd.DataFrame(tgt_rows)
+            st.dataframe(df_tgt, use_container_width=True, hide_index=True)
+            st.caption("💡 Target = W52H × 1.05 (kỳ vọng breakout). Stop = W52L × 1.02 hoặc −8%×β. R/R ≥ 1.5 = tốt.")
+
+        st.write("---")
+        st.write("## ⚖️ Đề xuất tái cân bằng (Rebalancing)")
+        rebal_rows = []
+        for ma, info in dm.items():
+            gia_tt = info.get("gia_thi_truong", 0)
+            sl = info.get("so_luong", 0)
+            if gia_tt <= 0 or sl <= 0: continue
+            ki = kpi.get(ma, {})
+            v_hien_tai = gia_tt * sl
+            w_hien_tai = v_hien_tai / tong_gt if tong_gt > 0 else 0
+            w_muc_tieu = float(ki.get("ty_trong_muc_tieu", w_hien_tai) or w_hien_tai)
+            v_muc_tieu = w_muc_tieu * tong_gt
+            chenh = v_muc_tieu - v_hien_tai
+            if abs(chenh) < v_hien_tai * 0.05:
+                hanh_dong = "GIỮ"
+            elif chenh > 0:
+                hanh_dong = f"MUA +{chenh:,.0f}₫"
+            else:
+                hanh_dong = f"BÁN {chenh:,.0f}₫"
+            rebal_rows.append({"Mã": ma, "Hiện tại %": f"{w_hien_tai*100:.1f}",
+                "Mục tiêu %": f"{w_muc_tieu*100:.1f}", "Chênh lệch %": f"{(w_muc_tieu-w_hien_tai)*100:+.1f}",
+                "Hành động": hanh_dong})
+        if rebal_rows:
+            df_rebal = pd.DataFrame(rebal_rows)
+            st.dataframe(df_rebal, use_container_width=True, hide_index=True)
+            buy_total = sum([float(r["Hành động"].replace("MUA +","").replace("₫","").replace(",",""))
+                             for r in rebal_rows if "MUA" in r["Hành động"]])
+            sell_total = sum([float(r["Hành động"].replace("BÁN -","").replace("₫","").replace(",",""))
+                              for r in rebal_rows if "BÁN" in r["Hành động"]])
+            rb1, rb2 = st.columns(2)
+            rb1.metric("💰 Tổng cần MUA", f"{buy_total:,.0f} ₫")
+            rb2.metric("💰 Tổng cần BÁN", f"{sell_total:,.0f} ₫")
+
+        st.write("---")
+        st.write("## 🕯️ Biểu đồ nến Top 3 mã (Candlestick 6 tháng)")
+        if has_real:
+            top3_ma = sorted(dm.items(),
+                key=lambda kv: kv[1].get("gia_thi_truong", 0) * kv[1].get("so_luong", 0),
+                reverse=True)[:3]
+            import yfinance as yf
+            for ma, _ in top3_ma:
+                try:
+                    full = yf.Ticker(f"{ma}.VN").history(period="6mo", timeout=8)
+                    if not full.empty and len(full) > 20:
+                        fig_candle = go.Figure(data=[go.Candlestick(
+                            x=full.index, open=full['Open'], high=full['High'],
+                            low=full['Low'], close=full['Close'], name=ma)])
+                        fig_candle.update_layout(height=300, title=f"{ma} — {len(full)} phiên",
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            font=dict(color="#ECE8E1"), xaxis_rangeslider_visible=False)
+                        st.plotly_chart(fig_candle, use_container_width=True)
+                except Exception:
+                    st.info(f"Không tải được nến {ma}")
+        else:
+            st.info("🎲 Cần dữ liệu yfinance để vẽ nến (đang mô phỏng).")
+
+        st.write("---")
+        st.write("## 🏭 So sánh ngành (Peer Comparison)")
+        sector_avg = {}
+        for ma, ki in kpi.items():
+            ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+            pe = float(ki.get("pe", 0) or 0)
+            roe = float(ki.get("roe", 0) or 0)
+            if pe > 0 and roe > 0:
+                if ng not in sector_avg: sector_avg[ng] = {"pe": [], "roe": []}
+                sector_avg[ng]["pe"].append(pe)
+                sector_avg[ng]["roe"].append(roe)
+        sector_avg_calc = {ng: {"pe": np.mean(v["pe"]), "roe": np.mean(v["roe"])} for ng, v in sector_avg.items() if v["pe"]}
+        peer_rows = []
+        for ma, info in dm.items():
+            gia_tt = info.get("gia_thi_truong", 0)
+            if gia_tt <= 0: continue
+            ki = kpi.get(ma, {})
+            pe = float(ki.get("pe", 0) or 0)
+            roe = float(ki.get("roe", 0) or 0)
+            ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+            avg_pe = sector_avg_calc.get(ng, {}).get("pe", pe)
+            avg_roe = sector_avg_calc.get(ng, {}).get("roe", roe)
+            pe_vs = "Rẻ hơn" if pe < avg_pe * 0.9 else ("Đắt hơn" if pe > avg_pe * 1.1 else "Tương đương")
+            roe_vs = "Tốt hơn" if roe > avg_roe * 1.1 else ("Yếu hơn" if roe < avg_roe * 0.9 else "Tương đương")
+            peer_rows.append({"Mã": ma, "Ngành": ng, "P/E": round(pe, 1), "P/E ngành": round(avg_pe, 1),
+                "Định giá": pe_vs, "ROE %": round(roe*100, 1), "ROE ngành %": round(avg_roe*100, 1),
+                "Chất lượng": roe_vs})
+        if peer_rows:
+            df_peer = pd.DataFrame(peer_rows)
+            st.dataframe(df_peer, use_container_width=True, hide_index=True)
+            st.caption("💡 P/E < 90% ngành = định giá rẻ. ROE > 110% ngành = chất lượng tốt.")
+
+        st.write("---")
+        st.write("## 💵 Phân tích cổ tức (Dividend Income)")
+        div_total = 0
+        div_rows = []
+        for ma, info in dm.items():
+            gia_tt = info.get("gia_thi_truong", 0)
+            sl = info.get("so_luong", 0)
+            if gia_tt <= 0 or sl <= 0: continue
+            ki = kpi.get(ma, {})
+            dy = float(ki.get("dividend_yield", 0) or 0)
+            v = gia_tt * sl
+            div_thu = v * dy
+            div_total += div_thu
+            div_rows.append({"Mã": ma, "Yield %": round(dy*100, 2),
+                "Giá trị DM": f"{v:,.0f}", "Cổ tức/năm": f"{div_thu:,.0f} ₫"})
+        if div_rows:
+            df_div = pd.DataFrame(div_rows)
+            st.dataframe(df_div, use_container_width=True, hide_index=True)
+            dv1, dv2 = st.columns(2)
+            dv1.metric("💰 Tổng cổ tức dự kiến/năm", f"{div_total:,.0f} ₫")
+            dv2.metric("📊 Yield TB danh mục", f"{div_total/tong_gt*100:.2f}%" if tong_gt > 0 else "—")
+
+        st.write("---")
+        st.write("## 📅 Hiệu suất lịch sử theo kỳ")
+        if has_real and 'dm_value_ts' in dir() and len(dm_equity) > 21:
+            p_now = float(dm_equity[-1])
+            p_1m = float(dm_equity[-21]) if len(dm_equity) >= 21 else float(dm_equity[0])
+            p_3m = float(dm_equity[-63]) if len(dm_equity) >= 63 else float(dm_equity[0])
+            p_6m = float(dm_equity[0])
+            r1 = (p_now/p_1m - 1)*100
+            r3 = (p_now/p_3m - 1)*100
+            r6 = (p_now/p_6m - 1)*100
+            hp1, hp2, hp3, hp4 = st.columns(4)
+            hp1.metric("📅 1 tháng qua", f"{r1:+.2f}%")
+            hp2.metric("📅 3 tháng qua", f"{r3:+.2f}%")
+            hp3.metric("📅 6 tháng qua", f"{r6:+.2f}%")
+            hp4.metric("📅 Từ đầu kỳ", f"{r6:+.2f}%")
+        else:
+            np.random.seed(2024)
+            sim_hp = np.random.normal(port_return/12, 0.04, 12)
+            st.caption("🎲 Mô phỏng (yfinance tạm không khả dụng)")
+            hp1, hp2, hp3, hp4 = st.columns(4)
+            hp1.metric("📅 1 tháng qua", f"{(sim_hp[-1])*100:+.2f}%")
+            hp2.metric("📅 3 tháng qua", f"{(np.prod(1+sim_hp[-3:])-1)*100:+.2f}%")
+            hp3.metric("📅 6 tháng qua", f"{(np.prod(1+sim_hp)-1)*100:+.2f}%")
+            hp4.metric("📅 Từ đầu kỳ", f"{(np.prod(1+sim_hp)-1)*100:+.2f}%")
+
+        st.write("---")
+        st.write("## 🚨 Cảnh báo rủi ro (Risk Alerts)")
+        alerts = []
+        if has_real:
+            for ma in dm.keys():
+                if ma in real_prices and len(real_prices[ma]) >= 50:
+                    p = real_prices[ma]
+                    ma50 = float(p.rolling(50).mean().iloc[-1])
+                    last = float(p.iloc[-1])
+                    if last < ma50 * 0.95:
+                        alerts.append(f"🔴 **{ma}**: Giá ({last:,.0f}) dưới MA50 ({ma50:,.0f}) 5%+ — xu hướng giảm")
+        for ma, info in dm.items():
+            gia_tt = info.get("gia_thi_truong", 0)
+            gia_von = info.get("gia_von", 0)
+            if gia_tt > 0 and gia_von > 0:
+                ret = (gia_tt - gia_von) / gia_von
+                if ret < -0.10:
+                    alerts.append(f"🔴 **{ma}**: Lỗ {ret*100:+.1f}% — cân nhắc cắt lỗ")
+                elif ret > 0.30:
+                    alerts.append(f"🟢 **{ma}**: Lãi {ret*100:+.1f}% — cân nhắc chốt lời 1 phần")
+        if top_w > 0.35:
+            alerts.append(f"⚠️ **{top_ma}** chiếm {top_w*100:.0f}% DM — rủi ro tập trung cao")
+        if port_beta > 1.3:
+            alerts.append(f"⚠️ Beta DM = {port_beta:.2f} — lắc lư mạnh hơn thị trường {port_beta-1:.0%}")
+        if not alerts:
+            st.success("✅ Không có cảnh báo rủi ro nào. Danh mục ổn định.")
+        else:
+            for a in alerts:
+                st.write(f"- {a}")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
