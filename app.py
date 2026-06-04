@@ -4744,6 +4744,182 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần giá thật 6T để tính drawdown từng mã.")
 
         st.write("---")
+        st.write("## 🏆 Return / MaxDD Ratio (RoMaD) — Hiệu quả trên Sụt giảm")
+        if has_real and dm_equity is not None and len(dm_equity) > 30:
+            eq_s8 = pd.Series(dm_equity)
+            total_ret = (float(eq_s8.iloc[-1]) / float(eq_s8.iloc[0]) - 1) * 100
+            running_max8 = eq_s8.cummax()
+            max_dd_v = float(((eq_s8 - running_max8) / running_max8).min() * 100)
+            romad = total_ret / abs(max_dd_v) if max_dd_v != 0 else 0
+            annual_ret = total_ret * (252 / len(eq_s8))
+            calmar = annual_ret / abs(max_dd_v) if max_dd_v != 0 else 0
+            rd1, rd2, rd3, rd4 = st.columns(4)
+            rd1.metric("📈 Return 6M", f"{total_ret:+.1f}%")
+            rd2.metric("📉 Max DD", f"{max_dd_v:.1f}%")
+            rd3.metric("⚖️ RoMaD", f"{romad:.2f}", help="Return / |MaxDD|. >1 = tốt, >2 = xuất sắc")
+            rd4.metric("📊 Calmar", f"{calmar:.2f}", help="Annualized Return / |MaxDD|. >1 = tốt")
+            grade_romad = "✅ Xuất sắc" if romad > 2 else ("✅ Tốt" if romad > 1 else ("🟡 Trung bình" if romad > 0.5 else "🔴 Yếu"))
+            st.write(f"**Đánh giá RoMaD:** {grade_romad} — Return gấp {romad:.1f}x mức sụt giảm tối đa")
+            st.caption(f"📊 Tính từ {len(eq_s8)} phiên giá thật yfinance 6T. RoMaD > 2 = lợi nhuận gấp 2 lần rủi ro sụt giảm = DM chất lượng cao.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính RoMaD.")
+
+        st.write("---")
+        st.write("## 🔥 Win/Loss Streaks — Chuỗi thắng/thua dài nhất")
+        if has_real and dm_equity is not None and len(dm_equity) > 10:
+            ret_s8 = pd.Series(dm_equity).pct_change().dropna()
+            pos = (ret_s8 > 0).astype(int).values
+            neg = (ret_s8 < 0).astype(int).values
+            max_win_streak = 0
+            max_loss_streak = 0
+            cur_win = 0
+            cur_loss = 0
+            for i in range(len(ret_s8)):
+                if ret_s8.iloc[i] > 0:
+                    cur_win += 1
+                    cur_loss = 0
+                    max_win_streak = max(max_win_streak, cur_win)
+                elif ret_s8.iloc[i] < 0:
+                    cur_loss += 1
+                    cur_win = 0
+                    max_loss_streak = max(max_loss_streak, cur_loss)
+                else:
+                    cur_win = cur_loss = 0
+            cur_streak = 0
+            cur_streak_type = "🟢 Đang thắng" if ret_s8.iloc[-1] > 0 else ("🔴 Đang thua" if ret_s8.iloc[-1] < 0 else "🟡 Đi ngang")
+            for i in range(len(ret_s8) - 1, -1, -1):
+                if (ret_s8.iloc[i] > 0 and cur_streak_type.startswith("🟢")) or \
+                   (ret_s8.iloc[i] < 0 and cur_streak_type.startswith("🔴")):
+                    cur_streak += 1
+                else:
+                    break
+            ws1, ws2, ws3, ws4 = st.columns(4)
+            ws1.metric("🔥 Chuỗi thắng dài nhất", f"{max_win_streak} phiên", help="Số phiên lãi liên tiếp dài nhất")
+            ws2.metric("❄️ Chuỗi thua dài nhất", f"{max_loss_streak} phiên", help="Số phiên lỗ liên tiếp dài nhất")
+            ws3.metric(f"{cur_streak_type}", f"{cur_streak} phiên", help="Chuỗi hiện tại đang chạy")
+            ws4.metric("📊 Tổng phiên", f"{len(ret_s8)}", help="Tổng số phiên có dữ liệu")
+            mental_warning = ""
+            if cur_streak >= 5 and cur_streak_type.startswith("🟢"):
+                mental_warning = "⚠️ Chuỗi thắng dài → cẩn thận tâm lý quá tự tin (overconfidence bias)"
+            elif cur_streak >= 5 and cur_streak_type.startswith("🔴"):
+                mental_warning = "⚠️ Chuỗi thua dài → cẩn thận tâm lý hoảng loạn (panic selling). Đây là lúc cần bình tĩnh, không bán tháo."
+            if mental_warning:
+                st.warning(mental_warning)
+            st.caption(f"📊 Tính từ {len(ret_s8)} phiên returns thật yfinance 6T. Chuỗi thắng/thua dài giúp nhận diện tâm lý đầu tư (Buffett: 'Người chơi thua nhiều nhất là người không thể chịu được chuỗi thua').")
+        else:
+            st.info("⚠️ Cần giá thật 6T để phân tích streaks.")
+
+        st.write("---")
+        st.write("## 📊 Vol-Adjusted Momentum — Momentum đã điều chỉnh rủi ro")
+        if has_real and len(real_prices) >= 1:
+            vam_rows = []
+            for ma in dm.keys():
+                if ma in real_prices and len(real_prices[ma]) >= 63:
+                    p = real_prices[ma]
+                    ret_3m = (float(p.iloc[-1]) / float(p.iloc[-63]) - 1) * 100
+                    vol_3m = float(p.tail(63).pct_change().dropna().std() * (252**0.5) * 100)
+                    vam = ret_3m / vol_3m if vol_3m > 0 else 0
+                    vam_rows.append({"Mã": ma, "Return 3M %": round(ret_3m, 1), "Vol 3M %": round(vol_3m, 1),
+                        "Vol-Adj Momentum": round(vam, 3),
+                        "Xếp loại": "🔥 Top" if vam > 0.5 else ("✅ Tốt" if vam > 0.2 else ("🟡 TB" if vam > 0 else "🔴 Yếu"))})
+            if vam_rows:
+                df_vam = pd.DataFrame(vam_rows).sort_values("Vol-Adj Momentum", ascending=False)
+                st.dataframe(df_vam, use_container_width=True, hide_index=True)
+                top_vam = vam_rows[0]
+                st.caption(f"📊 Tính từ {len(real_prices[top_vam['Mã']])} phiên giá thật yfinance 6T. Vol-Adj Momentum = Return 3M / Vol 3M. Top: **{top_vam['Mã']}** = {top_vam['Vol-Adj Momentum']:.2f}.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính Vol-Adj Momentum.")
+
+        st.write("---")
+        st.write("## ⏱️ Autocorrelation — Returns có tự tương quan không?")
+        if has_real and dm_equity is not None and len(dm_equity) > 60:
+            ret_s9 = pd.Series(dm_equity).pct_change().dropna()
+            lags_to_test = [1, 2, 3, 5, 10]
+            acf_rows = []
+            for lag in lags_to_test:
+                if len(ret_s9) > lag + 10:
+                    ac = float(ret_s9.autocorr(lag=lag))
+                    acf_rows.append({"Lag": f"{lag} phiên", "Autocorrelation": round(ac, 4),
+                        "Diễn giải": "🔴 Mean-reverting (ngược xu hướng)" if ac < -0.1 else
+                                    ("🟢 Momentum (cùng xu hướng)" if ac > 0.1 else
+                                    "🟡 Random walk (hiệu quả)")})
+            if acf_rows:
+                st.dataframe(pd.DataFrame(acf_rows), use_container_width=True, hide_index=True)
+                lag1 = acf_rows[0]["Autocorrelation"] if acf_rows else 0
+                interp_lag1 = "🔴 Mean reversion mạnh — có thể arbitrage bằng chiến lược đảo chiều" if lag1 < -0.15 else \
+                              ("🟢 Momentum yếu — xu hướng ngắn hạn có thể khai thác" if lag1 > 0.15 else \
+                              "🟡 Random walk — thị trường hiệu quả, khó arbitrage")
+                st.write(f"**Lag-1 AC:** {lag1:.4f} — {interp_lag1}")
+                st.caption(f"📊 Tính từ {len(ret_s9)} phiên returns thật yfinance 6T. AC <-0.1 = mean reversion (đảo chiều), >0.1 = momentum (cùng chiều), gần 0 = random walk.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính autocorrelation.")
+
+        st.write("---")
+        st.write("## 🔄 Beta Stability — Beta thay đổi qua các kỳ")
+        if has_real and len(real_prices) >= 1 and has_vn30 and dm_equity is not None and len(dm_equity) > 120:
+            eq_s10 = pd.Series(dm_equity)
+            common_b = sorted(set(eq_s10.index) & set(vn30_close.index))
+            if len(common_b) > 120:
+                dm_r = eq_s10.pct_change().dropna()
+                vn_r = vn30_close.pct_change().dropna()
+                common_b2 = sorted(set(dm_r.index) & set(vn_r.index))
+                if len(common_b2) > 120:
+                    chunks = [common_b2[i:i+30] for i in range(0, len(common_b2)-30, 30)]
+                    betas_overtime = []
+                    for chunk in chunks:
+                        if len(chunk) > 15:
+                            b_v = float(np.polyfit(vn_r.loc[chunk], dm_r.loc[chunk], 1)[0])
+                            betas_overtime.append({"Kỳ": f"{pd.Series(dm_r.index).loc[chunk[0]].strftime('%d/%m')}-{pd.Series(dm_r.index).loc[chunk[-1]].strftime('%d/%m')}",
+                                "Beta": round(b_v, 3)})
+                    if betas_overtime:
+                        df_bo = pd.DataFrame(betas_overtime)
+                        st.dataframe(df_bo, use_container_width=True, hide_index=True)
+                        b_vals = [b["Beta"] for b in betas_overtime]
+                        b_mean = float(np.mean(b_vals))
+                        b_std = float(np.std(b_vals))
+                        b_cv = b_std / abs(b_mean) if b_mean != 0 else 0
+                        bs1, bs2, bs3 = st.columns(3)
+                        bs1.metric("📊 Beta TB", f"{b_mean:.3f}")
+                        bs2.metric("📐 Beta std", f"{b_std:.3f}", help="Độ lệch chuẩn của beta qua các kỳ")
+                        bs3.metric("🎯 Beta CV", f"{b_cv:.2f}", help="Coefficient of Variation. <0.2 = ổn định, >0.5 = bất ổn")
+                        stability = "✅ Ổn định" if b_cv < 0.2 else ("🟡 Biến động" if b_cv < 0.5 else "🔴 Bất ổn")
+                        st.write(f"**Beta stability:** {stability}")
+                        fig_b = go.Figure()
+                        fig_b.add_trace(go.Scatter(x=list(range(len(b_vals))), y=b_vals, mode='lines+markers',
+                            line_color='#4FC3F7', marker_size=8, name='Beta theo kỳ'))
+                        fig_b.add_hline(y=b_mean, line_dash="dash", line_color='#FFD700', annotation_text=f"Mean={b_mean:.2f}")
+                        fig_b.update_layout(title="Beta qua các kỳ 30 phiên", xaxis_title="Kỳ", yaxis_title="Beta",
+                            height=320, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                        st.plotly_chart(fig_b, use_container_width=True)
+                        st.caption(f"📊 Tính rolling 30-phiên beta trên {len(common_b2)} phiên returns thật yfinance 6T. CV<0.2 = beta ổn định (DM lúc nào cũng giống thị trường).")
+        else:
+            st.info("⚠️ Cần ≥120 phiên + VN30 để tính beta stability.")
+
+        st.write("---")
+        st.write("## 📅 Calendar Returns — Hiệu suất theo tháng/quý")
+        if has_real and dm_equity is not None and len(dm_equity) > 60:
+            eq_s11 = pd.Series(dm_equity, index=pd.to_datetime([d for d in pd.Series(dm_equity).index]))
+            monthly_ret = eq_s11.resample('M').last().pct_change().dropna() * 100
+            if len(monthly_ret) >= 3:
+                mr_df = pd.DataFrame({"Tháng": monthly_ret.index.strftime("%m/%Y"),
+                    "Return %": monthly_ret.values.round(2),
+                    "Tốt/Xấu": ["🟢" if r > 0 else "🔴" for r in monthly_ret.values]})
+                st.dataframe(mr_df, use_container_width=True, hide_index=True)
+                best_month = monthly_ret.max()
+                worst_month = monthly_ret.min()
+                avg_month = float(monthly_ret.mean())
+                positive_months = int((monthly_ret > 0).sum())
+                total_months = len(monthly_ret)
+                cm1, cm2, cm3, cm4 = st.columns(4)
+                cm1.metric("🏆 Tháng tốt nhất", f"{best_month:+.2f}%")
+                cm2.metric("💀 Tháng tệ nhất", f"{worst_month:+.2f}%")
+                cm3.metric("📊 TB tháng", f"{avg_month:+.2f}%")
+                cm4.metric("🎯 Tỷ lệ tháng +", f"{positive_months}/{total_months} ({positive_months/total_months*100:.0f}%)")
+                st.caption(f"📊 Tính từ {len(monthly_ret)} tháng giá thật yfinance 6T. Phân tích seasonality giúp nhận diện tháng nào DM thường tăng/giảm.")
+        else:
+            st.info("⚠️ Cần ≥60 phiên giá thật để phân tích monthly returns.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
