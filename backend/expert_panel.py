@@ -471,11 +471,42 @@ def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None):
             thi_truong_context = (thi_truong_context + "\n\n" if thi_truong_context else "") + "\n".join(esg_lines)
 
     try:
-        results = asyncio.run(_run_expert_panel_async(cau_hoi, api_keys, thi_truong_context))
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    asyncio.run,
+                    _run_expert_panel_async(cau_hoi, api_keys, thi_truong_context)
+                )
+                results = future.result(timeout=180)
+        else:
+            results = asyncio.run(_run_expert_panel_async(cau_hoi, api_keys, thi_truong_context))
+        if not results or not isinstance(results, dict) or "experts" not in results:
+            return _build_error_result(api_keys)
         return results
     except Exception as e:
         logger.error(f"Expert panel error: {e}")
-        return None
+        return _build_error_result(api_keys)
+
+
+def _build_error_result(api_keys=None):
+    """Fallback khi không gọi được API — trả về dict hợp lệ với message lỗi"""
+    has_any_key = bool(api_keys) and any(api_keys.values())
+    msg = "❌ Không thể kết nối với API. Vui lòng kiểm tra cấu hình keys."
+    if not has_any_key:
+        msg = "❌ Chưa cấu hình API key nào (GROQ/OPENAI/GEMINI/OPENROUTER). Liên hệ admin để được hỗ trợ."
+    return {
+        "experts": [
+            {"id": e["id"], "name": e["name"], "title": e["title"], "color": e["color"], "response": msg}
+            for e in EXPERTS
+        ],
+        "chairman": msg if has_any_key else None,
+        "mode": "cao_cap",
+    }
 
 
 async def _run_expert_panel_async(question, api_keys, thi_truong_context=""):

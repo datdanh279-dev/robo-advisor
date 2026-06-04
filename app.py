@@ -4664,13 +4664,14 @@ elif st.session_state.trang_thai == "chat":
                 try:
                     with st.spinner("🧠 Đang hỏi các chuyên gia AI..."):
                         results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
-                    if results:
+                    if results and isinstance(results, dict) and results.get("experts"):
                         st.session_state.expert_results = results
                         mode = results.get("mode", "cao_cap")
                         mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
                         st.success(f"✅ Đã nhận phản hồi. Chế độ: {mode_labels.get(mode, mode)}")
                     else:
-                        st.error("❌ Không thể kết nối với các chuyên gia. Kiểm tra API keys.")
+                        st.session_state.expert_results = results
+                        st.warning("⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.")
                 except Exception as _expert_err:
                     st.error(f"❌ Lỗi khi gọi Hội đồng Chuyên gia: {_expert_err}")
                     st.info("Vui lòng thử lại hoặc dùng tab Chat bên cạnh.")
@@ -4680,29 +4681,35 @@ elif st.session_state.trang_thai == "chat":
 
         if st.session_state.expert_results:
             results = st.session_state.expert_results
-            st.markdown("---")
-            st.markdown("### 🗳️ Ý kiến Chuyên gia")
-
-            cols = st.columns(3)
-            for i, expert in enumerate(results["experts"]):
-                with cols[i % 3]:
-                    with st.expander(
-                        f"**{expert['name']}** — {expert['title']}",
-                        expanded=(i < 3),
-                    ):
-                        if expert["response"].startswith("❌"):
-                            st.error(expert["response"])
-                        elif expert["response"].startswith("⚠️"):
-                            st.warning(expert["response"])
-                        elif expert["response"].startswith("⏭️"):
-                            st.caption(expert["response"])
-                        else:
-                            st.markdown(expert["response"])
-
-            if results.get("chairman"):
+            if not isinstance(results, dict) or "experts" not in results:
+                st.warning("⚠️ Kết quả không hợp lệ. Vui lòng thử lại.")
+                st.session_state.expert_results = None
+            else:
                 st.markdown("---")
-                st.markdown("#### 👑 Kết luận của Chủ tịch Hội đồng")
-                st.markdown(results["chairman"])
+                st.markdown("### 🗳️ Ý kiến Chuyên gia")
+
+                cols = st.columns(3)
+                for i, expert in enumerate(results["experts"]):
+                    with cols[i % 3]:
+                        resp = expert.get("response") or "⚠️ Không có phản hồi."
+                        with st.expander(
+                            f"**{expert.get('name', 'Chuyên gia')}** — {expert.get('title', '')}",
+                            expanded=(i < 3),
+                        ):
+                            if resp.startswith("❌"):
+                                st.error(resp)
+                            elif resp.startswith("⚠️"):
+                                st.warning(resp)
+                            elif resp.startswith("⏭️"):
+                                st.caption(resp)
+                            else:
+                                st.markdown(resp)
+
+                chairman = results.get("chairman")
+                if chairman:
+                    st.markdown("---")
+                    st.markdown("#### 👑 Kết luận của Chủ tịch Hội đồng")
+                    st.markdown(chairman)
 
             if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
                 st.session_state.expert_results = None
