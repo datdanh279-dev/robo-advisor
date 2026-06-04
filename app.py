@@ -4927,6 +4927,178 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần ≥60 phiên giá thật để phân tích monthly returns.")
 
         st.write("---")
+        st.write("## 📐 Brinson Attribution — Stock Selection vs Sector Allocation")
+        if has_real and len(real_prices) >= 2 and has_vn30 and dm_equity is not None and len(dm_equity) > 60:
+            common_br = sorted(set(pd.Series(dm_equity).index) & set(vn30_close.index))
+            if len(common_br) > 60:
+                stock_rets = {}
+                for ma, info in dm.items():
+                    if ma in real_prices and len(real_prices[ma]) >= len(common_br) - 5:
+                        r = real_prices[ma].pct_change().dropna().reindex(common_br).dropna()
+                        if len(r) > 30:
+                            stock_rets[ma] = (1 + r).prod() - 1
+                if stock_rets:
+                    sector_rets = {}
+                    for ma, ret in stock_rets.items():
+                        ng = (kpi.get(ma, {}).get("nganh", "") or "Khác").strip() or "Khác"
+                        sector_rets.setdefault(ng, []).append((ret, ma))
+                    vn_ret = float((vn30_close.loc[common_br].iloc[-1] / vn30_close.loc[common_br].iloc[0]) - 1)
+                    br_rows = []
+                    for ng, lst in sector_rets.items():
+                        w_in_dm = sum(dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0) for r, ma in lst) / tong_gt if tong_gt > 0 else 0
+                        avg_stock_ret = sum(r for r, ma in lst) / len(lst)
+                        ng_ret = sum(r for r, ma in lst) / len(lst)
+                        allocation = w_in_dm * (ng_ret - vn_ret) * 100
+                        selection = w_in_dm * (avg_stock_ret - ng_ret) * 100
+                        interaction = 0
+                        for r, ma in lst:
+                            sw = dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0) / tong_gt if tong_gt > 0 else 0
+                            interaction += (sw - w_in_dm * 0) * (r - ng_ret) * 100
+                        br_rows.append({"Ngành": ng, "Tỷ trọng %": round(w_in_dm*100, 1),
+                            "Return ngành %": round(ng_ret*100, 1), "Allocation %": round(allocation, 3),
+                            "Selection %": round(selection, 3), "Interaction %": round(interaction/len(lst), 3)})
+                    if br_rows:
+                        st.dataframe(pd.DataFrame(br_rows), use_container_width=True, hide_index=True)
+                        total_alloc = sum(r["Allocation %"] for r in br_rows)
+                        total_select = sum(r["Selection %"] for r in br_rows)
+                        total_inter = sum(r["Interaction %"] for r in br_rows)
+                        ti1, ti2, ti3 = st.columns(3)
+                        ti1.metric("📊 Allocation Effect", f"{total_alloc:+.2f}%", help="Chọn ngành nào tốt/xấu hơn VN30")
+                        ti2.metric("🎯 Selection Effect", f"{total_select:+.2f}%", help="Chọn mã nào trong ngành tốt/xấu hơn TB ngành")
+                        ti3.metric("🔄 Interaction", f"{total_inter:+.2f}%", help="Tương tác giữa allocation và selection")
+                        st.caption(f"📊 Brinson decomposition: tổng 3 effects ≈ Excess return DM vs VN30 ({vn_ret*100:.1f}% VN30, {return_pct*100:.1f}% DM). Tính từ returns 6T thật × tỷ trọng DM.")
+        else:
+            st.info("⚠️ Cần giá thật + VN30 + nhiều mã để Brinson attribution.")
+
+        st.write("---")
+        st.write("## ⏱️ Conditional VaR/CVaR theo kỳ nắm giữ (Horizon Risk)")
+        if has_real and dm_equity is not None and len(dm_equity) > 60:
+            eq_s_cv = pd.Series(dm_equity).pct_change().dropna()
+            horizons = [1, 5, 10, 20, 60]
+            cv_rows = []
+            for h in horizons:
+                if len(eq_s_cv) >= h + 10:
+                    roll_ret = (eq_s_cv.rolling(h).sum().dropna())
+                    var_95_h = float(roll_ret.quantile(0.05)) * 100
+                    var_99_h = float(roll_ret.quantile(0.01)) * 100
+                    cvar_95_h = float(roll_ret[roll_ret <= roll_ret.quantile(0.05)].mean()) * 100
+                    cvar_99_h = float(roll_ret[roll_ret <= roll_ret.quantile(0.01)].mean()) * 100
+                    cv_rows.append({"Kỳ nắm giữ": f"{h} phiên ({h}D)",
+                        "VaR 95%": round(var_95_h, 2), "VaR 99%": round(var_99_h, 2),
+                        "CVaR 95%": round(cvar_95_h, 2), "CVaR 99%": round(cvar_99_h, 2)})
+            if cv_rows:
+                st.dataframe(pd.DataFrame(cv_rows), use_container_width=True, hide_index=True)
+                fig_cv = go.Figure()
+                fig_cv.add_trace(go.Scatter(x=[r["Kỳ nắm giữ"] for r in cv_rows], y=[r["VaR 95%"] for r in cv_rows],
+                    mode='lines+markers', name='VaR 95%', line=dict(color='#FFD700', width=2)))
+                fig_cv.add_trace(go.Scatter(x=[r["Kỳ nắm giữ"] for r in cv_rows], y=[r["CVaR 95%"] for r in cv_rows],
+                    mode='lines+markers', name='CVaR 95%', line=dict(color='#F44336', width=2)))
+                fig_cv.update_layout(title="VaR/CVaR theo kỳ nắm giữ (% lỗ)",
+                    xaxis_title="Horizon", yaxis_title="Lỗ tích lũy (%)",
+                    height=320, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_cv, use_container_width=True)
+                st.caption(f"📊 Tính từ {len(eq_s_cv)} phiên returns thật yfinance 6T. VaR(h) = quantile 5% của rolling return h phiên. Càng nắm giữ lâu, rủi ro càng cao (nếu DM âm).")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính horizon VaR.")
+
+        st.write("---")
+        st.write("## 🎯 Sterling & Burke Ratio — Return trên Drawdown")
+        if has_real and dm_equity is not None and len(dm_equity) > 60:
+            eq_s_st = pd.Series(dm_equity)
+            running_max_st = eq_s_st.cummax()
+            dd_pct_st = ((eq_s_st - running_max_st) / running_max_st * 100)
+            dd_neg = dd_pct_st[dd_pct_st < 0]
+            avg_dd_st = abs(float(dd_neg.mean())) if len(dd_neg) > 0 else 0.01
+            sum_dd2 = float((dd_neg ** 2).sum()) if len(dd_neg) > 0 else 0.01
+            burke = abs(dd_neg.count()) ** 0.5 if len(dd_neg) > 0 else 0
+            annual_ret_st = float((eq_s_st.iloc[-1] / eq_s_st.iloc[0] - 1) * 252 / len(eq_s_st) * 100)
+            sterling = annual_ret_st / avg_dd_st if avg_dd_st > 0 else 0
+            burke_ratio = annual_ret_st / (sum_dd2 ** 0.5) if sum_dd2 > 0 else 0
+            st1, st2, st3 = st.columns(3)
+            st1.metric("🎯 Sterling Ratio", f"{sterling:.2f}", help="Annual Return / |Avg DD|. >1 = tốt")
+            st2.metric("🎯 Burke Ratio", f"{burke_ratio:.2f}", help="Annual Return / sqrt(Σ DD²). >1 = tốt")
+            st3.metric("📉 Avg DD", f"{avg_dd_st:.2f}%", help="Trung bình mức sụt giảm")
+            grade_st = "✅ Xuất sắc" if sterling > 2 else ("✅ Tốt" if sterling > 1 else ("🟡 TB" if sterling > 0.5 else "🔴 Yếu"))
+            st.write(f"**Đánh giá:** {grade_st}")
+            st.caption(f"📊 Tính từ {len(eq_s_st)} phiên giá thật yfinance 6T. Sterling & Burke đo hiệu quả trên DD, khác Sharpe ở chỗ dùng DD thay vol.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính Sterling/Burke.")
+
+        st.write("---")
+        st.write("## 🔬 Martin Ratio (Ulcer Performance Index)")
+        if has_real and dm_equity is not None and len(dm_equity) > 30:
+            eq_s_mr = pd.Series(dm_equity)
+            running_max_mr = eq_s_mr.cummax()
+            dd_pct_mr = ((eq_s_mr - running_max_mr) / running_max_mr * 100)
+            ulcer_mr = float(np.sqrt((dd_pct_mr ** 2).mean()))
+            annual_ret_mr = float((eq_s_mr.iloc[-1] / eq_s_mr.iloc[0] - 1) * 252 / len(eq_s_mr) * 100)
+            martin = annual_ret_mr / ulcer_mr if ulcer_mr > 0 else 0
+            mr1, mr2, mr3, mr4 = st.columns(4)
+            mr1.metric("🔬 Martin Ratio", f"{martin:.2f}", help="Annual Return / Ulcer Index. >1 = tốt, >2 = xuất sắc")
+            mr2.metric("🩹 Ulcer Index", f"{ulcer_mr:.2f}")
+            mr3.metric("📊 Annual Return", f"{annual_ret_mr:+.1f}%")
+            mr4.metric("🎯 Xếp loại", "✅ Xuất sắc" if martin > 2 else ("✅ Tốt" if martin > 1 else ("🟡 TB" if martin > 0.5 else "🔴 Yếu")))
+            st.caption(f"📊 Martin Ratio (Ulcer Performance Index) đo return trên Ulcer Index (giống Pain Index). Tốt hơn Sharpe vì phạt DD thực tế. Tính từ {len(eq_s_mr)} phiên giá thật.")
+        else:
+            st.info("⚠️ Cần giá thật 6T để tính Martin Ratio.")
+
+        st.write("---")
+        st.write("## 📊 Active Share — DM khác VN30 bao nhiêu?")
+        if has_real and has_vn30 and len(real_prices) >= 2:
+            vn30_components = ["VCB", "HPG", "VHM", "VNM", "BID", "CTG", "TCB", "FPT", "MBB", "VPB",
+                "VIC", "VRE", "SSI", "PLX", "GAS", "MSN", "MWG", "SAB", "NVL", "POW"]
+            as_rows = []
+            for ma, info in dm.items():
+                if ma in real_prices:
+                    w_dm = (info.get("gia_thi_truong", 0) * info.get("so_luong", 0)) / tong_gt if tong_gt > 0 else 0
+                    w_vn30 = (1.0 / len(vn30_components)) if ma in vn30_components else 0
+                    as_rows.append({"Mã": ma, "Trọng số DM %": round(w_dm*100, 1),
+                        "Trọng số VN30 %": round(w_vn30*100, 1),
+                        "Chênh lệch %": round((w_dm - w_vn30)*100, 1)})
+            if as_rows:
+                df_as = pd.DataFrame(as_rows).sort_values("Chênh lệch %", ascending=False)
+                st.dataframe(df_as, use_container_width=True, hide_index=True)
+                active_share = sum(abs(r["Chênh lệch %"]) for r in as_rows) / 2
+                ac1, ac2 = st.columns(2)
+                ac1.metric("📊 Active Share", f"{active_share:.1f}%", help="Tổng |chênh lệch tỷ trọng| / 2. >60% = rất khác VN30, <20% = gần giống VN30")
+                ac2.metric("🎯 Phân loại",
+                    "🔴 Rất khác benchmark" if active_share > 80 else
+                    ("🟡 Khác vừa" if active_share > 50 else
+                    ("🟢 Gần giống VN30" if active_share > 20 else "✅ Index-like")))
+                st.caption(f"📊 Active Share = Σ|wi_dm - wi_benchmark| / 2. Đo mức độ 'chủ động' của DM so với VN30. Tính trên {len(as_rows)} mã có trong DM.")
+        else:
+            st.info("⚠️ Cần DM + VN30 để tính Active Share.")
+
+        st.write("---")
+        st.write("## 🌊 Return Distribution Quantile — Phân vị return")
+        if has_real and dm_equity is not None and len(dm_equity) > 60:
+            ret_s_q = pd.Series(dm_equity).pct_change().dropna()
+            quantiles = [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99]
+            q_rows = []
+            for q in quantiles:
+                qv = float(ret_s_q.quantile(q)) * 100
+                q_rows.append({"Phân vị": f"P{int(q*100)}", "Daily Return %": round(qv, 3),
+                    "Diễn giải": "🔴 Cực xấu" if q <= 0.05 else ("🔴 Xấu" if q <= 0.10 else
+                                ("🟡 Kém" if q <= 0.25 else ("🟢 Trung bình" if q <= 0.75 else
+                                ("🟢 Tốt" if q <= 0.90 else ("🟢 Rất tốt" if q <= 0.95 else "🟢 Cực tốt")))))})
+            st.dataframe(pd.DataFrame(q_rows), use_container_width=True, hide_index=True)
+            fig_qq = go.Figure()
+            qs = np.linspace(0.01, 0.99, 99)
+            qvs = [float(ret_s_q.quantile(q)) * 100 for q in qs]
+            fig_qq.add_trace(go.Scatter(x=qs*100, y=qvs, mode='lines', line_color='#4FC3F7', name='Phân phối thực tế'))
+            mu = float(ret_s_q.mean()) * 100
+            sigma = float(ret_s_q.std()) * 100
+            fig_qq.add_trace(go.Scatter(x=qs*100, y=[mu + sigma * (1.2816 if q > 0.9 else (-1.2816 if q < 0.1 else 0)) for q in qs],
+                mode='lines', line=dict(color='#FFD700', dash='dash'), name='Normal (lý thuyết)'))
+            fig_qq.update_layout(title="Q-Q Plot: Thực tế vs Normal", xaxis_title="Quantile (xác suất)",
+                yaxis_title="Return (%)", height=320,
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_qq, use_container_width=True)
+            st.caption(f"📊 Tính từ {len(ret_s_q)} phiên returns thật yfinance 6T. Nếu đường thực tế lệch đường Normal ở 2 đuôi → DM có tail risk cao (cần dùng CVaR thay VaR).")
+        else:
+            st.info("⚠️ Cần giá thật 6T để vẽ Q-Q plot.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
