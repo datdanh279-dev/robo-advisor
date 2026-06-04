@@ -2521,8 +2521,7 @@ elif st.session_state.trang_thai == "portfolio":
         st.info("Chưa có dữ liệu danh mục. Hãy cập nhật dữ liệu trước.")
 
 elif st.session_state.trang_thai == "deep_analysis":
-    import time as _time
-    st.error(f"🆕 VERSION 5.0 — BUILD 0ff6bb8+ — { _time.strftime('%H:%M:%S %d/%m/%Y') } — Dùng Yahoo Finance API trực tiếp + sector defaults. Nếu KHÔNG thấy dòng này = browser cache cũ → Ctrl+Shift+R")
+    st.markdown("**🆕 VERSION 5.1** — Dùng Yahoo Finance API trực tiếp + sector defaults. Không thấy dòng này = Ctrl+Shift+R.")
     st.write("# 📊 PHÂN TÍCH CHUYÊN SÂU DANH MỤC")
     st.write("---")
 
