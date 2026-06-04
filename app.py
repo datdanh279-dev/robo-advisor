@@ -2521,7 +2521,7 @@ elif st.session_state.trang_thai == "portfolio":
         st.info("Chưa có dữ liệu danh mục. Hãy cập nhật dữ liệu trước.")
 
 elif st.session_state.trang_thai == "deep_analysis":
-    st.markdown("**🆕 VERSION 5.1** — Dùng Yahoo Finance API trực tiếp + sector defaults. Không thấy dòng này = Ctrl+Shift+R.")
+    st.markdown("**🆕 VERSION 6.0** — 6 nhóm Tabs + 8 tính năng mới (thanh khoản, khối ngoại, AI, Bollinger, FX, VN30, lịch sử GD, thuế). Không thấy dòng này = Ctrl+Shift+R.")
     st.write("# 📊 PHÂN TÍCH CHUYÊN SÂU DANH MỤC")
     st.write("---")
 
@@ -2717,6 +2717,65 @@ elif st.session_state.trang_thai == "deep_analysis":
         max_dd_uoc = vol_proxy * 2.5
         expected_1y = port_return + 0.5 * vol_proxy
 
+        st.write("## 📑 6 NHÓM PHÂN TÍCH (TABS)")
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "📊 Tổng quan", "📈 Kỹ thuật", "📋 Cơ bản", "⚠️ Rủi ro", "🎯 Tối ưu", "📰 Tin tức & AI"
+        ])
+
+        with tab1:
+            st.write("### Tổng quan nhanh")
+            tc1, tc2, tc3, tc4 = st.columns(4)
+            tc1.metric("💎 Sharpe", f"{sharpe:.2f}")
+            tc2.metric("📈 Alpha", f"{alpha*100:+.2f}%")
+            tc3.metric("⚡ Beta", f"{port_beta:.2f}")
+            tc4.metric("🎯 Risk Grade", risk_grade[0])
+            tc5, tc6, tc7, tc8 = st.columns(4)
+            tc5.metric("📉 Vol", f"{vol_proxy*100:.1f}%")
+            tc6.metric("🔴 VaR", f"{var_95*100:.2f}%")
+            tc7.metric("📊 MaxDD", f"{max_dd_uoc*100:.1f}%")
+            tc8.metric("🌐 Đa dạng", f"{diversification*100:.0f}%")
+            st.info("⬇️ Xem chi tiết 12 chỉ số, Equity Curve, Backtest bên dưới")
+
+        with tab2:
+            st.write("### Phân tích kỹ thuật")
+            kc1, kc2, kc3 = st.columns(3)
+            kc1.metric("📊 Số mã DM", f"{n_ma}")
+            kc2.metric("📈 Giá thật (yfinance)", f"{len(real_prices)}/{n_ma}")
+            kc3.metric("🆚 VN30 proxy", vn30_label or "—")
+            st.info("⬇️ Xem RSI/MACD/MA, Bollinger/Fibonacci, Candlestick, Momentum, Top tăng/giảm bên dưới")
+
+        with tab3:
+            st.write("### Phân tích cơ bản")
+            fc1, fc2 = st.columns(2)
+            sectors_count = len([s for s in sector_exp if s != "Khác"])
+            fc1.metric("🏭 Số ngành", f"{sectors_count}")
+            fc2.metric("📊 Mã có P/E", f"{sum(1 for ki in kpi.values() if ki.get('pe', 0) > 0)}/{n_ma}")
+            st.info("⬇️ Xem P/E/P/B/ROE, Cổ tức, Peer, Target Price, Foreign flow bên dưới")
+
+        with tab4:
+            st.write("### Phân tích rủi ro")
+            rc1, rc2, rc3 = st.columns(3)
+            rc1.metric("🔴 VaR 95%", f"{var_95*100:.2f}%")
+            rc2.metric("🔴 CVaR 95%", f"{cvar_95*100:.2f}%")
+            rc3.metric("📉 MaxDD", f"{max_dd_uoc*100:.1f}%")
+            st.info("⬇️ Xem Stress Test, Sortino/Calmar, Concentration, FX/Lãi suất, Liquidity, Alerts bên dưới")
+
+        with tab5:
+            st.write("### Tối ưu danh mục")
+            oc1, oc2, oc3 = st.columns(3)
+            oc1.metric("🔮 Kỳ vọng 1Y", f"{(1+port_return)*100:+.1f}%")
+            oc2.metric("📈 Tích cực", f"{(expected_1y+vol_proxy)*100:+.1f}%")
+            oc3.metric("📉 Tiêu cực", f"{(port_return-vol_proxy)*100:+.1f}%")
+            st.info("⬇️ Xem 3 Kịch bản, Monte Carlo, Efficient Frontier, Rebalancing, Contribution bên dưới")
+
+        with tab6:
+            st.write("### Tin tức & AI")
+            ac1, ac2 = st.columns(2)
+            ac1.metric("📰 Tin tức thị trường", "✅ Đang tải")
+            ac2.metric("🤖 AI Insights", "✅ Sẵn sàng")
+            st.info("⬇️ Xem Tin tức, AI phân tích, Lịch sử GD, Thuế phí bên dưới")
+
+        st.write("---")
         st.write("## 💎 Chỉ số Rủi ro — Lợi nhuận (12 chỉ số)")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("📊 Sharpe Ratio", f"{sharpe:.2f}")
@@ -3446,6 +3505,167 @@ elif st.session_state.trang_thai == "deep_analysis":
         else:
             for a in alerts:
                 st.write(f"- {a}")
+
+        st.write("---")
+        st.write("## 💧 Phân tích thanh khoản (ADTV — Khối lượng giao dịch)")
+        liq_rows = []
+        for ma in dm.keys():
+            if ma in real_metas:
+                vol = real_metas[ma].get('regularMarketVolume', 0) or 0
+                price = real_metas[ma].get('regularMarketPrice', 0) or 0
+                adtv_value = vol * price
+                if adtv_value > 0:
+                    value_dm = dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0)
+                    days_to_liquidate = value_dm / adtv_value if adtv_value > 0 else 999
+                    liq_rows.append({
+                        "Mã": ma,
+                        "ADTV (tỷ)": round(adtv_value/1e9, 1),
+                        "GT DM (tỷ)": round(value_dm/1e9, 1),
+                        "Ngày thoát hàng": round(days_to_liquidate, 1),
+                        "Thanh khoản": "🟢 Cao" if adtv_value > 5e9 else ("🟡 TB" if adtv_value > 1e9 else "🔴 Thấp")
+                    })
+        if liq_rows:
+            df_liq = pd.DataFrame(liq_rows)
+            st.dataframe(df_liq, use_container_width=True, hide_index=True)
+            st.caption("💡 ADTV > 5 tỷ = thanh khoản cao (mua/bán dễ). Ngày thoát hàng = GT mã / ADTV. >5 ngày = khó bán gấp.")
+        else:
+            st.info("Không có dữ liệu volume từ yfinance.")
+
+        st.write("---")
+        st.write("## 🌍 Phân tích khối ngoại (Foreign Flow — ước lượng)")
+        FOREIGN_OWNERSHIP = {
+            "Ngân hàng": 0.30, "Công nghệ": 0.20, "Thép": 0.15, "Thực phẩm": 0.50,
+            "Bán lẻ": 0.25, "Bất động sản": 0.12, "Chứng khoán": 0.35, "Khác": 0.20
+        }
+        ff_rows = []
+        for ma, info in dm.items():
+            gia_tt = info.get("gia_thi_truong", 0)
+            sl = info.get("so_luong", 0)
+            if gia_tt <= 0 or sl <= 0: continue
+            ki = kpi.get(ma, {})
+            ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+            fo = FOREIGN_OWNERSHIP.get(ng, 0.20)
+            v = gia_tt * sl
+            ff_value = v * fo
+            momentum_3m = 0
+            if ma in real_prices and len(real_prices[ma]) >= 63:
+                momentum_3m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[-63]) - 1) * 100
+            flow_signal = "🟢 Mua ròng" if momentum_3m > 5 else ("🔴 Bán ròng" if momentum_3m < -5 else "🟡 Đi ngang")
+            ff_rows.append({"Mã": ma, "Ngành": ng, "Tỷ lệ NN %": round(fo*100, 0),
+                "GT NN ước lượng (tỷ)": round(ff_value/1e9, 1), "Momentum 3T %": round(momentum_3m, 1),
+                "Dòng tiền": flow_signal})
+        if ff_rows:
+            df_ff = pd.DataFrame(ff_rows)
+            st.dataframe(df_ff, use_container_width=True, hide_index=True)
+            st.caption("💡 Tỷ lệ sở hữu nước ngoài ước lượng theo ngành. Momentum 3T > 5% = mua ròng, < −5% = bán ròng.")
+
+        st.write("---")
+        st.write("## 🤖 AI Phân tích tự động (GPT-style insights)")
+        ai_insights = []
+        if sharpe < 0.5: ai_insights.append("⚠️ **Sharpe thấp** — Lợi nhuận chưa tương xứng rủi ro. Cân nhắc cắt mã yếu hoặc tăng tỷ trọng mã chất lượng cao (ROE>20%, P/E<15).")
+        if sharpe >= 1: ai_insights.append("✅ **Sharpe tốt** — DM đang sinh lời hiệu quả. Duy trì chiến lược hiện tại.")
+        if alpha > 0.02: ai_insights.append(f"✅ **Alpha = {alpha*100:+.2f}%** — DM vượt thị trường {alpha*100:.1f}%. Nhà đầu tư có kỹ năng chọn mã tốt.")
+        if alpha < -0.02: ai_insights.append(f"🔴 **Alpha = {alpha*100:+.2f}%** — DM thua thị trường. Cân nhắc chuyển sang ETF VN30 hoặc VFMVN30.")
+        if port_beta > 1.3: ai_insights.append(f"⚠️ **Beta = {port_beta:.2f}** — DM lắc lư mạnh. Thêm mã phòng thủ (Ngân hàng, Thực phẩm) để giảm beta về ~1.0.")
+        if top_w > 0.3: ai_insights.append(f"⚠️ **{top_ma}** chiếm {top_w*100:.0f}% — Tập trung cao. Nếu mã này giảm 20%, DM mất {top_w*20:.1f}%.")
+        if diversification > 0.8: ai_insights.append("✅ **Đa dạng hóa xuất sắc** — DM cân bằng giữa nhiều mã/ngành. Rủi ro tập trung thấp.")
+        if nganh_count < 3: ai_insights.append(f"⚠️ Chỉ **{nganh_count} ngành** — Nên thêm 2-3 ngành khác để giảm rủi ro ngành.")
+        if vol_proxy > 0.25: ai_insights.append("⚠️ **Volatility > 25%** — DM biến động mạnh. Phù hợp nhà đầu tư chấp nhận rủi ro cao.")
+        for r in recs[:3]: ai_insights.append(f"📌 {r}")
+        if not ai_insights: ai_insights.append("✅ DM hiện tại đạt các tiêu chí cơ bản. Tiếp tục theo dõi và tái cân bằng định kỳ.")
+        for ins in ai_insights[:8]:
+            st.write(f"- {ins}")
+
+        st.write("---")
+        st.write("## 📐 Bollinger Bands & Fibonacci (Kỹ thuật nâng cao)")
+        if has_real:
+            bb_rows = []
+            for ma, info in dm.items():
+                if ma in real_prices and len(real_prices[ma]) >= 20:
+                    p = real_prices[ma]
+                    gia_tt = float(p.iloc[-1])
+                    ma20_v = float(p.rolling(20).mean().iloc[-1])
+                    std20 = float(p.rolling(20).std().iloc[-1])
+                    bb_upper = ma20_v + 2*std20
+                    bb_lower = ma20_v - 2*std20
+                    high_60 = float(p.tail(60).max()) if len(p) >= 60 else float(p.max())
+                    low_60 = float(p.tail(60).min()) if len(p) >= 60 else float(p.min())
+                    fib_382 = low_60 + (high_60 - low_60) * 0.382
+                    fib_618 = low_60 + (high_60 - low_60) * 0.618
+                    bb_pos = (gia_tt - bb_lower) / max(bb_upper - bb_lower, 1) * 100
+                    if gia_tt > bb_upper: bb_sig = "🔴 Trên BB"
+                    elif gia_tt < bb_lower: bb_sig = "🟢 Dưới BB"
+                    elif gia_tt > ma20_v: bb_sig = "🟡 Trên MA20"
+                    else: bb_sig = "🟡 Dưới MA20"
+                    fib_zone = "Vùng 38.2-61.8%" if fib_382 <= gia_tt <= fib_618 else "Ngoài vùng vàng"
+                    bb_rows.append({"Mã": ma, "Giá": f"{gia_tt:,.0f}", "BB trên": f"{bb_upper:,.0f}",
+                        "BB dưới": f"{bb_lower:,.0f}", "Fib 38.2%": f"{fib_382:,.0f}",
+                        "Fib 61.8%": f"{fib_618:,.0f}", "Vị trí BB %": round(bb_pos, 0),
+                        "Tín hiệu": bb_sig, "Fibonacci": fib_zone})
+            if bb_rows:
+                df_bb = pd.DataFrame(bb_rows)
+                st.dataframe(df_bb, use_container_width=True, hide_index=True)
+                st.caption("💡 Giá < BB dưới = quá bán (cơ hội MUA). Giá > BB trên = quá mua (cân nhắc BÁN). Fibonacci 38.2-61.8% = vùng hỗ trợ/mức cản quan trọng.")
+
+        st.write("---")
+        st.write("## 💱 Phân tích rủi ro tỷ giá & lãi suất")
+        NH_SENSITIVITY = {"Ngân hàng": 0.8, "Bất động sản": 0.6, "Thép": 0.3, "Thực phẩm": 0.2, "Bán lẻ": 0.2, "Công nghệ": 0.1, "Khác": 0.2}
+        fx_impact = 0
+        rate_impact = 0
+        for ma, info in dm.items():
+            gia_tt = info.get("gia_thi_truong", 0)
+            sl = info.get("so_luong", 0)
+            if gia_tt <= 0 or sl <= 0: continue
+            ki = kpi.get(ma, {})
+            ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+            sens = NH_SENSITIVITY.get(ng, 0.2)
+            w = (gia_tt * sl) / tong_gt if tong_gt > 0 else 0
+            fx_impact += w * sens * 0.02
+            rate_impact += w * sens * 0.05
+        fc1, fc2, fc3 = st.columns(3)
+        fc1.metric("💵 Tỷ giá +2% → DM", f"{fx_impact*100:+.2f}%", help="VNĐ mất giá 2% so với USD")
+        fc2.metric("📈 Lãi suất +1% → DM", f"{-rate_impact*100:+.2f}%", help="NHNN tăng lãi suất 1%")
+        fc3.metric("🏭 Ngành nhạy cảm nhất", max(NH_SENSITIVITY, key=NH_SENSITIVITY.get))
+        st.caption("💡 Ngân hàng & BĐS nhạy cảm nhất với lãi suất. Xuất khẩu nhạy cảm với tỷ giá. Công nghệ ít bị ảnh hưởng.")
+
+        st.write("---")
+        st.write("## 🆚 So sánh với VN30 / HNX-Index")
+        if has_real and 'dm_equity' in dir():
+            vn30_ret = ((vn_equity[-1] / vn_equity[0]) - 1) * 100 if len(vn_equity) > 0 else 0
+            dm_ret = ((dm_equity[-1] / dm_equity[0]) - 1) * 100 if len(dm_equity) > 0 else 0
+            cmp1, cmp2, cmp3, cmp4 = st.columns(4)
+            cmp1.metric("📈 DM của anh", f"{dm_ret:+.2f}%")
+            cmp2.metric(f"📊 {vn30_label or 'VN30'}", f"{vn30_ret:+.2f}%")
+            cmp3.metric("🏆 Outperformance", f"{dm_ret - vn30_ret:+.2f}%")
+            cmp4.metric("📊 Số mã DM", f"{n_ma} mã")
+            st.caption(f"💡 VN30 = top 30 mã vốn hóa lớn nhất HOSE. DM {n_ma} mã {'vượt' if dm_ret > vn30_ret else 'thua'} VN30 {abs(dm_ret - vn30_ret):.2f}%.")
+
+        st.write("---")
+        st.write("## 📜 Lịch sử giao dịch & Thuế phí")
+        tx_rows = []
+        phi_mua = 0.0015
+        thue_tncn = 0.001
+        total_phi = 0
+        for ma, info in dm.items():
+            gia_von = info.get("gia_von", 0)
+            sl = info.get("so_luong", 0)
+            ngay_mua = info.get("ngay_mua", "—")
+            if gia_von <= 0 or sl <= 0: continue
+            v_mua = gia_von * sl
+            phi = v_mua * phi_mua
+            total_phi += phi
+            tx_rows.append({"Mã": ma, "SL": f"{sl:,.0f}", "Giá vốn": f"{gia_von:,.0f}",
+                "GT mua": f"{v_mua:,.0f}", "Phí mua (0.15%)": f"{phi:,.0f}",
+                "Ngày mua": ngay_mua})
+        if tx_rows:
+            df_tx = pd.DataFrame(tx_rows)
+            st.dataframe(df_tx, use_container_width=True, hide_index=True)
+            tx1, tx2, tx3 = st.columns(3)
+            tx1.metric("💸 Tổng phí mua", f"{total_phi:,.0f} ₫")
+            tx2.metric("📊 Phí TB/mã", f"{total_phi/max(len(tx_rows),1):,.0f} ₫")
+            thue_ban = tong_lai_lo * thue_tncn if tong_lai_lo > 0 else 0
+            tx3.metric("💰 Thuế TNCN (nếu bán)", f"{thue_ban:,.0f} ₫", help="0.1% trên lãi (thuế chuyển nhượng CK)")
+            st.caption("💡 Phí mua = 0.15% (HOSE). Thuế TNCN = 0.1% trên lãi (nếu bán có lãi). Phí bán = 0.15% + 0.1% thuế.")
 
         st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
