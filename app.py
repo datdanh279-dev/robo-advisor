@@ -1490,7 +1490,7 @@ def _render_tonghop():
         st.markdown("### 🛠️ Bộ Công Cụ Nâng Cao")
         st.markdown("Các tính năng bổ sung: Watchlist, Cảnh báo giá, Biểu đồ kỹ thuật, So sánh cổ phiếu, Xuất PDF.")
         st.markdown("---")
-        sub_alert, sub_chart, sub_watch, sub_compare, sub_pdf, sub_news, sub_event, sub_profile = st.tabs([
+        sub_alert, sub_chart, sub_watch, sub_compare, sub_pdf, sub_news, sub_event, sub_profile, sub_backtest, sub_ai, sub_optim = st.tabs([
             "🔔 Cảnh báo giá",
             "📊 Biểu đồ kỹ thuật",
             "💼 Watchlist",
@@ -1499,6 +1499,9 @@ def _render_tonghop():
             "📰 Tin tức",
             "📅 Sự kiện",
             "👤 Hồ sơ",
+            "🧪 Backtest",
+            "🤖 AI dự đoán",
+            "🎯 Tối ưu DM",
         ])
 
         with sub_alert:
@@ -1835,6 +1838,207 @@ def _render_tonghop():
                             "ngay_sinh": "Ngày sinh", "nghe_nghiep": "Nghề nghiệp", "muc_tieu": "Mục tiêu"
                         }
                         st.markdown(f"- **{label_map.get(k, k)}:** {v}")
+
+        with sub_backtest:
+            st.markdown("#### 🧪 Backtest chiến lược")
+            st.caption("⚠️ Dùng dữ liệu synthetic (252 ngày) — chỉ để minh họa logic, KHÔNG phải dự đoán thật.")
+            cp_vn_bt = sorted(DOCS.get("co_phieu_vn", {}).keys())
+            ma_bt = st.selectbox("Mã CP", options=cp_vn_bt, key="bt_ma")
+            chien_luoc = st.selectbox("Chiến lược", [
+                "MA Crossover (MA20 > MA50 → Mua)",
+                "RSI Mean Reversion (RSI<30 Mua, RSI>70 Bán)",
+                "Buy & Hold (mua giữ)",
+            ], key="bt_chien_luoc")
+            von_bd = st.number_input("Vốn ban đầu (₫)", value=100_000_000, step=10_000_000, key="bt_von")
+            n_days_bt = st.slider("Số ngày test", 60, 504, 252, key="bt_n")
+            if st.button("▶️ Chạy backtest", use_container_width=True, key="bt_run"):
+                try:
+                    info = DOCS.get("co_phieu_vn", {}).get(ma_bt, {})
+                    gia_goc = info.get("gia", 50000)
+                    np.random.seed(hash(ma_bt) % 2**32)
+                    ret = np.random.randn(n_days_bt) * 0.015
+                    prices = gia_goc * np.exp(np.cumsum(ret))
+                    df_bt = pd.DataFrame({"price": prices})
+                    df_bt["MA20"] = df_bt["price"].rolling(20).mean()
+                    df_bt["MA50"] = df_bt["price"].rolling(50).mean()
+                    delta = df_bt["price"].diff()
+                    gain = delta.where(delta > 0, 0).rolling(14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                    rs = gain / loss.replace(0, 1e-9)
+                    df_bt["RSI"] = 100 - (100 / (1 + rs))
+                    cash = von_bd
+                    holdings = 0
+                    trades = []
+                    in_pos = False
+                    for i in range(50, len(df_bt)):
+                        p = df_bt["price"].iloc[i]
+                        signal = False
+                        sell = False
+                        if chien_luoc.startswith("MA Crossover"):
+                            if not in_pos and df_bt["MA20"].iloc[i] > df_bt["MA50"].iloc[i] and df_bt["MA20"].iloc[i-1] <= df_bt["MA50"].iloc[i-1]:
+                                signal = True
+                            elif in_pos and df_bt["MA20"].iloc[i] < df_bt["MA50"].iloc[i] and df_bt["MA20"].iloc[i-1] >= df_bt["MA50"].iloc[i-1]:
+                                sell = True
+                        elif chien_luoc.startswith("RSI"):
+                            if not in_pos and df_bt["RSI"].iloc[i] < 30:
+                                signal = True
+                            elif in_pos and df_bt["RSI"].iloc[i] > 70:
+                                sell = True
+                        if signal and cash > 0:
+                            holdings = cash / p
+                            cash = 0
+                            trades.append({"ngay": i, "loai": "MUA", "gia": p})
+                            in_pos = True
+                        elif sell and holdings > 0:
+                            cash = holdings * p
+                            holdings = 0
+                            trades.append({"ngay": i, "loai": "BÁN", "gia": p})
+                            in_pos = False
+                    if holdings > 0:
+                        cash = holdings * df_bt["price"].iloc[-1]
+                    if chien_luoc.startswith("Buy & Hold"):
+                        final_value = von_bt_calc = von_bd * (prices[-1] / prices[0])
+                    else:
+                        final_value = cash
+                    buy_hold = von_bd * (prices[-1] / prices[0])
+                    ret_strat = (final_value - von_bd) / von_bd * 100
+                    ret_bh = (buy_hold - von_bd) / von_bd * 100
+                    n_trades = len(trades) // 2 if chien_luoc != "Buy & Hold" else 1
+                    win_trades = sum(1 for t in range(0, len(trades)-1, 2) if trades[t+1]["gia"] > trades[t]["gia"]) if len(trades) >= 2 else 0
+                    win_rate = (win_trades / n_trades * 100) if n_trades > 0 else 0
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("Vốn cuối", f"{final_value:,.0f}₫", delta=f"{ret_strat:+.1f}%")
+                    c2.metric("Buy & Hold", f"{buy_hold:,.0f}₫", delta=f"{ret_bh:+.1f}%")
+                    c3.metric("Số lệnh", f"{n_trades}")
+                    c4.metric("Win rate", f"{win_rate:.0f}%")
+                    fig_bt = go.Figure()
+                    fig_bt.add_trace(go.Scatter(y=prices, mode="lines", name="Giá", line=dict(color="#ECE8E1", width=1)))
+                    if chien_luoc.startswith("MA"):
+                        fig_bt.add_trace(go.Scatter(y=df_bt["MA20"], mode="lines", name="MA 20", line=dict(color="#FFD700", width=1)))
+                        fig_bt.add_trace(go.Scatter(y=df_bt["MA50"], mode="lines", name="MA 50", line=dict(color="#2196F3", width=1)))
+                    buy_x = [t["ngay"] for t in trades if t["loai"] == "MUA"]
+                    buy_y = [t["gia"] for t in trades if t["loai"] == "MUA"]
+                    sell_x = [t["ngay"] for t in trades if t["loai"] == "BÁN"]
+                    sell_y = [t["gia"] for t in trades if t["loai"] == "BÁN"]
+                    fig_bt.add_trace(go.Scatter(x=buy_x, y=buy_y, mode="markers", name="Mua", marker=dict(color="#4CAF50", size=10, symbol="triangle-up")))
+                    fig_bt.add_trace(go.Scatter(x=sell_x, y=sell_y, mode="markers", name="Bán", marker=dict(color="#F44336", size=10, symbol="triangle-down")))
+                    fig_bt.update_layout(height=400, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                    st.plotly_chart(fig_bt, use_container_width=True)
+                    if ret_strat > ret_bh:
+                        st.success(f"🏆 Chiến lược **{chien_luoc}** thắng Buy & Hold: {ret_strat - ret_bh:+.1f}%")
+                    else:
+                        st.info(f"ℹ️ Buy & Hold thắng chiến lược: {ret_bh - ret_strat:+.1f}%")
+                except Exception as e:
+                    st.error(f"❌ Lỗi backtest: {e}")
+                    import traceback as _tb
+                    with st.expander("Chi tiết"):
+                        st.code(_tb.format_exc())
+
+        with sub_ai:
+            st.markdown("#### 🤖 AI dự đoán giá (Linear Regression)")
+            st.caption("⚠️ Dự đoán minh họa dùng sklearn LinearRegression trên dữ liệu synthetic.")
+            cp_vn_ai = sorted(DOCS.get("co_phieu_vn", {}).keys())
+            ma_ai = st.selectbox("Mã CP", options=cp_vn_ai, key="ai_ma")
+            n_days_pred = st.slider("Số ngày dự đoán tương lai", 7, 60, 30, key="ai_n")
+            n_days_hist = st.slider("Số ngày lịch sử (train)", 60, 504, 252, key="ai_hist")
+            if st.button("🔮 Dự đoán", use_container_width=True, key="ai_run"):
+                try:
+                    from sklearn.linear_model import LinearRegression
+                    info = DOCS.get("co_phieu_vn", {}).get(ma_ai, {})
+                    gia_goc = info.get("gia", 50000)
+                    np.random.seed(hash(ma_ai) % 2**32)
+                    trend = 0.0005
+                    ret = np.random.randn(n_days_hist + n_days_pred) * 0.015 + trend
+                    all_prices = gia_goc * np.exp(np.cumsum(ret))
+                    hist = all_prices[:n_days_hist]
+                    X = np.arange(n_days_hist).reshape(-1, 1)
+                    y = hist
+                    model = LinearRegression()
+                    model.fit(X, y)
+                    X_future = np.arange(n_days_hist, n_days_hist + n_days_pred).reshape(-1, 1)
+                    y_pred = model.predict(X_future)
+                    y_train_pred = model.predict(X)
+                    r2 = model.score(X, y)
+                    last_real = hist[-1]
+                    last_pred = y_pred[-1]
+                    pct_change = (last_pred - last_real) / last_real * 100
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Giá hiện tại", f"{last_real:,.0f}₫")
+                    c2.metric(f"Dự đoán {n_days_pred} ngày", f"{last_pred:,.0f}₫", delta=f"{pct_change:+.1f}%")
+                    c3.metric("R² (train)", f"{r2:.3f}")
+                    fig_ai = go.Figure()
+                    fig_ai.add_trace(go.Scatter(y=hist, mode="lines", name="Lịch sử (thật)", line=dict(color="#ECE8E1", width=1.5)))
+                    fig_ai.add_trace(go.Scatter(x=np.arange(n_days_hist), y=y_train_pred, mode="lines", name="Fit (train)", line=dict(color="#FFD700", width=1, dash="dot")))
+                    fig_ai.add_trace(go.Scatter(x=np.arange(n_days_hist, n_days_hist + n_days_pred), y=y_pred, mode="lines+markers", name="Dự đoán", line=dict(color="#FF9800", width=2)))
+                    if pct_change > 5:
+                        st.success(f"📈 Xu hướng TĂNG: dự đoán +{pct_change:.1f}% sau {n_days_pred} ngày")
+                    elif pct_change < -5:
+                        st.error(f"📉 Xu hướng GIẢM: dự đoán {pct_change:.1f}% sau {n_days_pred} ngày")
+                    else:
+                        st.info(f"➡️ Xu hướng đi ngang: {pct_change:+.1f}%")
+                    st.plotly_chart(fig_ai, use_container_width=True)
+                    st.warning("⚠️ LinearRegression là model ĐƠN GIẢN. Kết quả chỉ minh họa, KHÔNG dùng để quyết định đầu tư thật.")
+                except Exception as e:
+                    st.error(f"❌ Lỗi: {e}")
+                    import traceback as _tb
+                    with st.expander("Chi tiết"):
+                        st.code(_tb.format_exc())
+
+        with sub_optim:
+            st.markdown("#### 🎯 Tối ưu danh mục (Markowitz)")
+            st.caption("⚠️ Tối ưu trên dữ liệu synthetic — minh họa Markowitz mean-variance, KHÔNG dùng để đầu tư thật.")
+            cp_vn_op = sorted(DOCS.get("co_phieu_vn", {}).keys())
+            ds_chon_op = st.multiselect("Chọn 2-8 mã CP", options=cp_vn_op, default=cp_vn_op[:5] if len(cp_vn_op) >= 5 else cp_vn_op, key="op_chon")
+            rf = st.number_input("Lãi suất phi rủi ro (%/năm)", value=5.0, step=0.5, key="op_rf") / 100
+            n_sim = st.slider("Số portfolio thử (Monte Carlo)", 1000, 10000, 3000, step=500, key="op_n")
+            if st.button("🎯 Tối ưu", use_container_width=True, key="op_run") and len(ds_chon_op) >= 2:
+                try:
+                    from scipy.optimize import minimize
+                    np.random.seed(42)
+                    n_assets = len(ds_chon_op)
+                    mean_returns = np.random.uniform(0.05, 0.25, n_assets)
+                    cov = np.random.uniform(0.005, 0.04, (n_assets, n_assets))
+                    cov = (cov + cov.T) / 2
+                    np.fill_diagonal(cov, np.random.uniform(0.02, 0.06, n_assets))
+                    def neg_sharpe(w):
+                        port_ret = np.dot(w, mean_returns)
+                        port_vol = np.sqrt(np.dot(w.T, np.dot(cov, w)))
+                        return -(port_ret - rf) / port_vol if port_vol > 0 else 0
+                    cons = [{"type": "eq", "fun": lambda w: np.sum(w) - 1}]
+                    bounds = tuple((0, 1) for _ in range(n_assets))
+                    w0 = np.ones(n_assets) / n_assets
+                    res = minimize(neg_sharpe, w0, method="SLSQP", bounds=bounds, constraints=cons)
+                    w_opt = res.x
+                    ret_opt = np.dot(w_opt, mean_returns)
+                    vol_opt = np.sqrt(np.dot(w_opt.T, np.dot(cov, w_opt)))
+                    sharpe_opt = (ret_opt - rf) / vol_opt if vol_opt > 0 else 0
+                    st.markdown("##### Trọng số tối ưu (max Sharpe ratio)")
+                    fig_pie = go.Figure(data=[go.Pie(labels=ds_chon_op, values=w_opt, hole=0.4, marker=dict(colors=["#FFD700", "#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#F44336", "#00BCD4", "#795548"][:n_assets]))])
+                    fig_pie.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Return kỳ vọng", f"{ret_opt*100:.1f}%")
+                    c2.metric("Volatility", f"{vol_opt*100:.1f}%")
+                    c3.metric("Sharpe ratio", f"{sharpe_opt:.2f}")
+                    st.markdown("---")
+                    st.markdown(f"##### 🎲 Efficient Frontier (Monte Carlo {n_sim:,} portfolios)")
+                    n_port = n_sim
+                    weights_rand = np.random.dirichlet(np.ones(n_assets), n_port)
+                    port_rets = weights_rand @ mean_returns
+                    port_vols = np.sqrt(np.einsum("ij,jk,ik->i", weights_rand, cov, weights_rand))
+                    port_sharpe = (port_rets - rf) / port_vols
+                    fig_ef = go.Figure()
+                    fig_ef.add_trace(go.Scatter(x=port_vols*100, y=port_rets*100, mode="markers", marker=dict(color=port_sharpe, colorscale="Viridis", showscale=True, size=5, colorbar=dict(title="Sharpe")), name="Random portfolios"))
+                    fig_ef.add_trace(go.Scatter(x=[vol_opt*100], y=[ret_opt*100], mode="markers", marker=dict(color="#FFD700", size=18, symbol="star"), name="TỐI ƯU"))
+                    fig_ef.update_layout(xaxis_title="Volatility (%)", yaxis_title="Return kỳ vọng (%)", height=450, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                    st.plotly_chart(fig_ef, use_container_width=True)
+                except Exception as e:
+                    st.error(f"❌ Lỗi tối ưu: {e}")
+                    import traceback as _tb
+                    with st.expander("Chi tiết"):
+                        st.code(_tb.format_exc())
+            elif len(ds_chon_op) < 2:
+                st.info("👉 Chọn ít nhất 2 mã CP để tối ưu.")
 
 if st.session_state.trang_thai == "home":
     st.session_state.trang_thai = "dashboard"
