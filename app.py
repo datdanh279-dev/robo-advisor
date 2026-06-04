@@ -3082,13 +3082,32 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 💥 Stress Test — Mô phỏng sốc thị trường")
-        stress_scenarios = [
-            ("📈 Tăng mạnh", +0.15, "Tin tốt bất ngờ, chính sách hỗ trợ"),
-            ("📊 Tăng nhẹ", +0.05, "Thị trường ổn định"),
-            ("⚠️ Giảm nhẹ", -0.10, "Điều chỉnh kỹ thuật"),
-            ("🔴 Sụt giảm", -0.20, "Khủng hoảng niềm tin"),
-            ("💀 Crash", -0.30, "Khủng hoảng toàn cầu (COVID-2020)"),
-        ]
+        if has_real and len(dm_equity) > 30:
+            ret_series = pd.Series(dm_equity).pct_change().dropna()
+            var_95_h = float(ret_series.quantile(0.05))
+            var_99_h = float(ret_series.quantile(0.01))
+            best_day = float(ret_series.max())
+            worst_day = float(ret_series.min())
+            rolling_max_h = pd.Series(dm_equity).cummax()
+            dd_h = ((pd.Series(dm_equity) - rolling_max_h) / rolling_max_h).dropna()
+            worst_dd_h = float(dd_h.min())
+            stress_scenarios = [
+                ("📈 Tăng mạnh", best_day, f"Ngày tốt nhất thực tế (6T)"),
+                ("📊 Tăng nhẹ", var_95_h * -0.5, f"~50% VaR 95% (ngày nhẹ)"),
+                ("⚠️ Giảm nhẹ", var_95_h, f"📊 VaR 95% lịch sử thật"),
+                ("🔴 Sụt giảm", var_99_h, f"📊 VaR 99% lịch sử thật"),
+                ("💀 Crash", worst_dd_h, f"📊 Max DD thực tế 6T"),
+            ]
+            stress_source = f"📊 Tính từ {len(ret_series)} phiên returns thật (yfinance 6T)"
+        else:
+            stress_scenarios = [
+                ("📈 Tăng mạnh", +0.15, "Tin tốt bất ngờ, chính sách hỗ trợ"),
+                ("📊 Tăng nhẹ", +0.05, "Thị trường ổn định"),
+                ("⚠️ Giảm nhẹ", -0.10, "Điều chỉnh kỹ thuật"),
+                ("🔴 Sụt giảm", -0.20, "Khủng hoảng niềm tin"),
+                ("💀 Crash", -0.30, "Khủng hoảng toàn cầu (COVID-2020)"),
+            ]
+            stress_source = "⚠️ Ước lượng cố định (yfinance tạm không khả dụng)"
         st_cols = st.columns(len(stress_scenarios))
         for i, (label, shock, mo_ta) in enumerate(stress_scenarios):
             val_sau = tong_gt * (1 + shock * port_beta)
@@ -3096,6 +3115,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             with st_cols[i]:
                 st.metric(label, f"{val_sau:,.0f} ₫", f"{pnl_sau:+,.0f} ₫", delta_color="inverse" if shock < 0 else "normal")
                 st.caption(f"{mo_ta}\nGiả định: β×{shock*100:+.0f}%")
+        st.caption(stress_source)
 
         st.write("---")
         st.write("## 💰 Đóng góp lợi nhuận từng mã (Contribution)")
