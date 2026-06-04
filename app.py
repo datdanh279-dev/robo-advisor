@@ -2837,6 +2837,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         vn_bond_close = _fetch_vn_bond_yield()
         port_beta = sum(betas)
         port_return = rp
+        dm_equity = None
         if has_real and len(real_prices) >= 2:
             try:
                 common_dates = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
@@ -2847,6 +2848,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                             shares = dm[ma].get("so_luong", 0)
                             aligned = prices.reindex(common_dates).ffill().bfill()
                             dm_value_ts += aligned.astype(float) * shares
+                    dm_equity = dm_value_ts.values
                     daily_ret_real = dm_value_ts.pct_change().dropna()
                     if len(daily_ret_real) > 20:
                         vol_proxy = float(daily_ret_real.std() * (252 ** 0.5))
@@ -3130,7 +3132,7 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 💥 Stress Test — Mô phỏng sốc thị trường")
-        if has_real and len(dm_equity) > 30:
+        if has_real and dm_equity is not None and len(dm_equity) > 30:
             ret_series = pd.Series(dm_equity).pct_change().dropna()
             var_95_h = float(ret_series.quantile(0.05))
             var_99_h = float(ret_series.quantile(0.01))
