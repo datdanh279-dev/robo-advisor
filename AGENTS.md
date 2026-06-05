@@ -83,3 +83,38 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - Mỗi chuỗi kỳ lạ ("103,710", "16.8%", "lặp 4 lần", …) phải tìm được trong code thật bằng `grep`/`rg` trước khi fix.
 - Ví dụ đã gặp: AI phân tích bảo "tổng lãi/lỗ 103,710₫ return 16.8%" nhưng `grep` toàn project → **0 match**. Số thật là 10.230.000₫ từ `tinh_return_danh_muc` ở `backend/danh_muc_metrics.py:4`.
 - Ví dụ đã gặp: AI bảo "Hội đồng 6 Chuyên gia" lặp 4 lần nhưng `grep "Hội đồng 6"` → **đúng 1 match** ở `app.py:1876`. 6 expert chips riêng là render riêng, không chứa title.
+
+## 100% Số thật — cam kết từ 2026-06-05
+
+**Nguyên tắc:** KHÔNG hiển thị số ước lượng, tất cả số liệu từ yfinance/API thật.
+
+**Số thật 100% — KHÔNG còn fallback ước lượng cứng:**
+- ✅ SECTOR_DEFAULTS_FALLBACK → auto-fetch từ yfinance cho 13 ngành, ~30 mã đại diện (VCB, BID, CTG, FPT, HPG, VNM, MSN, MWG, PNJ, VIC, VHM, NVL, KDH, SSI, VCI, PLX, GAS, POW, GVR, BVH…)
+- ✅ vol_proxy=0.18 (xóa) → `_estimate_dm_vol_from_sector()` tính từ vol thật 3 tháng của từng mã trong DM, weighted theo tỷ trọng
+- ✅ max_pe Stock Screener (wire) → auto-fetch P/E từ yfinance.info cho 50 mã
+- ✅ Backtest vol = 0.015 (cũ) → fetch daily_vol thật từ yfinance 6 tháng
+- ✅ AI Predict = synthetic (cũ) → dùng giá thật 1 năm từ yfinance chart API
+- ✅ Footer timestamp `datetime.now()` → `st.session_state._footer_ts` (ổn định, fix removeChild bug)
+
+**Real-data features (KHÔNG TRÙNG, 79+ sections):**
+- Phase 1: 12 chỉ số rủi ro, KT, Pie ngành, Backtest, Monte Carlo, Efficient Frontier, Brinson, Active Share, Q-Q Plot, RoMaD, CAPM, Brinson…
+- Phase 2 (50 mã toàn thị trường): Top Movers, Volume Leaders, Stock Screener, Sector Heatmap, Market Valuation, Dividend Champions, Volume Distribution, Market Breadth, 52W High/Low, RSI Heatmap, Volatility Ranking, Market Cap Distribution, Avg Daily Range
+- Phase 3 (thêm mới): Real Money Flow, Sector P/E Benchmark, Insider & Institutional Holdings, Earnings Calendar, **Sector Rotation Matrix (1W/1M/3M/6M/1Y)**, **Earnings Yield vs Bond Yield**, **Currency Strength (8 cặp)**, **Market Heat Index**
+
+**Chat thông minh (6 intent mới, dùng real-data từ context):**
+- "Phân tích DM của tôi" → real-time từ st.session_state.dm
+- "Mã nào đang tăng/giảm" → từ 50-mã market scan thật
+- "Vol đột biến" → real vol_ratio từ yfinance
+- "Phân bổ X triệu" → theo risk_profile thật (Bảo thủ/TB/Tích cực)
+- "Cổ tức tốt" → từ co_phieu_vn.json data
+- "Có nên mua mã nào" → scoring algorithm (blue-chip + vol + ổn định + chưa có trong DM)
+
+**File `_build_chat_context()` ở app.py:111** tổng hợp context (dm, kpi, market_data, risk_profile, real_prices) từ session_state. `tim_cau_tra_loi()` ở backend/chat_advisor.py:1186 xử lý intent trước khi gọi AI advisor.
+
+**Fix lỗi đã làm:**
+- ✅ `NameError df_mkt` (cb94103) — định nghĩa `df_mkt = pd.DataFrame()` ngay cả khi market_data rỗng
+- ✅ `AttributeError px.scatter` (7c0782a) — clip Vốn hóa >=0.1
+- ✅ `NameError dm_equity` (f340e88) — tính sớm sau khi fetch real_prices
+- ✅ 6 Chuyên gia asyncio + ThreadPoolExecutor (654cfaa)
+- ✅ NaN checks cho 52W/RSI/Vol/Range (5822942) — `pd.notna()`, `min(len())`, skip delisted
+- ✅ removeChild footer timestamp → session_state cached
