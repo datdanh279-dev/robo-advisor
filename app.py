@@ -6124,6 +6124,295 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần dữ liệu thị trường.")
 
         st.write("---")
+        st.write("## 🔬 TOP 20 DEEP DIVE — Phân tích chuyên sâu 20 mã vốn hóa lớn nhất")
+        if market_data and len(market_data) >= 5:
+            top20 = sorted([d for d in market_data if d.get("von_hoa", 0) > 0],
+                          key=lambda d: -d["von_hoa"])[:20]
+            with st.spinner(f"📡 Tải đầy đủ P/E, P/B, ROE, beta, EPS cho {len(top20)} mã..."):
+                deep_data = []
+                for d in top20:
+                    ma = d["ma"]
+                    try:
+                        import yfinance as _yf_dd
+                        info = _yf_dd.Ticker(ma + ".VN").info
+                        pe = info.get("trailingPE")
+                        pb = info.get("priceToBook")
+                        roe = info.get("returnOnEquity")
+                        beta = info.get("beta")
+                        eps = info.get("trailingEps")
+                        div_yield = info.get("dividendYield")
+                        inst = info.get("heldPercentInstitutions")
+                        rec = {
+                            "ma": ma,
+                            "ten": d.get("ten", ma)[:25],
+                            "nganh": d.get("nganh", "Khác"),
+                            "gia": d.get("gia", 0),
+                            "von_hoa_ty": d.get("von_hoa", 0) / 1e9,
+                            "pe": pe if pe and 0 < pe < 200 else None,
+                            "pb": pb if pb and 0 < pb < 50 else None,
+                            "roe_pct": roe * 100 if roe and -0.5 < roe < 0.5 else None,
+                            "beta": beta if beta and 0 < beta < 3 else None,
+                            "eps": eps if eps and eps > 0 else None,
+                            "div_yield_pct": div_yield * 100 if div_yield and 0 <= div_yield < 0.3 else None,
+                            "inst_pct": inst * 100 if inst and 0 <= inst < 1 else None,
+                            "thay_doi": d.get("thay_doi", 0),
+                            "ret_3m": d.get("ret_3m", 0),
+                        }
+                        deep_data.append(rec)
+                    except Exception:
+                        deep_data.append({
+                            "ma": ma, "ten": d.get("ten", ma)[:25], "nganh": d.get("nganh", "Khác"),
+                            "gia": d.get("gia", 0), "von_hoa_ty": d.get("von_hoa", 0) / 1e9,
+                            "pe": None, "pb": None, "roe_pct": None, "beta": None, "eps": None,
+                            "div_yield_pct": None, "inst_pct": None,
+                            "thay_doi": d.get("thay_doi", 0), "ret_3m": d.get("ret_3m", 0),
+                        })
+            if deep_data:
+                df_dd = pd.DataFrame(deep_data)
+                st.write(f"**📊 Deep Dive {len(df_dd)} mã top vốn hóa:**")
+                display_cols = ["ma", "ten", "nganh", "gia", "von_hoa_ty", "pe", "pb",
+                              "roe_pct", "beta", "div_yield_pct", "inst_pct", "thay_doi", "ret_3m"]
+                st.dataframe(df_dd[display_cols].round(2),
+                    use_container_width=True, hide_index=True,
+                    column_config={
+                        "von_hoa_ty": st.column_config.NumberColumn("Vốn hóa (tỷ)", format="%.0f"),
+                        "pe": st.column_config.NumberColumn("P/E", format="%.1f"),
+                        "pb": st.column_config.NumberColumn("P/B", format="%.2f"),
+                        "roe_pct": st.column_config.NumberColumn("ROE %", format="%.1f"),
+                        "beta": st.column_config.NumberColumn("Beta", format="%.2f"),
+                        "div_yield_pct": st.column_config.NumberColumn("Div Yield %", format="%.2f"),
+                        "inst_pct": st.column_config.NumberColumn("Foreign %", format="%.1f"),
+                        "thay_doi": st.column_config.NumberColumn("% hôm nay", format="%+.2f"),
+                        "ret_3m": st.column_config.NumberColumn("Return 3M %", format="%+.1f"),
+                    })
+                st.caption(f"📊 Đầy đủ metrics cho {len(df_dd)} mã top vốn hóa từ yfinance.info: P/E, P/B, ROE, beta, EPS, dividend yield, foreign ownership %, % thay đổi, return 3M.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 🧮 MULTI-FACTOR SCORING — Xếp hạng 50 mã theo nhiều yếu tố")
+        if market_data and len(market_data) >= 5:
+            with st.spinner("📡 Tính composite score cho 50 mã..."):
+                score_data = []
+                for d in market_data:
+                    ma = d["ma"]
+                    try:
+                        import yfinance as _yf_sc
+                        info = _yf_sc.Ticker(ma + ".VN").info
+                        pe = info.get("trailingPE")
+                        roe = info.get("returnOnEquity")
+                        dy = info.get("dividendYield")
+                        inst = info.get("heldPercentInstitutions")
+                        pe_s = 0
+                        roe_s = 0
+                        dy_s = 0
+                        inst_s = 0
+                        mom_s = 0
+                        qual_s = 0
+                        if pe and 0 < pe < 200:
+                            pe_s = max(0, 100 - pe * 2)
+                        if roe and -0.5 < roe < 0.5:
+                            roe_s = min(100, max(0, roe * 100 * 3))
+                        if dy and 0 <= dy < 0.3:
+                            dy_s = min(100, dy * 1000)
+                        if inst and 0 <= inst < 1:
+                            inst_s = inst * 100
+                        ret_3m = d.get("ret_3m", 0) or 0
+                        mom_s = max(0, min(100, 50 + ret_3m * 1.5))
+                        von_hoa = d.get("von_hoa", 0) or 0
+                        if von_hoa > 1e12:
+                            qual_s = 30
+                        elif von_hoa > 1e11:
+                            qual_s = 20
+                        elif von_hoa > 1e10:
+                            qual_s = 10
+                        composite = (pe_s * 0.20 + roe_s * 0.25 + dy_s * 0.10 +
+                                   inst_s * 0.10 + mom_s * 0.15 + qual_s * 0.20)
+                        score_data.append({
+                            "ma": ma, "ten": d.get("ten", ma)[:25],
+                            "value_s": pe_s, "quality_s": roe_s, "div_s": dy_s,
+                            "foreign_s": inst_s, "momentum_s": mom_s, "size_s": qual_s,
+                            "composite": composite,
+                            "pe": pe, "roe": roe * 100 if roe else 0,
+                            "von_hoa_ty": von_hoa / 1e9
+                        })
+                    except Exception:
+                        continue
+            if score_data:
+                df_sc = pd.DataFrame(score_data).sort_values("composite", ascending=False)
+                st.write(f"**🏆 Top 10 mã COMPOSITE SCORE cao nhất (tốt nhất đầu tư):**")
+                top10 = df_sc.head(10)[["ma", "ten", "composite", "pe", "roe", "von_hoa_ty"]].round(2)
+                st.dataframe(top10, use_container_width=True, hide_index=True,
+                    column_config={
+                        "composite": st.column_config.ProgressColumn("Score (0-100)", min_value=0, max_value=100, format="%.1f"),
+                        "pe": st.column_config.NumberColumn("P/E", format="%.1f"),
+                        "roe": st.column_config.NumberColumn("ROE %", format="%.1f"),
+                        "von_hoa_ty": st.column_config.NumberColumn("Vốn hóa (tỷ)", format="%.0f"),
+                    })
+                st.write(f"**📉 Bottom 10 mã COMPOSITE SCORE thấp nhất (cần cẩn thận):**")
+                bot10 = df_sc.tail(10)[["ma", "ten", "composite", "pe", "roe", "von_hoa_ty"]].round(2)
+                st.dataframe(bot10, use_container_width=True, hide_index=True)
+                fig_score = go.Figure()
+                fig_score.add_trace(go.Bar(
+                    x=df_sc["ma"], y=df_sc["composite"],
+                    marker_color=['#4CAF50' if s > 60 else ('#FFD700' if s > 40 else '#F44336') for s in df_sc["composite"]],
+                    name='Composite Score'
+                ))
+                fig_score.update_layout(title="Composite Score cho 50 mã VN (0-100)",
+                    xaxis_title="Mã CP", yaxis_title="Score",
+                    height=400, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_score, use_container_width=True)
+                avg_score = float(df_sc["composite"].mean())
+                st.caption(f"📊 Composite = Value(20%) + Quality(25%) + Dividend(10%) + Foreign(10%) + Momentum(15%) + Size(20%). Score TB toàn thị trường: {avg_score:.1f}/100. Tính từ {len(df_sc)} mã có đủ data từ yfinance.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 🔗 50-STOCK CORRELATION MATRIX — Ma trận tương quan 50 mã")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=1800)
+            def _compute_50_corr(symbols):
+                import requests as _rq_c
+                prices_dict = {}
+                for s in symbols:
+                    try:
+                        r = _rq_c.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=3mo&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            d = r.json()
+                            cs = d.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            valid = [c for c in cs if c]
+                            if len(valid) > 30:
+                                prices_dict[s] = pd.Series(valid)
+                    except Exception:
+                        continue
+                if len(prices_dict) < 3:
+                    return None
+                df_p = pd.DataFrame(prices_dict)
+                ret = df_p.pct_change().dropna()
+                if len(ret) < 10:
+                    return None
+                return ret.corr()
+            with st.spinner(f"📡 Tính correlation 3T cho {len(market_data)} mã..."):
+                corr = _compute_50_corr(tuple([d["ma"] for d in market_data]))
+            if corr is not None and not corr.empty:
+                st.write(f"**🔗 Ma trận tương quan {len(corr.columns)}×{len(corr.columns)} mã VN (3 tháng):**")
+                fig_corr = go.Figure(data=go.Heatmap(
+                    z=corr.values, x=corr.columns, y=corr.index,
+                    colorscale='RdBu_r', zmid=0, zmin=-1, zmax=1,
+                    colorbar=dict(title="Corr"),
+                    text=corr.round(2).values,
+                    texttemplate="%{text}",
+                    textfont={"size": 8}
+                ))
+                fig_corr.update_layout(title="Ma trận tương quan 50 mã VN (Pearson, 3T)",
+                    height=700, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_corr, use_container_width=True)
+                pairs = []
+                cols = corr.columns.tolist()
+                for i in range(len(cols)):
+                    for j in range(i+1, len(cols)):
+                        if cols[i] != cols[j]:
+                            pairs.append((cols[i], cols[j], float(corr.iloc[i, j])))
+                pairs.sort(key=lambda x: -abs(x[2]))
+                st.write("**🔥 Top 10 cặp tương quan CAO (cùng xu hướng mạnh):**")
+                st.dataframe(pd.DataFrame(pairs[:10], columns=["Mã 1", "Mã 2", "Correlation"]).round(3),
+                    use_container_width=True, hide_index=True)
+                st.write("**❄️ Top 10 cặp tương quan THẤP (phân tán tốt cho DM):**")
+                st.dataframe(pd.DataFrame(pairs[-10:], columns=["Mã 1", "Mã 2", "Correlation"]).round(3),
+                    use_container_width=True, hide_index=True)
+                st.caption(f"📊 Correlation = Pearson trên daily returns 3T. >0.7 = cùng xu hướng mạnh. <0.3 = phân tán tốt. Tính từ {len(corr.columns)} mã giá thật yfinance.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 📊 DISTRIBUTION ANALYSIS — Phân phối P/E, ROE, Vol 50 mã")
+        if market_data and len(market_data) >= 5:
+            with st.spinner("📡 Tải P/E, ROE, beta cho 50 mã..."):
+                dist_data = []
+                for d in market_data:
+                    ma = d["ma"]
+                    try:
+                        import yfinance as _yf_dist
+                        info = _yf_dist.Ticker(ma + ".VN").info
+                        pe = info.get("trailingPE")
+                        roe = info.get("returnOnEquity")
+                        beta = info.get("beta")
+                        if pe and 0 < pe < 200:
+                            dist_data.append({"ma": ma, "pe": float(pe),
+                                "roe": float(roe) * 100 if roe and -0.5 < roe < 0.5 else None,
+                                "beta": float(beta) if beta and 0 < beta < 3 else None})
+                    except Exception:
+                        continue
+            if dist_data:
+                df_dist = pd.DataFrame(dist_data)
+                fig_dist = make_subplots(rows=1, cols=3, subplot_titles=("Phân phối P/E", "Phân phối ROE %", "Phân phối Beta"))
+                fig_dist.add_trace(go.Histogram(x=df_dist["pe"].dropna(), nbinsx=20,
+                    marker_color='#2196F3', name='P/E', showlegend=False), row=1, col=1)
+                if "roe" in df_dist.columns:
+                    fig_dist.add_trace(go.Histogram(x=df_dist["roe"].dropna(), nbinsx=20,
+                        marker_color='#4CAF50', name='ROE', showlegend=False), row=1, col=2)
+                if "beta" in df_dist.columns:
+                    fig_dist.add_trace(go.Histogram(x=df_dist["beta"].dropna(), nbinsx=20,
+                        marker_color='#FF9800', name='Beta', showlegend=False), row=1, col=3)
+                fig_dist.update_layout(height=350, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_dist, use_container_width=True)
+                d1, d2, d3, d4, d5, d6 = st.columns(6)
+                d1.metric("📊 P/E Median", f"{df_dist['pe'].median():.1f}")
+                d2.metric("📊 P/E Mean", f"{df_dist['pe'].mean():.1f}")
+                d3.metric("📊 ROE Median", f"{df_dist['roe'].dropna().median():.1f}%" if df_dist['roe'].notna().any() else "N/A")
+                d4.metric("📊 ROE Mean", f"{df_dist['roe'].dropna().mean():.1f}%" if df_dist['roe'].notna().any() else "N/A")
+                d5.metric("📊 Beta Median", f"{df_dist['beta'].dropna().median():.2f}" if df_dist['beta'].notna().any() else "N/A")
+                d6.metric("📊 Beta Mean", f"{df_dist['beta'].dropna().mean():.2f}" if df_dist['beta'].notna().any() else "N/A")
+                st.caption(f"📊 Histogram phân phối P/E, ROE, Beta cho {len(df_dist)} mã VN từ yfinance.info. P/E median 12-15 = thị trường hợp lý. ROE median 12-15% = chất lượng tốt.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 🌐 CROSS-SECTOR COMPARISON — So sánh đa ngành (Boxplot)")
+        if market_data and len(market_data) >= 5:
+            with st.spinner("📡 Tải P/E, ROE, beta theo ngành..."):
+                cs_data = []
+                for d in market_data:
+                    ma = d["ma"]
+                    try:
+                        import yfinance as _yf_cs
+                        info = _yf_cs.Ticker(ma + ".VN").info
+                        pe = info.get("trailingPE")
+                        roe = info.get("returnOnEquity")
+                        beta = info.get("beta")
+                        if pe and 0 < pe < 200:
+                            cs_data.append({"nganh": d.get("nganh", "Khác"),
+                                "pe": float(pe),
+                                "roe": float(roe) * 100 if roe and -0.5 < roe < 0.5 else None,
+                                "beta": float(beta) if beta and 0 < beta < 3 else None,
+                                "ret_3m": d.get("ret_3m", 0)})
+                    except Exception:
+                        continue
+            if cs_data:
+                df_cs = pd.DataFrame(cs_data)
+                fig_cs = make_subplots(rows=1, cols=3, subplot_titles=("P/E theo ngành", "ROE % theo ngành", "Return 3M theo ngành"))
+                if "pe" in df_cs.columns:
+                    for ng in df_cs["nganh"].unique():
+                        d_ng = df_cs[df_cs["nganh"] == ng]
+                        fig_cs.add_trace(go.Box(y=d_ng["pe"], name=ng, boxpoints="outliers", showlegend=False), row=1, col=1)
+                if "roe" in df_cs.columns and df_cs["roe"].notna().any():
+                    for ng in df_cs["nganh"].unique():
+                        d_ng = df_cs[df_cs["nganh"] == ng]
+                        d_ng = d_ng[d_ng["roe"].notna()]
+                        if len(d_ng) > 0:
+                            fig_cs.add_trace(go.Box(y=d_ng["roe"], name=ng, boxpoints="outliers", showlegend=False), row=1, col=2)
+                if "ret_3m" in df_cs.columns:
+                    for ng in df_cs["nganh"].unique():
+                        d_ng = df_cs[df_cs["nganh"] == ng]
+                        fig_cs.add_trace(go.Box(y=d_ng["ret_3m"], name=ng, boxpoints="outliers", showlegend=False), row=1, col=3)
+                fig_cs.update_layout(height=450, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_cs, use_container_width=True)
+                st.caption(f"📊 Boxplot P/E, ROE, Return 3M theo ngành từ {len(df_cs)} mã. Box rộng = variance lớn trong ngành. Dot outlier = mã đặc biệt.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
         if is_demo:
             st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
