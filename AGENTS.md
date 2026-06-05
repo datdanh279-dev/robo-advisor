@@ -134,12 +134,14 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - **Bond Yield 7584%**: `_fetch_vn_bond_yield` fallback `^GSPC` (S&P 500 ~5000 USD) → tính nhầm thành 5000%. Fix: bỏ `^GSPC`, chỉ giữ `^VN10Y/VN10Y=X/VNI10Y=X`. Validate `0<bv<1 → ×100`, `1≤bv<50 → giữ nguyên`, else 0. ERP chỉ tính khi `0<bond_yield<30`.
 - **CAPM Regression** (line 4529) + **Brinson Attribution** (line 5161): cùng bug `set(pd.Series(dm_equity).index) & set(vn30_close.index)` empty (int vs datetime). Fix: tạo `_dm_capm_series` / `_dm_br_series` từ `common_dates` thật.
 
-**Phase 7 (commit `9b22c98`) — DEEP ANALYSIS 384 MÃ toàn thị trường:**
-- Section mới "🌐 DEEP ANALYSIS 384 MÃ" (sau Deep Dive 20 mã, trước Correlation Matrix) gồm 4 sub-section:
+**Phase 7 (commit `9b22c98` + `b964057`) — DEEP ANALYSIS 384 MÃ toàn thị trường:**
+- Section mới "🌐 DEEP ANALYSIS 384 MÃ" (sau Deep Dive 20 mã, trước Correlation Matrix) gồm 6 sub-section:
   1. **📅 Calendar Returns Top 30**: fetch 6mo monthly data yfinance → Return 6M %
   2. **🌪️ Volatility Cone 384 mã**: phân phối Vol toàn thị trường, P10/P25/P50/P75/P90 + histogram
   3. **🧬 Higher Moments Top 30**: Vol + Skewness + Kurtosis + VaR 95% từ daily returns 3T
   4. **🔗 Cross-Correlation Top 30**: heatmap correlation matrix top 20 vốn hóa
+  5. **📉 Max Drawdown Distribution Top 30** (commit `b964057`): Top 10 sụt giảm mạnh + Top 10 RoMaD tốt nhất
+  6. **⚖️ Beta & Alpha toàn thị trường** (commit `b964057`): so với VN30/E1VFVN30 benchmark, Top 10 phòng thủ + Top 10 tăng mạnh theo thị trường
 - Cho phép "Phân tích chuyên sâu" không chỉ giới hạn 8 mã DM mà phân tích cả 384 mã thị trường
 
 **File `_build_chat_context()` ở app.py:111** tổng hợp context (dm, kpi, market_data, risk_profile, real_prices) từ session_state. `tim_cau_tra_loi()` ở backend/chat_advisor.py:1186 xử lý intent trước khi gọi AI advisor.
