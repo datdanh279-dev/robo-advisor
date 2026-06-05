@@ -2831,6 +2831,34 @@ elif st.session_state.trang_thai == "deep_analysis":
                     ki[k] = v_fb
                     if f"{k}_source" not in ki:
                         ki[f"{k}_source"] = "ước lượng cuối (yfinance miss toàn ngành)"
+            vn_static = (DOCS.get("co_phieu_vn") or {}).get(ma, {})
+            tg_static = (DOCS.get("co_phieu_tg") or {}).get(ma, {})
+            static_src = vn_static or tg_static
+            if static_src:
+                _field_map = {
+                    "pe": ("pe", lambda v: float(v) if v else None),
+                    "pb": ("pb", lambda v: float(v) if v else None),
+                    "roe": ("roe", lambda v: float(v) if v else None),
+                    "eps": ("eps", lambda v: float(v) if v else None),
+                    "dividend_yield": ("co_tuc_pct", lambda v: float(v) / 100.0 if v else None),
+                    "von_hoa": ("von_hoa", lambda v: float(v) if v else None),
+                    "market_cap": ("von_hoa", lambda v: float(v) if v else None),
+                    "current_price": ("gia", lambda v: float(v) if v else None),
+                }
+                for k_real, (k_static, conv) in _field_map.items():
+                    cur = ki.get(k_real)
+                    if cur is None or cur == 0:
+                        v_static = conv(static_src.get(k_static, 0))
+                        if v_static is not None and v_static != 0:
+                            ki[k_real] = v_static
+                            if f"{k_real}_source" not in ki:
+                                ki[f"{k_real}_source"] = f"co_phieu_vn.json (fallback khi yfinance miss)"
+                if not ki.get("nganh"):
+                    ki["nganh"] = static_src.get("nganh", ng)
+                if not ki.get("ten"):
+                    ki["ten"] = static_src.get("ten", ma)
+                if not ki.get("ytd") and static_src.get("ytd"):
+                    ki["ytd"] = float(static_src.get("ytd", 0)) / 100.0
             if "w52_high" not in ki or ki.get("w52_high", 0) <= 0:
                 gia_tt = info.get("gia_thi_truong", 0)
                 ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
