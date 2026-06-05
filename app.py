@@ -2847,15 +2847,17 @@ elif st.session_state.trang_thai == "deep_analysis":
             else:
                 kpi[ma] = _fill_kpi_for_real(ma, info, {"nganh": info.get("nganh", "Khác")})
 
-        @st.cache_data(ttl=3600, show_spinner="📡 Tải giá thật từ Yahoo Finance...")
-        def _fetch_real_prices(_symbols):
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def _fetch_real_prices(_targets):
             import requests as _rq, pandas as _pd
+            from concurrent.futures import ThreadPoolExecutor, as_completed
             out = {}
             metas = {}
-            for sym in _symbols:
+
+            def _one(sym, suffix):
                 try:
                     r = _rq.get(
-                        f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.VN",
+                        f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
                         params={"range": "6mo", "interval": "1d"},
                         timeout=10,
                         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36"}
@@ -2863,33 +2865,44 @@ elif st.session_state.trang_thai == "deep_analysis":
                     if r.status_code == 200:
                         d = r.json()
                         if not d.get('chart', {}).get('result'):
-                            continue
+                            return sym, None, None
                         result = d['chart']['result'][0]
                         ts = result.get('timestamp', [])
                         closes_raw = result.get('indicators', {}).get('quote', [{}])[0].get('close', [])
                         if not ts or not closes_raw:
-                            continue
+                            return sym, None, None
                         pairs = [(t, c) for t, c in zip(ts, closes_raw) if c is not None]
                         if len(pairs) < 20:
-                            continue
+                            return sym, None, None
                         ts_v, cs_v = zip(*pairs)
                         idx = _pd.to_datetime(list(ts_v), unit='s')
-                        out[sym] = _pd.Series(list(cs_v), index=idx)
-                        metas[sym] = result.get('meta', {})
+                        return sym, _pd.Series(list(cs_v), index=idx), result.get('meta', {})
                 except Exception:
                     pass
+                return sym, None, None
+
+            with ThreadPoolExecutor(max_workers=20) as ex:
+                futs = [ex.submit(_one, sym, suffix) for sym, suffix in _targets]
+                for f in as_completed(futs):
+                    sym, s, m = f.result()
+                    if s is not None:
+                        out[sym] = s
+                        if m:
+                            metas[sym] = m
             return out, metas
 
-        @st.cache_data(ttl=3600, show_spinner="📊 Tải P/E, P/B, ROE thật từ yfinance...")
-        def _fetch_real_fundamentals(_symbols):
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def _fetch_real_fundamentals(_targets):
             import yfinance as _yf
+            from concurrent.futures import ThreadPoolExecutor, as_completed
             out = {}
-            for sym in _symbols:
+
+            def _one(sym, suffix):
                 try:
-                    t = _yf.Ticker(f"{sym}.VN")
+                    t = _yf.Ticker(f"{sym}{suffix}")
                     info = t.info
                     if not info or 'symbol' not in info:
-                        continue
+                        return sym, None
                     inst_pct = None
                     try:
                         mh = t.major_holders
@@ -2900,7 +2913,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                                     break
                     except Exception:
                         pass
-                    out[sym] = {
+                    return sym, {
                         "pe": float(info.get("trailingPE") or 0) or None,
                         "pb": float(info.get("priceToBook") or 0) or None,
                         "roe": (float(info.get("returnOnEquity") or 0) or None),
@@ -2914,6 +2927,14 @@ elif st.session_state.trang_thai == "deep_analysis":
                     }
                 except Exception:
                     pass
+                return sym, None
+
+            with ThreadPoolExecutor(max_workers=15) as ex:
+                futs = [ex.submit(_one, sym, suffix) for sym, suffix in _targets]
+                for f in as_completed(futs):
+                    sym, data = f.result()
+                    if data is not None:
+                        out[sym] = data
             return out
 
         @st.cache_data(ttl=3600, show_spinner="💵 Tải tỷ giá USD/VND thật...")
@@ -2966,7 +2987,25 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         _ma_for_fetch = [ma for ma, info in dm.items()
                          if info.get("gia_thi_truong", 0) > 0 and info.get("so_luong", 0) > 0]
-        _fetch_result = _fetch_real_prices(tuple(_ma_for_fetch))
+
+        _targets_all = []
+        for _ma in (DOCS.get("co_phieu_vn") or {}).keys():
+            _targets_all.append((_ma, ".VN"))
+        for _ma in (DOCS.get("co_phieu_tg") or {}).keys():
+            _targets_all.append((_ma, ""))
+        _targets_all = tuple(_targets_all)
+        n_ma_all = len(_targets_all)
+
+        try:
+            _st_real_ph = st.status(f"📡 Tải yfinance: 0/{n_ma_all} mã (giá + lịch sử 6T)", expanded=True)
+        except Exception:
+            _st_real_ph = None
+        _fetch_result = _fetch_real_prices(_targets_all)
+        try:
+            if _st_real_ph is not None:
+                _st_real_ph.update(label=f"📊 Tải yfinance P/E, P/B, ROE: 0/{n_ma_all} mã")
+        except Exception:
+            pass
         real_prices = _fetch_result[0] if isinstance(_fetch_result, tuple) else _fetch_result
         real_metas = _fetch_result[1] if isinstance(_fetch_result, tuple) and len(_fetch_result) > 1 else {}
         try:
@@ -2983,12 +3022,20 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if w52l: kpi[ma]['w52_low'] = float(w52l)
                 if cur_px and dm[ma].get('gia_thi_truong', 0) <= 0:
                     dm[ma]['gia_thi_truong'] = float(cur_px)
-        real_fund = _fetch_real_fundamentals(tuple(_ma_for_fetch))
+        real_fund = _fetch_real_fundamentals(_targets_all)
         for ma, fund in real_fund.items():
             if ma in kpi and fund:
                 for k, v in fund.items():
                     if v is not None and v != 0:
                         kpi[ma][k] = v
+        try:
+            if _st_real_ph is not None:
+                _st_real_ph.update(
+                    state="complete",
+                    label=f"✅ yfinance: {len(real_prices)}/{n_ma_all} giá, {len(real_fund)}/{n_ma_all} P/E-P/B-ROE-EPS"
+                )
+        except Exception:
+            pass
         vn30_close, vn30_label = _fetch_vn30_proxy()
         has_real = len(real_prices) >= 2
         has_vn30 = vn30_close is not None

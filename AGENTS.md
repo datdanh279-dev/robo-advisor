@@ -175,6 +175,14 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - ✅ removeChild tab Chat (79eca02) — `st.spinner` → `st.status` + try/except
 - ✅ DM mở rộng 8 → 16 mã (f838dce) — FPT, VCB, MBB, CTG, TCB, HPG, VIX, SSI, VNM, MSN, MWG, CTR, VIC, VHM, HVN, PNJ (tổng 97.4M₫, +9.82%)
 - ✅ **Fix Excel DM 8 → 16 mã (b8c8509)** — `doc_danh_muc()` đọc Excel "HỆ THỐNG QUẢN LÝ " TRƯỚC; nếu Excel có 8 mã thì JSON fallback 16 mã không bao giờ trigger → user thấy 8 mã. Fix: update Excel sheet rows 5-20 với 16 mã khớp JSON
+- ✅ **Phase 9 (commit `XXX` chưa push) — Mở rộng yfinance fetch từ 16 DM → 384 mã TOÀN THỊ TRƯỜNG (229 VN + 155 TG):**
+  - `_fetch_real_prices(_targets)` — refactor: thay vòng `for sym in _symbols` (sequential) bằng `ThreadPoolExecutor(max_workers=20)` + `as_completed()`. Truyền `(symbol, suffix)` thay vì chỉ symbol → VN: `.VN`, TG: `""` (no suffix)
+  - `_fetch_real_fundamentals(_targets)` — refactor tương tự với `ThreadPoolExecutor(max_workers=15)`
+  - Build `_targets_all = [(ma, ".VN") for ma in co_phieu_vn] + [(ma, "") for ma in co_phieu_tg]` = 384 targets
+  - `n_ma_all = 384` thay vì `len(dm) = 16` cho metric hiển thị
+  - Progress: `st.status("📡 Tải yfinance: 0/384 mã (giá + lịch sử 6T)", expanded=True)` → update label qua 2 giai đoạn → `state="complete"` cuối
+  - Lần đầu: ~60-90s với 20+15 workers song song. Sau đó cache 1h → tức thì
+  - Metric sẽ hiển thị "Giá hiện tại & lịch sử: yfinance (X/384 mã)" và "P/E, P/B, ROE, EPS: yfinance (X/384 mã)"
 - ✅ st.progress trong @st.cache_data (b8d593d) — refactor `_fetch_all_parallel` thêm `progress_callback` param, 4 callsites wrap progress NGOÀI cached function
 
 **Phase 8 (commit `XXX` chưa push) — Mở rộng khảo sát rủi ro 12 → 24 câu (`backend/risk_profile.py`):**
