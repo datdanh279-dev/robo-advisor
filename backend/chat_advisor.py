@@ -1,4 +1,5 @@
 import random
+import re
 from .data_loader import DOCS
 
 MO_DAU = (
@@ -1321,6 +1322,111 @@ def _xu_ly_smart(cau_hoi, cau_thuong, cau_khong_dau, ctx):
                       "tôi nên mua", "toi nen mua"]
     if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_nen_mua):
         return _goi_y_mua_theo_risk(risk, market_data, dm, kpi)
+
+    intent_an_toan = ["mã nào an toàn", "ma nao an toan", "rủi ro thấp", "rui ro thap",
+                      "ít rủi ro", "it rui ro", "blue chip", "ổn định", "on dinh",
+                      "phòng thủ", "phong thu", "an toàn nhất", "an toan nhat"]
+    if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_an_toan):
+        if not market_data:
+            return None
+        safe = sorted(
+            [d for d in market_data if d.get("vol_ratio", 0) > 0 and d.get("ret_3m", 0) > 0],
+            key=lambda d: (d.get("vol_ratio", 99), -d.get("ret_3m", 0))
+        )[:5]
+        if not safe:
+            return f"{MO_DAU}⚠️ Chưa có đủ dữ liệu để gợi ý mã an toàn."
+        ds = "\n".join(
+            f"• **{d['ma']}** ({d.get('vung','')}): Vol {d.get('vol_ratio',0):.1f}x — return 3M {d.get('ret_3m',0):+.1f}% — giá {d.get('gia',0):,.0f}"
+            for d in safe
+        )
+        return (
+            f"{MO_DAU}"
+            f"🛡️ **TOP 5 MÃ AN TOÀN NHẤT** (Vol ratio thấp + return 3M dương)\n\n"
+            f"{ds}\n\n"
+            f"💡 *Vol ratio < 1x = thanh khoản ổn định, không có biến động bất thường. "
+            f"Phù hợp nhà đầu tư Bảo thủ / Trung bình.*"
+        )
+
+    intent_von_hoa = ["vốn hóa lớn nhất", "von hoa lon nhat", "blue chip",
+                      "mã lớn nhất", "ma lon nhat", "top vốn hóa", "top von hoa",
+                      "cổ phiếu lớn", "co phieu lon"]
+    if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_von_hoa):
+        if not market_data:
+            return None
+        top_vh = sorted(
+            [d for d in market_data if d.get("von_hoa", 0) > 0],
+            key=lambda d: d.get("von_hoa", 0), reverse=True
+        )[:5]
+        if not top_vh:
+            return f"{MO_DAU}⚠️ Chưa có dữ liệu vốn hóa."
+        def _fmt_vh(vh):
+            vh_f = float(vh)
+            if vh_f > 1e12:
+                return f"{vh_f/1e12:.1f} nghìn tỷ"
+            elif vh_f > 1e9:
+                return f"{vh_f/1e9:.0f} tỷ"
+            else:
+                return f"{vh_f/1e6:.0f} triệu"
+        ds = "\n".join(
+            f"• **{d['ma']}** ({d.get('vung','')}): VH {_fmt_vh(d.get('von_hoa',0))} — giá {d.get('gia',0):,.0f} — {d.get('nganh','')[:20]}"
+            for d in top_vh
+        )
+        return (
+            f"{MO_DAU}"
+            f"🏛️ **TOP 5 MÃ VỐN HÓA LỚN NHẤT** (real-time từ yfinance)\n\n"
+            f"{ds}\n\n"
+            f"💡 *Mã vốn hóa lớn = thanh khoản cao, ít bị thao túng. "
+            f"Tốt cho người mới + DCA dài hạn.*"
+        )
+
+    intent_phan_tich_ma = ["phân tích mã", "phan tich ma", "đánh giá mã", "danh gia ma",
+                           "mã này có tốt", "ma nay co tot", "review mã", "review ma",
+                           "thông tin về mã", "thong tin ve ma", "nên giữ", "nen giu"]
+    ma_match = None
+    for kw in intent_phan_tich_ma:
+        if kw in cau_thuong or kw in cau_khong_dau:
+            words = re.findall(r"\b[A-Z]{3,4}\b", cau_hoi.upper())
+            for w in words:
+                if w in (kpi or {}) or any(d.get("ma") == w for d in market_data or []):
+                    ma_match = w
+                    break
+            if ma_match:
+                break
+    if ma_match and (kpi or market_data):
+        ki = kpi.get(ma_match, {})
+        md = next((d for d in market_data or [] if d.get("ma") == ma_match), None)
+        if ki or md:
+            ten = (ki.get("ten") or (md.get("ten") if md else ma_match) or ma_match)[:35]
+            gia = (md.get("gia") if md else ki.get("gia", 0)) or 0
+            ret3 = (md.get("ret_3m") if md else 0) or 0
+            volr = (md.get("vol_ratio") if md else 0) or 0
+            roe = ki.get("roe", 0) or 0
+            pe = ki.get("pe", 0) or 0
+            pb = ki.get("pb", 0) or 0
+            nganh = ki.get("nganh") or (md.get("nganh") if md else "") or ""
+            von_hoa = (md.get("von_hoa") if md else 0) or 0
+            vh_fmt = f"{von_hoa/1e12:.1f} nghìn tỷ" if von_hoa > 1e12 else (f"{von_hoa/1e9:.0f} tỷ" if von_hoa > 0 else "N/A")
+            score = 0
+            if ret3 > 0: score += 1
+            if volr < 1.5: score += 1
+            if roe and roe > 0.12: score += 1
+            if pe and 0 < pe < 18: score += 1
+            rating = "🟢 TỐT" if score >= 3 else ("🟡 TRUNG BÌNH" if score >= 2 else "🔴 CẨN THẬN")
+            return (
+                f"{MO_DAU}"
+                f"🔍 **PHÂN TÍCH NHANH: {ma_match}** — {ten}\n\n"
+                f"📊 **Dữ liệu real-time:**\n"
+                f"• Giá hiện tại: **{gia:,.0f}**\n"
+                f"• Return 3M: **{ret3:+.1f}%**\n"
+                f"• Vol ratio: **{volr:.1f}x** TB20D\n"
+                f"• Vốn hóa: **{vh_fmt}**\n"
+                f"• ROE: **{roe*100:.1f}%**\n"
+                f"• P/E: **{pe:.1f}** | P/B: **{pb:.2f}**\n"
+                f"• Ngành: {nganh}\n\n"
+                f"🎯 **Đánh giá tổng hợp: {rating}** (điểm {score}/4)\n\n"
+                f"💡 *Tiêu chí: return 3M>0, vol<1.5x, ROE>12%, P/E<18. "
+                f"Đây là quick-screen, KHÔNG thay thế phân tích chuyên sâu.*"
+            )
 
     return None
 
