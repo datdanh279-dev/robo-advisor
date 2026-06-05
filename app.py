@@ -7151,9 +7151,18 @@ elif st.session_state.trang_thai == "chat":
                 with _qcols[_i % 2]:
                     if st.button(_q, key=f"qq_{_i}", use_container_width=True):
                         st.session_state.chat_history.append({"role": "user", "content": _q})
-                        with st.spinner("🤖 Robo-Advisor đang phân tích DM + thị trường..."):
+                        _chat_status = st.status("🤖 Robo-Advisor đang phân tích DM + thị trường...", expanded=False)
+                        try:
                             _ctx = _build_chat_context()
                             tra_loi = tim_cau_tra_loi(_q, st.session_state.chat_history, context=_ctx)
+                            _chat_status.update(label="✅ Xong", state="complete")
+                        except Exception as _chat_err:
+                            _chat_status.update(label="❌ Lỗi", state="error")
+                            tra_loi = f"Xin lỗi, đã xảy ra lỗi: {_chat_err}"
+                        try:
+                            _chat_status.empty()
+                        except Exception:
+                            pass
                         st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
                         try:
                             username = st.session_state.get("username", "unknown")
@@ -7188,9 +7197,18 @@ elif st.session_state.trang_thai == "chat":
                 submitted = st.form_submit_button("Gửi", use_container_width=True)
                 if submitted and cau_hoi:
                     st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
-                    with st.spinner("🤖 Robo-Advisor đang suy nghĩ..."):
+                    _chat_status = st.status("🤖 Robo-Advisor đang suy nghĩ...", expanded=False)
+                    try:
                         _ctx = _build_chat_context()
                         tra_loi = tim_cau_tra_loi(cau_hoi, st.session_state.chat_history, context=_ctx)
+                        _chat_status.update(label="✅ Xong", state="complete")
+                    except Exception as _chat_err:
+                        _chat_status.update(label="❌ Lỗi", state="error")
+                        tra_loi = f"Xin lỗi, đã xảy ra lỗi: {_chat_err}"
+                    try:
+                        _chat_status.empty()
+                    except Exception:
+                        pass
                     st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
                     username = st.session_state.get("username", "unknown")
                     try:
