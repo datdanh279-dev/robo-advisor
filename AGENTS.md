@@ -176,6 +176,23 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - ✅ DM mở rộng 8 → 16 mã (f838dce) — FPT, VCB, MBB, CTG, TCB, HPG, VIX, SSI, VNM, MSN, MWG, CTR, VIC, VHM, HVN, PNJ (tổng 97.4M₫, +9.82%)
 - ✅ **Fix Excel DM 8 → 16 mã (b8c8509)** — `doc_danh_muc()` đọc Excel "HỆ THỐNG QUẢN LÝ " TRƯỚC; nếu Excel có 8 mã thì JSON fallback 16 mã không bao giờ trigger → user thấy 8 mã. Fix: update Excel sheet rows 5-20 với 16 mã khớp JSON
 - ✅ **Phase 9 (commit `1dbb4b2`) — Mở rộng yfinance fetch từ 16 DM → 384 mã TOÀN THỊ TRƯỜNG (229 VN + 155 TG):**
+  - `_fetch_real_prices(_targets)` refactor ThreadPoolExecutor(20) + tuple (symbol, suffix)
+  - `_fetch_real_fundamentals(_targets)` refactor ThreadPoolExecutor(15) cho P/E, P/B, ROE, EPS
+  - Build `_targets_all = 229 VN + 155 TG = 384 targets`
+  - `st.status` progress hiển thị
+- ✅ **Phase 10 (commit `6c1e0c4`) — DM 16 → 200 mã + market scan 384 mã parallel:**
+  - `data/danh_muc.json` + `data/TONG_HOP_v44_SOI_HOP_NHAT.xlsx` updated từ 16 → 200 mã (tỷ trọng đều 0.5%/mã, 55 ngành)
+  - Market scan thay hardcoded list (200+100) bằng `DOCS['co_phieu_vn'][:229] + DOCS['co_phieu_tg'][:155] = 384 mã` thật từ JSON
+  - Market scan: ThreadPoolExecutor(20) thay sequential, scan 384 mã trong ~30s
+  - `data/danh_muc.json` giờ 200 mã thay vì 16
+- ✅ **Phase 10b (chưa commit) — Fix cross-correlation bug `px.imshow` crash:**
+  - Lỗi `'float' object has no attribute 'imshow'` xảy ra khi `df_xc.shape[1] < 2` (chỉ 1 mã có data) → `corr()` trả về Series thay vì DataFrame
+  - Fix: check `df_xc.shape[1] >= 2`, convert Series → DataFrame, thêm info message thay vì crash
+  - Cũng thêm fallback messages cho các edge cases (1 mã, 0 mã, 0 phiên)
+- ⚠️ **Mở rộng 384 → 800 mã (500 VN + 300 TG)**: Cần data sourcing mới. Hiện tại vẫn dùng 229+155=384 từ JSON có sẵn.
+- ⚠️ **Còn nhiều section hiển thị "Cần giá thật 6T"**: Sau khi DM 200 mã, các section này sẽ tự động có data vì loop qua `dm.items()` thay vì `real_prices.keys()`. Cần F5 web sau redeploy để thấy kết quả.
+- ⚠️ **VỐ HÓA TỶ chưa có số liệu** ở section "PHÂN TÍCH CHUYÊN SÂU 384 MÃ": Có thể do `dd_prices` (data cho Max DD section) chưa có đủ — cần xem lại log
+- ⚠️ **Sections RSI Heatmap (5 mã), Vol Ranking (5 mã), ADTV (5 mã), 52W Scanner (5 mã), Real Money Flow (1 mã), Heat Index (5 mã), Earnings Calendar (5 mã)**: Vẫn dùng `market_data[:50]` thay vì tất cả 384. Cần fix để loop qua tất cả `market_data`.
   - `_fetch_real_prices(_targets)` — refactor: thay vòng `for sym in _symbols` (sequential) bằng `ThreadPoolExecutor(max_workers=20)` + `as_completed()`. Truyền `(symbol, suffix)` thay vì chỉ symbol → VN: `.VN`, TG: `""` (no suffix)
   - `_fetch_real_fundamentals(_targets)` — refactor tương tự với `ThreadPoolExecutor(max_workers=15)`
   - Build `_targets_all = [(ma, ".VN") for ma in co_phieu_vn] + [(ma, "") for ma in co_phieu_tg]` = 384 targets

@@ -6776,19 +6776,31 @@ elif st.session_state.trang_thai == "deep_analysis":
                     pass
                 if len(xc_prices) >= 5:
                     df_xc = pd.DataFrame(xc_prices).dropna()
-                    if len(df_xc) > 10:
+                    if len(df_xc) > 10 and df_xc.shape[1] >= 2:
                         corr_xc = df_xc.corr()
-                        fig_xc = px.imshow(corr_xc, text_auto=".2f", color_continuous_scale="RdBu_r",
-                            zmin=-1, zmax=1, aspect="auto",
-                            title=f"Correlation Matrix Top {len(corr_xc)} mã (3T)")
-                        fig_xc.update_layout(height=600,
-                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                            font=dict(color="#ECE8E1"))
-                        st.plotly_chart(fig_xc, use_container_width=True)
-                        avg_corr = float(corr_xc.values[np.triu_indices_from(corr_xc.values, k=1)].mean())
-                        st.metric("📊 Correlation TB (cặp đôi)", f"{avg_corr:.3f}",
-                            help="TB corr giữa các cặp mã. Càng gần 0 = đa dạng hóa tốt")
-                        st.caption(f"📊 Corr>0.7 = cùng nhóm (đỏ đậm), <0.3 = độc lập. Tính từ {len(corr_xc)} mã top 50 vốn hóa daily returns 3T yfinance.")
+                        if isinstance(corr_xc, pd.Series):
+                            corr_xc = corr_xc.to_frame()
+                        if corr_xc.shape[0] >= 2 and corr_xc.shape[1] >= 2:
+                            fig_xc = px.imshow(corr_xc, text_auto=".2f", color_continuous_scale="RdBu_r",
+                                zmin=-1, zmax=1, aspect="auto",
+                                title=f"Correlation Matrix Top {len(corr_xc)} mã (3T)")
+                            fig_xc.update_layout(height=600,
+                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                                font=dict(color="#ECE8E1"))
+                            st.plotly_chart(fig_xc, use_container_width=True)
+                            try:
+                                avg_corr = float(corr_xc.values[np.triu_indices_from(corr_xc.values, k=1)].mean())
+                                st.metric("📊 Correlation TB (cặp đôi)", f"{avg_corr:.3f}",
+                                    help="TB corr giữa các cặp mã. Càng gần 0 = đa dạng hóa tốt")
+                            except Exception:
+                                pass
+                            st.caption(f"📊 Corr>0.7 = cùng nhóm (đỏ đậm), <0.3 = độc lập. Tính từ {len(corr_xc)} mã top 50 vốn hóa daily returns 3T yfinance.")
+                        else:
+                            st.info(f"⚠️ Cần ≥2 mã có dữ liệu để tính correlation. Mới có {corr_xc.shape[0]} mã.")
+                    else:
+                        st.info(f"⚠️ Cần ≥10 phiên × ≥2 mã để tính correlation. Mới có {len(df_xc)} phiên × {df_xc.shape[1]} mã.")
+                else:
+                    st.info(f"⚠️ Cần ≥5 mã có dữ liệu giá 3T. Mới có {len(xc_prices)} mã.")
             except Exception as e:
                 st.warning(f"⚠️ Không tính được cross-correlation: {str(e)[:80]}")
 
