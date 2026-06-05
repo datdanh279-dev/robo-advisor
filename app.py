@@ -3337,14 +3337,19 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⬇️ Xem Tin tức, AI phân tích, Lịch sử GD, Thuế phí bên dưới")
 
         st.write("---")
+        _synth_used = st.session_state.get("_synth_prices_used", False)
+        if _synth_used:
+            st.warning("⚠️ Yahoo Finance rate-limited → dùng **SYNTHETIC prices** (130 ngày, từ gia_von + gia_thi_truong, seed ổn định). Refresh trong 5-10 phút để có data thật.")
+        else:
+            st.success(f"✅ Yahoo Finance: {len(real_prices)}/384 mã có giá thật, {len(real_fund)}/384 mã có P/E-P/B-ROE-EPS, VN30: {vn30_label or '—'}")
         st.write("## 📊 Nguồn dữ liệu (Data Source)")
         ds1, ds2, ds3 = st.columns(3)
         with ds1:
             st.write("**✅ SỐ THẬT 100%:**")
             st.write(f"- Giá hiện tại & lịch sử: yfinance ({len(real_prices)}/{n_ma} mã)")
             st.write(f"- P/E, P/B, ROE, EPS: yfinance ({len(real_fund)}/{n_ma} mã)")
-            st.write(f"- W52 High/Low, Volume: yfinance")
-            st.write(f"- Vol, Sharpe, VaR: tính từ giá thật")
+            st.write("- W52 High/Low, Volume: yfinance")
+            st.write("- Vol, Sharpe, VaR: tính từ giá thật")
         with ds2:
             st.write("**⚠️ ƯỚC LƯỢNG (có ghi chú):**")
             st.write("- Foreign flow: tỷ lệ NN theo ngành")
