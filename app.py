@@ -4664,18 +4664,30 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 📊 Information Ratio Decomposition theo kỳ")
+        dm_eq_series = None
         if has_real and dm_equity is not None and has_vn30 and len(dm_equity) > 30:
-            common_idx3 = sorted(set(pd.Series(dm_equity).index) & set(vn30_close.index))
+            try:
+                if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
+                    dm_eq_series = dm_equity
+                else:
+                    common_dates_local = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    if len(common_dates_local) > 30:
+                        dm_eq_series = pd.Series(dm_equity, index=common_dates_local)
+            except Exception:
+                dm_eq_series = None
+        if dm_eq_series is not None and has_vn30 and len(dm_eq_series) > 30:
+            common_idx3 = sorted(set(dm_eq_series.index) & set(vn30_close.index))
             if len(common_idx3) > 30:
                 ir_rows = []
                 periods = [("1 tháng", 22), ("3 tháng", 66), ("6 tháng", len(common_idx3))]
                 for label, n in periods:
                     n_use = min(n, len(common_idx3))
                     if n_use < 10: continue
-                    dm_p = float(pd.Series(dm_equity).iloc[-1] / pd.Series(dm_equity).iloc[-n_use] - 1)
+                    dm_aligned = dm_eq_series.loc[common_idx3]
+                    dm_p = float(dm_aligned.iloc[-1] / dm_aligned.iloc[-n_use] - 1)
                     vn_p = float(vn30_close.loc[common_idx3].iloc[-1] / vn30_close.loc[common_idx3].iloc[-n_use] - 1)
                     diff_ret = dm_p - vn_p
-                    dm_period_ret = pd.Series(dm_equity).iloc[-n_use:].pct_change().dropna()
+                    dm_period_ret = dm_aligned.iloc[-n_use:].pct_change().dropna()
                     vn_period_ret = vn30_close.loc[common_idx3].iloc[-n_use:].pct_change().dropna()
                     common_p = sorted(set(dm_period_ret.index) & set(vn_period_ret.index))
                     if len(common_p) > 5:
@@ -4691,17 +4703,30 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if ir_rows:
                     st.dataframe(pd.DataFrame(ir_rows), use_container_width=True, hide_index=True)
                     st.caption(f"📊 Tính từ returns thật yfinance 6T. IR > 1 = xuất sắc, > 0.5 = tốt, < 0 = thua thị trường.")
+                else:
+                    st.info("⚠️ Không đủ dữ liệu chung với VN30 để phân tích theo kỳ.")
             else:
-                st.info("⚠️ Không đủ dữ liệu chung với VN30.")
+                st.info("⚠️ Không đủ dữ liệu chung với VN30 (chỉ có {0} ngày overlap).".format(len(common_idx3)))
         else:
             st.info("⚠️ Cần giá thật + VN30 để tính IR decomposition.")
 
         st.write("---")
         st.write("## 🎯 Upside/Downside Capture — Bắt trend TĂNG, né trend GIẢM")
+        dm_capture_series = None
         if has_real and dm_equity is not None and has_vn30 and len(dm_equity) > 60:
-            common_idx4 = sorted(set(pd.Series(dm_equity).index) & set(vn30_close.index))
+            try:
+                if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
+                    dm_capture_series = dm_equity
+                else:
+                    common_dates_local2 = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    if len(common_dates_local2) > 30:
+                        dm_capture_series = pd.Series(dm_equity, index=common_dates_local2)
+            except Exception:
+                dm_capture_series = None
+        if dm_capture_series is not None and has_vn30 and len(dm_capture_series) > 60:
+            common_idx4 = sorted(set(dm_capture_series.index) & set(vn30_close.index))
             if len(common_idx4) > 60:
-                dm_r_full = pd.Series(dm_equity, index=pd.Series(dm_equity).index).pct_change().dropna()
+                dm_r_full = dm_capture_series.pct_change().dropna()
                 vn_r_full = vn30_close.pct_change().dropna()
                 common_idx5 = sorted(set(dm_r_full.index) & set(vn_r_full.index))
                 dm_arr = dm_r_full.loc[common_idx5]
@@ -5240,19 +5265,26 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🌍 Quét toàn thị trường — Top Movers & Volume Leaders")
-        _all_vn_stocks = ["VCB", "FPT", "HPG", "VNM", "MWG", "MBB", "VIC", "CTG", "VHM", "BID",
-                          "TCB", "VPB", "SSI", "PLX", "GAS", "MSN", "SAB", "NVL", "POW", "HDB",
-                          "TPB", "STB", "EIB", "SHB", "VIB", "ACB", "BCM", "VRE", "KDH", "DXG",
-                          "PDR", "NLG", "IJC", "PC1", "REE", "PNJ", "VJC", "VCI", "HCM", "DCM",
-                          "DPM", "GVR", "PVD", "PVS", "BSR", "PVT", "BWE", "TCH", "DIG", "CII"]
+        try:
+            _vn_doc_keys = list((DOCS.get("co_phieu_vn") or {}).keys())
+            _tg_doc_keys = list((DOCS.get("co_phieu_tg") or {}).keys())
+        except Exception:
+            _vn_doc_keys = []
+            _tg_doc_keys = []
+        if not _vn_doc_keys:
+            _vn_doc_keys = ["VCB","BID","CTG","MBB","TCB","ACB","VPB","HDB","STB","VIB","TPB","SHB","EIB","MSB","OCB","LPB","VIC","VHM","VRE","NVL","KDH","DXG","PDR","DIG","NLG","IJC","FPT","HPG","VNM","MWG","MSN","SAB","PNJ","VJC","HVN","REE","CTD","PC1","SSI","VCI","HCM","BSI","MBS","PLX","GAS","PVS","PVD","PVT","POW","NT2","BSR","DCM","DPM","GVR","PHR","HSG","NKG","SVC","POM","HAG","HNG","DBC","TAR","VHC","ANV","IDI","IBC","VOS","VTO","CMX","VMD","SMC","BMP","AAA","VGC","QCG","PVD","PVT","PXS","PXT","PVS","PVC","PVB","PVC","GAS","PLX","DPM","DCM","PHR","VFG","CSV","VSI","HPI","TNG","MSH","VGT","GIL","LHG","HAH","GMD","VOS","SKG","TCL","DQC","HBC","DHA","HDG","HDC","HQC","SCR","SZC","KBC","BCM","SZL","LHG","VTR","SGP","ITA","PIT","BWE","TCH","CII","DC4","PTL","LCG","DPR","PBC","HID","TBD","TIX","CRC","VNE","BWS","STG","DLG","SJF","HHS","DPG","FMC","HAP","HCD","TNC","EVS","VCS","MKP","MCG","VCF","HNF","PAC","SJD","DST","SDA","NHA","VGS","PGS","PXL","BGC","HTL","VGP","NSC","MVC","SBA","IDV","HUT","CEO","HID","SGT","TST","SHP","PRC","HHC","CTG","BID","VCB","ACB","LPB","STB","NVB","PGB","BAB","MCO","KLB","ABB","VAB","NAB","SGB","OJB","EIB","HDB","TCB","MBB","VPB","VIB","TPB","SHB","MSB","OCB","SEB","VBB","ABB"]
+        if not _tg_doc_keys:
+            _tg_doc_keys = ["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","JNJ","PG","KO","PEP","WMT","MCD","NKE","DIS","UNH","JPM","V","MA","HD","BAC","XOM","CVX","PFE","MRK","ABBV","TMO","ABT","COST","AVGO","ORCL","CRM","NFLX","ADBE","INTC","AMD","QCOM","TXN","MU","CSCO","IBM","GS","MS","WFC","C","BA","CAT","GE","F","GM","T","VZ","NEE","DUK","SO","NEE","LIN","APD","ECL","SHW","FCX","NEM","GOLD","BABA","PDD","TSM","ASML","TM","NVO","ORCL","SAP","UL","NSRGY","RACE","LVMUY","SHEL","BP","TTE","ENI","EQNR","SNOW","UBER","LYFT","ABNB","SHOP","SQ","PYPL","COIN","PLTR","SNAP","RBLX","ZM","DOCU","ROKU","TWLO","NET","CRWD","OKTA","DDOG","MDB","TEAM","ATVI","EA","TTWO","GME","AMC","BB","NOK","INTC","CSCO","ORCL","BABA","JD","PDD","BIDU","NTES","TCEHY","NIO","XPEV","LI","BILI","TME","VIPS","TAL","EDU","YUM","CMG","SBUX","MCD","DPZ"]
+        _all_vn_stocks = list(_vn_doc_keys) + list(_tg_doc_keys)
         @st.cache_data(ttl=1800, show_spinner="📡 Quét toàn thị trường...")
         def _scan_market_stocks(symbols_tuple):
             import requests as _rq_s
             out = []
-            for sym in symbols_tuple:
+            for entry in symbols_tuple:
                 try:
-                    r = _rq_s.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}.VN",
-                        headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                    sym, suffix = entry
+                    r = _rq_s.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
                     if r.status_code == 200:
                         data = r.json()
                         result = data.get("chart", {}).get("result", [{}])[0]
@@ -5270,14 +5302,23 @@ elif st.session_state.trang_thai == "deep_analysis":
                             avg_vol_20 = float(np.mean([v for v in volumes[-20:] if v])) if len(volumes) >= 5 and any(v for v in volumes[-20:] if v) else 0
                             vol_ratio = vol_today / avg_vol_20 if avg_vol_20 > 0 else 0
                             if not (vol_ratio != vol_ratio) and not (chg_pct != chg_pct) and not (ret_3m != ret_3m):
-                                out.append({"ma": sym, "ten": (meta.get("longName", sym) or sym)[:30],
+                                region = "VN" if suffix else "TG"
+                                display_sym = sym if suffix else sym
+                                out.append({"ma": display_sym, "ten": (meta.get("longName", sym) or sym)[:30],
                                     "nganh": (meta.get("industry") or "Khác"),
+                                    "vung": region, "tien": (meta.get("currency") or "VND"),
                                     "gia": cur, "thay_doi": chg_pct, "ret_3m": ret_3m,
                                     "vol": vol_today, "vol_ratio": vol_ratio, "von_hoa": float(meta.get("marketCap") or 0)})
                 except Exception:
                     continue
             return out
-        with st.spinner(f"📡 Đang quét {len(_all_vn_stocks)} mã toàn thị trường..."):
+        _scan_list = []
+        for _s in _vn_doc_keys:
+            _scan_list.append((_s, ".VN"))
+        for _s in _tg_doc_keys:
+            _scan_list.append((_s, ""))
+        _all_vn_stocks = _scan_list
+        with st.spinner(f"📡 Đang quét {len(_all_vn_stocks)} mã toàn thị trường (VN + Thế giới)..."):
             market_data = _scan_market_stocks(tuple(_all_vn_stocks))
             try:
                 st.session_state["chat_market_data"] = market_data
@@ -5287,28 +5328,38 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.warning(f"⚠️ Chỉ quét được {len(market_data) if market_data else 0}/{len(_all_vn_stocks)} mã. Một số section bên dưới sẽ bị ẩn. Có thể Yahoo Finance đang giới hạn request — thử lại sau vài phút.")
         df_mkt = pd.DataFrame(market_data) if market_data and len(market_data) >= 5 else pd.DataFrame()
         if market_data and len(market_data) >= 5:
-            st.caption(f"📊 Quét {len(market_data)}/{len(_all_vn_stocks)} mã thành công từ yfinance")
+            st.caption(f"📊 Quét {len(market_data)}/{len(_all_vn_stocks)} mã thành công từ yfinance (VN + Thế giới)")
+            region_filter = st.radio("Lọc theo vùng:", ["Tất cả", "Chỉ VN", "Chỉ Thế giới"], horizontal=True, key="mkt_region")
+            if region_filter == "Chỉ VN":
+                df_mkt_view = df_mkt[df_mkt["vung"] == "VN"].copy()
+            elif region_filter == "Chỉ Thế giới":
+                df_mkt_view = df_mkt[df_mkt["vung"] == "TG"].copy()
+            else:
+                df_mkt_view = df_mkt.copy()
+            if len(df_mkt_view) < 5:
+                st.warning(f"⚠️ Vùng '{region_filter}' chỉ có {len(df_mkt_view)} mã. Hiển thị tất cả.")
+                df_mkt_view = df_mkt.copy()
             mv1, mv2 = st.columns(2)
             with mv1:
                 st.write("**🚀 Top 10 tăng mạnh nhất hôm nay:**")
-                top_up = df_mkt.nlargest(10, "thay_doi")[["ma", "ten", "gia", "thay_doi", "vol_ratio"]]
-                top_up.columns = ["Mã", "Tên", "Giá", "% Thay đổi", "Vol vs TB20D"]
+                top_up = df_mkt_view.nlargest(10, "thay_doi")[["ma", "vung", "ten", "gia", "thay_doi", "vol_ratio"]]
+                top_up.columns = ["Mã", "Vùng", "Tên", "Giá", "% Thay đổi", "Vol vs TB20D"]
                 st.dataframe(top_up, use_container_width=True, hide_index=True)
             with mv2:
                 st.write("**💀 Top 10 giảm mạnh nhất hôm nay:**")
-                top_dn = df_mkt.nsmallest(10, "thay_doi")[["ma", "ten", "gia", "thay_doi", "vol_ratio"]]
-                top_dn.columns = ["Mã", "Tên", "Giá", "% Thay đổi", "Vol vs TB20D"]
+                top_dn = df_mkt_view.nsmallest(10, "thay_doi")[["ma", "vung", "ten", "gia", "thay_doi", "vol_ratio"]]
+                top_dn.columns = ["Mã", "Vùng", "Tên", "Giá", "% Thay đổi", "Vol vs TB20D"]
                 st.dataframe(top_dn, use_container_width=True, hide_index=True)
             mv3, mv4 = st.columns(2)
             with mv3:
                 st.write("**📊 Top 10 Volume đột biến (Vol > 2x TB20D):**")
-                hot_vol = df_mkt[df_mkt["vol_ratio"] > 1].nlargest(10, "vol_ratio")[["ma", "ten", "vol", "vol_ratio", "thay_doi"]]
-                hot_vol.columns = ["Mã", "Tên", "Volume hôm nay", "Vol/TB20D", "% Thay đổi"]
+                hot_vol = df_mkt_view[df_mkt_view["vol_ratio"] > 1].nlargest(10, "vol_ratio")[["ma", "vung", "ten", "vol", "vol_ratio", "thay_doi"]]
+                hot_vol.columns = ["Mã", "Vùng", "Tên", "Volume hôm nay", "Vol/TB20D", "% Thay đổi"]
                 st.dataframe(hot_vol, use_container_width=True, hide_index=True)
             with mv4:
                 st.write("**📈 Top 10 Return 3 tháng cao nhất:**")
-                top_3m = df_mkt.nlargest(10, "ret_3m")[["ma", "ten", "gia", "ret_3m", "thay_doi"]]
-                top_3m.columns = ["Mã", "Tên", "Giá hiện tại", "Return 3M %", "% Hôm nay"]
+                top_3m = df_mkt_view.nlargest(10, "ret_3m")[["ma", "vung", "ten", "gia", "ret_3m", "thay_doi"]]
+                top_3m.columns = ["Mã", "Vùng", "Tên", "Giá hiện tại", "Return 3M %", "% Hôm nay"]
                 st.dataframe(top_3m, use_container_width=True, hide_index=True)
             st.caption("📊 Tất cả dữ liệu từ yfinance chart API (giá thật real-time). Phân tích toàn thị trường giúp nhận diện cơ hội đầu tư mới.")
         else:
@@ -5330,7 +5381,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             use_pe_filter = max_pe_input > 0
             if use_pe_filter:
                 with st.spinner(f"📡 Đang tải P/E cho {len(market_data)} mã..."):
-                    pe_dist = _get_pe_distribution(tuple([d["ma"] for d in market_data]))
+                    pe_dist = _get_pe_distribution(tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]))
                 if pe_dist:
                     pe_map = {r["ma"]: r["pe"] for r in pe_dist}
                     df_mkt["pe"] = df_mkt["ma"].map(pe_map)
@@ -5388,18 +5439,22 @@ elif st.session_state.trang_thai == "deep_analysis":
                 import yfinance as _yf_pe
                 pes = []
                 for s in symbols:
+                    suffix = ".VN"
+                    sym = s
+                    if isinstance(s, tuple):
+                        sym, suffix = s
                     try:
-                        info = _yf_pe.Ticker(s + ".VN").info
+                        info = _yf_pe.Ticker(f"{sym}{suffix}").info
                         pe = info.get("trailingPE")
                         pb = info.get("priceToBook")
                         roe = info.get("returnOnEquity")
                         if pe and pe > 0:
-                            pes.append({"ma": s, "pe": pe, "pb": pb or 0, "roe": roe or 0})
+                            pes.append({"ma": sym, "pe": pe, "pb": pb or 0, "roe": roe or 0})
                     except Exception:
                         continue
                 return pes
             with st.spinner(f"📡 Lấy P/E/P/B/ROE cho {len(market_data)} mã..."):
-                pe_data = _get_pe_distribution(tuple([d["ma"] for d in market_data]))
+                pe_data = _get_pe_distribution(tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]))
             if pe_data:
                 df_pe = pd.DataFrame(pe_data)
                 st.write(f"**📊 Định giá thị trường từ {len(df_pe)} mã:**")
@@ -5790,7 +5845,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("## 🏛️ Real Sector P/E Benchmark — So sánh P/E mã vs ngành")
         if market_data and len(market_data) >= 5:
             with st.spinner("📡 Đang tải P/E + ngành cho 50 mã..."):
-                pe_dist_full = _get_pe_distribution(tuple([d["ma"] for d in market_data]))
+                pe_dist_full = _get_pe_distribution(tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]))
             if pe_dist_full:
                 pe_by_ma = {r["ma"]: r for r in pe_dist_full}
                 ng_by_ma = {d["ma"]: d.get("nganh", "Khác") for d in market_data}
@@ -5980,7 +6035,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("## 💎 Real Earnings Yield vs Bond Yield — So sánh thu nhập thật")
         if market_data and len(market_data) >= 5:
             with st.spinner("📡 Tải P/E + lãi suất trái phiếu VN..."):
-                pe_dist_ey = _get_pe_distribution(tuple([d["ma"] for d in market_data]))
+                pe_dist_ey = _get_pe_distribution(tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]))
                 bond_yield = _fetch_vn_bond_yield()
             bond_yield_pct = float(bond_yield.iloc[-1] * 100) if bond_yield is not None and len(bond_yield) > 0 else 7.05
             if pe_dist_ey:
