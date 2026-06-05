@@ -167,3 +167,29 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - ✅ Calendar Returns ValueError resample('M') (d774dd8) — `pd.DatetimeIndex(common_dates)` + `'ME'` (Month-End thay 'M' deprecated)
 - ✅ Bond Yield 7584% nonsense (d774dd8) — bỏ `^GSPC` fallback, validate `0<bv<50`
 - ✅ CAPM Regression + Brinson "không đủ dữ liệu VN30" (d774dd8) — same fix as IR/Capture, dùng `common_dates` thật
+- ✅ ROE 1640% hiển thị sai (b045570) — `roe = roe_raw if roe_raw <= 1 else roe_raw/100` (kpi đã %)
+- ✅ P/B = 0.00 khi kpi thiếu (b045570) — fallback `market_data`
+- ✅ "Danh mục của tôi" AttributeError (b045570) — `isinstance(dm, dict)` + list→dict convert
+- ✅ "Đánh giá HPG" intent None (b045570) — keywords `phan tich/danh gia/review` + regex mã
+- ✅ removeChild tab 6 Chuyên gia (30dc519) — `st.spinner` → `st.status` + session_state cache + `_safe_msg()`
+- ✅ removeChild tab Chat (79eca02) — `st.spinner` → `st.status` + try/except
+- ✅ DM mở rộng 8 → 16 mã (f838dce) — FPT, VCB, MBB, CTG, TCB, HPG, VIX, SSI, VNM, MSN, MWG, CTR, VIC, VHM, HVN, PNJ (tổng 97.4M₫, +9.82%)
+- ✅ st.progress trong @st.cache_data (b8d593d) — refactor `_fetch_all_parallel` thêm `progress_callback` param, 4 callsites wrap progress NGOÀI cached function
+
+**Phase 8 (commit `XXX` chưa push) — Mở rộng khảo sát rủi ro 12 → 24 câu (`backend/risk_profile.py`):**
+- Thêm 12 câu mới (câu 13-24):
+  1. Tổng tài sản ròng (5 mức: <500M → >20 tỷ)
+  2. Tỷ lệ nợ vay trên thu nhập hàng năm
+  3. Ngân sách đầu tư ban đầu (<10M → >1 tỷ)
+  4. Phản ứng nếu DM giảm 40% (kịch bản xấu hơn 20%)
+  5. Mức lỗ tối đa chấp nhận được (<5% → >50%)
+  6. Hiểu biết P/E, P/B (5 mức: chưa từng nghe → thành thạo)
+  7. Tình trạng gia đình (độc thân → nghỉ hưu)
+  8. Số người phụ thuộc tài chính (0 → 5+)
+  9. Tần suất giao dịch (mua giữ → day trading)
+  10. Kinh nghiệm margin (chưa biết → đã cháy TK)
+  11. Đã từng lỗ >30% trước đây (rút lui → coi là bài học)
+  12. Mức độ tin tưởng TTCK VN 5 năm tới (rất thấp → rất cao)
+- **Đã sửa `LOAI_NHA_DAU_TU.score_range`**: Bảo thủ (0-36), Thận trọng (37-60), Trung dung (61-84), Tăng trưởng (85-104), Táo bạo (105-120)
+- Max điểm: 24 × 5 = **120 điểm** (thay vì 12 × 5 = 60)
+- Đánh giá toàn diện hơn: về TÀI SẢN, NỢ, KINH NGHIỆM, TÂM LÝ, KỸ NĂNG, KẾ HOẠCH
