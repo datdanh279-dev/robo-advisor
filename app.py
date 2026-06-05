@@ -5709,6 +5709,282 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần giá thật 6T để vẽ Q-Q plot.")
 
         st.write("---")
+        st.write("## 🎯 Kelly Criterion Position Sizing — Tỷ trọng tối ưu cho từng mã")
+        if has_real and len(real_prices) >= 5:
+            try:
+                kelly_rows = []
+                for ma, ser in real_prices.items():
+                    if ser is None or len(ser) < 20:
+                        continue
+                    rets = ser.pct_change().dropna()
+                    if len(rets) < 10:
+                        continue
+                    wins = rets[rets > 0]
+                    losses = rets[rets < 0]
+                    if len(wins) < 3 or len(losses) < 3:
+                        continue
+                    p_win = len(wins) / len(rets)
+                    avg_win = float(wins.mean())
+                    avg_loss = abs(float(losses.mean()))
+                    if avg_loss <= 0:
+                        continue
+                    kelly_raw = (p_win * avg_win - (1 - p_win) * avg_loss) / (avg_win * avg_loss)
+                    kelly_pct = max(-0.99, min(0.25, kelly_raw))
+                    if ma in dm:
+                        cur_w = float(dm[ma].get("ty_trong", 0))
+                    else:
+                        cur_w = 0
+                    diff = kelly_pct - cur_w
+                    action = "TĂNG" if diff > 0.02 else ("GIẢM" if diff < -0.02 else "GIỮ")
+                    kelly_rows.append({"Mã": ma, "Win%": round(p_win * 100, 1),
+                        "Avg Win %": round(avg_win * 100, 2), "Avg Loss %": round(avg_loss * 100, 2),
+                        "Kelly %": round(kelly_pct * 100, 1), "Hiện tại %": round(cur_w * 100, 2),
+                        "Hành động": f"🟢 {action}" if action == "TĂNG" else (f"🔴 {action}" if action == "GIẢM" else f"🟡 {action}")})
+                if kelly_rows:
+                    df_kelly = pd.DataFrame(kelly_rows).sort_values("Kelly %", ascending=False)
+                    st.write(f"**Tính từ {len(df_kelly)} mã có ≥20 phiên giá thật. Kelly > hiện tại → TĂNG, < → GIẢM.**")
+                    st.dataframe(df_kelly.head(15), use_container_width=True, hide_index=True)
+                    top_k = df_kelly.iloc[0]
+                    bot_k = df_kelly.iloc[-1]
+                    kc1, kc2, kc3 = st.columns(3)
+                    kc1.metric("🏆 Top Kelly", f"{top_k['Mã']}", f"{top_k['Kelly %']}%")
+                    kc2.metric("🔻 Bottom Kelly", f"{bot_k['Mã']}", f"{bot_k['Kelly %']}%")
+                    kc3.metric("📊 Kelly TB", f"{df_kelly['Kelly %'].mean():.1f}%", help="Trung bình Kelly của tất cả mã")
+                    st.caption("📐 **Kelly % = (W × AvgWin − L × AvgLoss) / (AvgWin × AvgLoss)**. Kelly dương = nên tăng tỷ trọng, âm = nên giảm/bỏ. **Lưu ý: Kelly lý thuyết tích cực, thực tế nên dùng ½-Kelly hoặc ⅓-Kelly để an toàn.**")
+            except Exception as _ke:
+                st.caption(f"⚠️ Kelly lỗi: {str(_ke)[:80]}")
+        else:
+            st.info("⚠️ Cần giá thật 6T cho ≥5 mã để tính Kelly.")
+
+        st.write("---")
+        st.write("## 📊 Factor Decomposition — Phân tách Return: Thị trường / Ngành / Riêng")
+        if has_real and has_vn30 and len(real_prices) >= 10:
+            try:
+                if vn30_close is not None and len(vn30_close) >= 60:
+                    mkt_rets = vn30_close.pct_change().dropna()
+                    sector_rets_dict = {}
+                    for ma, ser in real_prices.items():
+                        if ma in dm and ser is not None and len(ser) >= 60:
+                            nganh_ma = dm[ma].get("nganh", "Khác")
+                            rets_ma = ser.pct_change().dropna()
+                            common_idx = rets_ma.index.intersection(mkt_rets.index)
+                            if len(common_idx) >= 30:
+                                sector_rets_dict.setdefault(nganh_ma, []).append(rets_ma.loc[common_idx])
+                    sector_avg = {n: pd.concat(rs, axis=1).mean(axis=1) for n, rs in sector_rets_dict.items() if len(rs) >= 2}
+                    fd_rows = []
+                    for ma, ser in real_prices.items():
+                        if ma not in dm or ser is None or len(ser) < 60:
+                            continue
+                        rets_ma = ser.pct_change().dropna()
+                        common_idx = rets_ma.index.intersection(mkt_rets.index)
+                        if len(common_idx) < 30:
+                            continue
+                        r_ma = rets_ma.loc[common_idx]
+                        r_mkt = mkt_rets.loc[common_idx]
+                        nganh_ma = dm[ma].get("nganh", "Khác")
+                        r_sec = sector_avg.get(nganh_ma, r_mkt).loc[common_idx] if nganh_ma in sector_avg else r_mkt
+                        if r_sec is None or len(r_sec) < 30:
+                            r_sec = r_mkt
+                        try:
+                            beta_m = float(np.cov(r_ma, r_mkt)[0, 1] / max(np.var(r_mkt), 1e-12))
+                            beta_s = float(np.cov(r_ma, r_sec)[0, 1] / max(np.var(r_sec), 1e-12))
+                        except Exception:
+                            beta_m, beta_s = 1.0, 1.0
+                        ret_total = float((1 + r_ma).prod() - 1) * 100
+                        ret_mkt = float((1 + r_mkt).prod() - 1) * 100
+                        ret_sec = float((1 + r_sec).prod() - 1) * 100
+                        contrib_mkt = beta_m * ret_mkt
+                        contrib_sec = beta_s * (ret_sec - ret_mkt)
+                        contrib_spec = ret_total - contrib_mkt - contrib_sec
+                        fd_rows.append({"Mã": ma, "Ngành": nganh_ma, "Return %": round(ret_total, 1),
+                            "Market %": round(contrib_mkt, 1), "Sector %": round(contrib_sec, 1),
+                            "Specific %": round(contrib_spec, 1),
+                            "Phân loại": "🏆 Vượt trội" if contrib_spec > 5 else ("✅ Khá" if contrib_spec > 0 else ("⚠️ Yếu" if contrib_spec > -5 else "🔴 Kém"))})
+                    if fd_rows:
+                        df_fd = pd.DataFrame(fd_rows).sort_values("Specific %", ascending=False)
+                        st.write(f"**Phân tách return 6T cho {len(df_fd)} mã. Specific > 0 = vượt ngành+thị trường, < 0 = kém.**")
+                        st.dataframe(df_fd.head(20), use_container_width=True, hide_index=True)
+                        st.write("**Top 10 mã có Specific (riêng) CAO nhất:**")
+                        st.dataframe(df_fd.head(10)[["Mã", "Ngành", "Specific %", "Phân loại"]], use_container_width=True, hide_index=True)
+                        st.write("**Top 10 mã có Specific (riêng) THẤP nhất (nên xem xét bỏ):**")
+                        st.dataframe(df_fd.tail(10)[["Mã", "Ngành", "Specific %", "Phân loại"]], use_container_width=True, hide_index=True)
+                        avg_spec = float(df_fd["Specific %"].mean())
+                        n_beat = int((df_fd["Specific %"] > 0).sum())
+                        fd1, fd2, fd3 = st.columns(3)
+                        fd1.metric("📊 Specific TB", f"{avg_spec:+.1f}%", help="Trung bình đóng góp riêng của mỗi mã")
+                        fd2.metric("✅ Vượt trội", f"{n_beat}/{len(df_fd)}", help="Số mã có Specific > 0")
+                        fd3.metric("🏆 Top Specific", f"{df_fd.iloc[0]['Mã']}", f"{df_fd.iloc[0]['Specific %']:+.1f}%")
+                        st.caption("📐 **Return tổng = β_market × Return_thị_trường + β_sector × (Return_ngành − Return_thị trường) + Specific**. Specific dương = chọn mã giỏi, Specific âm = kéo DM xuống dù ngành/thị trường tốt.")
+            except Exception as _fe:
+                st.caption(f"⚠️ Factor Decomposition lỗi: {str(_fe)[:80]}")
+        else:
+            st.info("⚠️ Cần giá thật 6T + VN30 + ≥10 mã để phân tách yếu tố.")
+
+        st.write("---")
+        st.write("## 💧 Liquidity Stress Test — Test thanh khoản (Position / ADTV)")
+        if has_real and market_data and len(market_data) >= 5:
+            try:
+                liq_rows = []
+                for ma, d in dm.items():
+                    px = float(d.get("gia_thi_truong", 0))
+                    sl = float(d.get("so_luong", 0))
+                    vh = float(d.get("von_hoa", 0))
+                    if px <= 0 or sl <= 0 or ma not in real_prices or len(real_prices[ma]) < 20:
+                        continue
+                    rets = real_prices[ma].pct_change().dropna()
+                    vol_proxy = float(rets.tail(20).abs().mean()) * 1000
+                    adtv = max(vh * 0.005, vol_proxy * px, 100_000_000)
+                    pos_value = px * sl
+                    days_to_liquidate = max(1, pos_value / adtv)
+                    pct_of_adtv = pos_value / adtv
+                    stress = "🟢 OK" if pct_of_adtv < 1 else ("🟡 Cẩn thận" if pct_of_adtv < 5 else ("🟠 Khó" if pct_of_adtv < 15 else "🔴 Rất khó"))
+                    liq_rows.append({"Mã": ma, "GT vị thế (Tỷ)": round(pos_value / 1e9, 2),
+                        "ADTV (Tỷ/ngày)": round(adtv / 1e9, 2), "% ADTV": round(pct_of_adtv, 1),
+                        "Ngày bán hết": round(days_to_liquidate, 1), "Trạng thái": stress})
+                if liq_rows:
+                    df_liq = pd.DataFrame(liq_rows).sort_values("% ADTV", ascending=False)
+                    st.write(f"**Test thanh khoản cho {len(df_liq)} mã. ADTV ước lượng = max(vốn hóa × 0.5%, vol×px, 100M₫). %ADTV > 5% = khó thoát hàng.**")
+                    st.dataframe(df_liq.head(20), use_container_width=True, hide_index=True)
+                    n_warn = int((df_liq["% ADTV"] >= 5).sum())
+                    n_bad = int((df_liq["% ADTV"] >= 15).sum())
+                    lq1, lq2, lq3 = st.columns(3)
+                    lq1.metric("🟢 Thoát hàng <1 ngày", f"{int((df_liq['% ADTV'] < 1).sum())}/{len(df_liq)}")
+                    lq2.metric("🟡 Cảnh báo >5% ADTV", f"{n_warn}")
+                    lq3.metric("🔴 Khó bán >15% ADTV", f"{n_bad}")
+                    st.caption("📐 **%ADTV = (Giá × Số lượng) / ADTV**. Nếu > 5% → khó thoát hàng trong 1 ngày mà không đẩy giá. Nếu > 15% → cần chia nhỏ lệnh bán nhiều ngày. Stress test giả định kịch bản bán tháo.")
+            except Exception as _le:
+                st.caption(f"⚠️ Liquidity test lỗi: {str(_le)[:80]}")
+        else:
+            st.info("⚠️ Cần DM + giá thật 6T + market_data để test thanh khoản.")
+
+        st.write("---")
+        st.write("## 🌍 Macro Sensitivity Matrix — Độ nhạy DM với biến vĩ mô")
+        def _macro_interpret(label, corr):
+            if "VIX" in label:
+                return "🛡️ Phòng thủ tốt" if corr < 0 else "⚠️ Sợ hãi → DM giảm"
+            if "Dollar" in label or "DXY" in label:
+                return "🛡️ USD yếu = CP tốt" if corr < 0 else "⚠️ USD mạnh = áp lực"
+            if "US10Y" in label or "Lãi suất" in label:
+                return "🛡️ Lãi suất Mỹ cao = rút vốn" if corr < 0 else "✅ Cùng hưởng tăng"
+            if "Gold" in label or "Vàng" in label:
+                return "🛡️ Vàng tăng = phòng thủ" if corr < 0 else "✅ Cùng tài sản trú ẩn"
+            if "Bitcoin" in label or "BTC" in label:
+                return "🛡️ Crypto rủi ro tách biệt" if corr < 0 else "⚠️ Rủi ro cùng chiều"
+            return f"Corr = {corr:+.2f}"
+        if has_real and dm_equity is not None and len(dm_equity) >= 30:
+            try:
+                @st.cache_data(ttl=3600, show_spinner="📡 Tải dữ liệu vĩ mô (VIX, DXY, US10Y, Gold, BTC)...")
+                def _get_macro_prices():
+                    import yfinance as _yf_m
+                    macro_syms = {"VIX (Sợ hãi)": "^VIX", "DXY (Dollar)": "DX-Y.NYB",
+                        "US10Y (Lãi suất Mỹ)": "^TNX", "Gold (Vàng)": "GC=F", "Bitcoin": "BTC-USD"}
+                    out = {}
+                    for label, sym in macro_syms.items():
+                        try:
+                            s = _yf_m.Ticker(sym)
+                            h = s.history(period="6mo", auto_adjust=True)
+                            if h is not None and len(h) > 20:
+                                out[label] = h["Close"].pct_change().dropna()
+                        except Exception:
+                            continue
+                    return out
+                with st.spinner("📡 Tải dữ liệu vĩ mô..."):
+                    macro_data = _get_macro_prices()
+                if macro_data and len(macro_data) >= 3:
+                    dm_rets = pd.Series(dm_equity).pct_change().dropna()
+                    ms_rows = []
+                    for label, mr in macro_data.items():
+                        common_idx = dm_rets.index.intersection(mr.index)
+                        if len(common_idx) < 20:
+                            continue
+                        d = dm_rets.loc[common_idx]
+                        m = mr.loc[common_idx]
+                        try:
+                            corr = float(np.corrcoef(d, m)[0, 1])
+                            beta_macro = float(np.cov(d, m)[0, 1] / max(np.var(m), 1e-12))
+                        except Exception:
+                            corr, beta_macro = 0, 0
+                        ms_rows.append({"Biến vĩ mô": label, "Correlation": round(corr, 3),
+                            "Beta": round(beta_macro, 3),
+                            "Diễn giải": _macro_interpret(label, corr)})
+                    if ms_rows:
+                        df_ms = pd.DataFrame(ms_rows)
+                        st.write(f"**Tương quan giữa DM và {len(df_ms)} biến vĩ mô 6T qua. Correlation âm = phòng thủ.**")
+                        st.dataframe(df_ms, use_container_width=True, hide_index=True)
+                        fig_ms = go.Figure()
+                        fig_ms.add_trace(go.Bar(x=df_ms["Biến vĩ mô"], y=df_ms["Correlation"],
+                            marker_color=["#4CAF50" if c < 0 else "#FF5252" for c in df_ms["Correlation"]],
+                            text=df_ms["Correlation"].round(2), textposition="outside"))
+                        fig_ms.update_layout(title="DM Correlation với biến vĩ mô", yaxis_title="Correlation (-1 ↔ +1)",
+                            height=350, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                        st.plotly_chart(fig_ms, use_container_width=True)
+                        most_neg = df_ms.loc[df_ms["Correlation"].idxmin()]
+                        most_pos = df_ms.loc[df_ms["Correlation"].idxmax()]
+                        ms1, ms2 = st.columns(2)
+                        ms1.metric("🛡️ Hấp thụ tốt nhất", f"{most_neg['Biến vĩ mô']}", f"{most_neg['Correlation']:+.3f}",
+                            help="Correlation âm nhất = biến này tăng thì DM giảm (phòng thủ)")
+                        ms2.metric("⚠️ Nhạy cảm nhất", f"{most_pos['Biến vĩ mô']}", f"{most_pos['Correlation']:+.3f}",
+                            help="Correlation dương cao nhất = DM đi cùng chiều biến này")
+                        st.caption("📐 **Correlation** = mức độ đi cùng chiều/ngược chiều (-1 ↔ +1). **Beta** = DM biến động gấp mấy lần biến vĩ mô. Correlation < 0 = tài sản phòng thủ khi biến này biến động mạnh. Correlation > 0.5 = rủi ro hệ thống cao.")
+            except Exception as _me:
+                st.caption(f"⚠️ Macro sensitivity lỗi: {str(_me)[:80]}")
+        else:
+            st.info("⚠️ Cần giá thật 6T (≥30 phiên) để tính độ nhạy vĩ mô.")
+
+        st.write("---")
+        st.write("## 📊 Mean Reversion / Momentum Score — Điểm trung bình trở về vs Xu hướng")
+        if has_real and len(real_prices) >= 5:
+            try:
+                mrm_rows = []
+                for ma, ser in real_prices.items():
+                    if ser is None or len(ser) < 60:
+                        continue
+                    rets = ser.pct_change().dropna()
+                    if len(rets) < 30:
+                        continue
+                    px_now = float(ser.iloc[-1])
+                    ma20 = float(ser.tail(20).mean())
+                    ma60 = float(ser.tail(60).mean())
+                    std60 = float(ser.tail(60).std())
+                    z_score = (px_now - ma60) / std60 if std60 > 0 else 0
+                    ret_20d = (px_now / float(ser.iloc[-21])) - 1 if len(ser) >= 21 else 0
+                    ret_60d = (px_now / float(ser.iloc[-61])) - 1 if len(ser) >= 61 else 0
+                    if z_score < -1.5:
+                        signal = "🟢 Mua (mean reversion)"
+                        score = "🟢"
+                    elif z_score > 1.5:
+                        signal = "🔴 Bán (quá mua)"
+                        score = "🔴"
+                    elif ret_20d > 0.1 and ret_60d > 0.15:
+                        signal = "🟢 Momentum mạnh"
+                        score = "🟢"
+                    elif ret_20d < -0.1 and ret_60d < -0.15:
+                        signal = "🔴 Momentum yếu"
+                        score = "🔴"
+                    else:
+                        signal = "🟡 Trung tính"
+                        score = "🟡"
+                    mrm_rows.append({"Mã": ma, "Giá": round(px_now, 1), "MA20": round(ma20, 1),
+                        "MA60": round(ma60, 1), "Z-score": round(z_score, 2),
+                        "20D %": round(ret_20d * 100, 1), "60D %": round(ret_60d * 100, 1),
+                        "Tín hiệu": signal, "Điểm": score})
+                if mrm_rows:
+                    df_mrm = pd.DataFrame(mrm_rows).sort_values("Z-score")
+                    st.write(f"**Z-score = (Giá − MA60) / σ60. Z < −1.5 = mua (mean reversion), Z > 1.5 = bán (quá mua).**")
+                    st.dataframe(df_mrm.head(25), use_container_width=True, hide_index=True)
+                    buy_n = int((df_mrm["Điểm"] == "🟢").sum())
+                    sell_n = int((df_mrm["Điểm"] == "🔴").sum())
+                    mr1, mr2, mr3 = st.columns(3)
+                    mr1.metric("🟢 Tín hiệu MUA", f"{buy_n} mã", help="Z-score < -1.5 hoặc momentum mạnh")
+                    mr2.metric("🔴 Tín hiệu BÁN", f"{sell_n} mã", help="Z-score > 1.5 hoặc momentum yếu")
+                    mr3.metric("🟡 Trung tính", f"{int((df_mrm['Điểm'] == '🟡').sum())} mã")
+                    st.caption("📐 **Z-score âm** = giá thấp hơn trung bình 60 ngày (có thể mua mean reversion). **Z-score dương** = giá cao hơn TB (có thể bán chốt lời). **Momentum** = xu hướng 20D/60D.")
+            except Exception as _mre:
+                st.caption(f"⚠️ Mean Reversion lỗi: {str(_mre)[:80]}")
+        else:
+            st.info("⚠️ Cần giá thật 6T cho ≥5 mã để tính Mean Reversion.")
+
+        st.write("---")
         st.write("## 🌍 Quét toàn thị trường — Top Movers & Volume Leaders")
         try:
             _vn_doc_keys = list((DOCS.get("co_phieu_vn") or {}).keys())
