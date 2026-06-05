@@ -3164,11 +3164,12 @@ elif st.session_state.trang_thai == "deep_analysis":
                 )
         except Exception:
             pass
+        has_real_pre = len(real_prices) >= 2
         vn30_close, vn30_label = _fetch_vn30_proxy()
-        if vn30_close is None and has_real:
+        if vn30_close is None and has_real_pre:
             _md_for_vn30 = st.session_state.get("chat_market_data") or []
             vn30_close, vn30_label = _build_vn30_synthetic(dict(real_prices), tuple(_md_for_vn30))
-        has_real = len(real_prices) >= 2
+        has_real = has_real_pre
         has_vn30 = vn30_close is not None and len(vn30_close) >= 30
         has_fund = len(real_fund) >= 1
         usdvnd_close = _fetch_usdvnd()
