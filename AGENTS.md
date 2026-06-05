@@ -100,6 +100,12 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - Phase 1: 12 chỉ số rủi ro, KT, Pie ngành, Backtest, Monte Carlo, Efficient Frontier, Brinson, Active Share, Q-Q Plot, RoMaD, CAPM, Brinson…
 - Phase 2 (50 mã toàn thị trường): Top Movers, Volume Leaders, Stock Screener, Sector Heatmap, Market Valuation, Dividend Champions, Volume Distribution, Market Breadth, 52W High/Low, RSI Heatmap, Volatility Ranking, Market Cap Distribution, Avg Daily Range
 - Phase 3 (thêm mới): Real Money Flow, Sector P/E Benchmark, Insider & Institutional Holdings, Earnings Calendar, **Sector Rotation Matrix (1W/1M/3M/6M/1Y)**, **Earnings Yield vs Bond Yield**, **Currency Strength (8 cặp)**, **Market Heat Index**
+- **Phase 4 (commit `641e7aa`) — Mở rộng 50 → 229 VN + 155 TG = 384 mã:**
+  - `_all_vn_stocks` tự động load từ `co_phieu_vn.json` (229 mã) + `co_phieu_tg.json` (155 mã)
+  - Yahoo API: `(symbol, suffix)` tuple — VN: `.VN`, TG: không suffix
+  - Top Movers/Volume/Return: thêm cột **Vùng** (VN/TG) + radio filter (Tất cả / Chỉ VN / Chỉ Thế giới)
+  - `_get_pe_distribution` nhận tuple, tự động chọn suffix theo vùng
+  - **Fix lỗi "Không đủ dữ liệu chung với VN30"** ở IR Decomposition + Upside/Downside Capture: nguyên nhân `dm_equity = dm_value_ts.values` (numpy array, không có datetime index) → `set(pd.Series(dm_equity).index) & set(vn30_close.index)` luôn rỗng. Fix: tạo `dm_eq_series = pd.Series(dm_equity, index=common_dates_local)` rồi mới tính common_idx.
 
 **Chat thông minh (6 intent mới, dùng real-data từ context):**
 - "Phân tích DM của tôi" → real-time từ st.session_state.dm
