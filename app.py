@@ -192,6 +192,24 @@ def hoi_dong_chuyen_gia(*args, **kwargs):
     return _impl(*args, **kwargs)
 _T4b = datetime.now(); print(f"[TRACE] expert_panel deferred: {(_T4b-_T4).total_seconds():.3f}s", file=sys.stderr)
 
+def _safe_msg(kind, msg, key=None):
+    """Wrapper an toan cho st.error/warning/info/success.
+    Fix React removeChild bug bang cach stable hoa content trong session_state.
+    """
+    if not key:
+        import hashlib
+        key = "msg_" + hashlib.md5((kind + str(msg)[:200]).encode("utf-8")).hexdigest()[:12]
+    if kind not in st.session_state._safe_msg_cache:
+        st.session_state._safe_msg_cache[kind] = {}
+    cache = st.session_state._safe_msg_cache[kind]
+    if key in cache:
+        return
+    cache[key] = True
+    st.write(msg)
+
+if "_safe_msg_cache" not in st.session_state:
+    st.session_state._safe_msg_cache = {"error": {}, "warning": {}, "info": {}, "success": {}}
+
 def _khoi_tao_dulieu():
     print("[TRACE] _khoi_tao_dulieu called", file=sys.stderr)
     if "docs_loaded" not in st.session_state or not st.session_state.docs_loaded:
@@ -7235,23 +7253,37 @@ elif st.session_state.trang_thai == "chat":
             )
             submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
             if submitted and cau_hoi:
+                _status = st.status("🧠 Đang kết nối 6 chuyên gia AI...", expanded=True)
                 try:
-                    with st.spinner("🧠 Đang hỏi các chuyên gia AI..."):
-                        results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
+                    _status.update(label="🧠 Đang gửi câu hỏi cho 6 chuyên gia (có thể mất 30-90 giây)...")
+                    results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
+                    _status.update(label="✅ Hoàn tất!", state="complete")
                     if results and isinstance(results, dict) and results.get("experts"):
                         st.session_state.expert_results = results
-                        mode = results.get("mode", "cao_cap")
-                        mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
-                        st.success(f"✅ Đã nhận phản hồi. Chế độ: {mode_labels.get(mode, mode)}")
+                        st.session_state.expert_status = "ok"
+                        st.session_state.expert_mode = results.get("mode", "cao_cap")
                     else:
                         st.session_state.expert_results = results
-                        st.warning("⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.")
+                        st.session_state.expert_status = "empty"
                 except Exception as _expert_err:
-                    st.error(f"❌ Lỗi khi gọi Hội đồng Chuyên gia: {_expert_err}")
-                    st.info("Vui lòng thử lại hoặc dùng tab Chat bên cạnh.")
-                    import traceback as _tb
-                    with st.expander("Chi tiết lỗi (debug)"):
-                        st.code(_tb.format_exc())
+                    _status.update(label="❌ Lỗi", state="error")
+                    st.session_state.expert_status = "error"
+                    st.session_state.expert_error = str(_expert_err)
+                try:
+                    _status.empty()
+                except Exception:
+                    pass
+
+        if st.session_state.get("expert_status") == "ok":
+            _mode = st.session_state.get("expert_mode", "cao_cap")
+            _mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
+            st.write(f"✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}")
+        elif st.session_state.get("expert_status") == "empty":
+            st.write("⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.")
+        elif st.session_state.get("expert_status") == "error":
+            _err = st.session_state.get("expert_error", "Lỗi không xác định")
+            st.write(f"❌ Lỗi khi gọi Hội đồng Chuyên gia: {_err}")
+            st.write("Vui lòng thử lại hoặc dùng tab Chat bên cạnh.")
 
         if st.session_state.expert_results:
             results = st.session_state.expert_results
@@ -7270,20 +7302,13 @@ elif st.session_state.trang_thai == "chat":
                             f"**{expert.get('name', 'Chuyên gia')}** — {expert.get('title', '')}",
                             expanded=(i < 3),
                         ):
-                            if resp.startswith("❌"):
-                                st.error(resp)
-                            elif resp.startswith("⚠️"):
-                                st.warning(resp)
-                            elif resp.startswith("⏭️"):
-                                st.caption(resp)
-                            else:
-                                st.markdown(resp)
+                            st.write(resp)
 
                 chairman = results.get("chairman")
                 if chairman:
-                    st.markdown("---")
-                    st.markdown("#### 👑 Kết luận của Chủ tịch Hội đồng")
-                    st.markdown(chairman)
+                    st.write("---")
+                    st.write("#### 👑 Kết luận của Chủ tịch Hội đồng")
+                    st.write(chairman)
 
             if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
                 st.session_state.expert_results = None
