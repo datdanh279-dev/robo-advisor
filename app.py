@@ -2085,7 +2085,23 @@ def _render_tonghop():
                     info = DOCS.get("co_phieu_vn", {}).get(ma_bt, {})
                     gia_goc = info.get("gia", 50000)
                     np.random.seed(hash(ma_bt) % 2**32)
-                    ret = np.random.randn(n_days_bt) * 0.015
+                    daily_vol = 0.015
+                    try:
+                        import requests as _rq_bt
+                        r = _rq_bt.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma_bt}.VN?range=6mo&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            d = r.json()
+                            cs = d.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            valid = [c for c in cs if c]
+                            if len(valid) > 30:
+                                p = pd.Series(valid)
+                                r_real = p.pct_change().dropna()
+                                if len(r_real) > 20:
+                                    daily_vol = float(r_real.std())
+                    except Exception:
+                        pass
+                    ret = np.random.randn(n_days_bt) * daily_vol
                     prices = gia_goc * np.exp(np.cumsum(ret))
                     df_bt = pd.DataFrame({"price": prices})
                     df_bt["MA20"] = df_bt["price"].rolling(20).mean()
@@ -2177,9 +2193,30 @@ def _render_tonghop():
                     gia_goc = info.get("gia", 50000)
                     np.random.seed(hash(ma_ai) % 2**32)
                     trend = 0.0005
-                    ret = np.random.randn(n_days_hist + n_days_pred) * 0.015 + trend
-                    all_prices = gia_goc * np.exp(np.cumsum(ret))
-                    hist = all_prices[:n_days_hist]
+                    daily_vol_ai = 0.015
+                    hist_prices = None
+                    try:
+                        import requests as _rq_ai
+                        r = _rq_ai.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma_ai}.VN?range=1y&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            d = r.json()
+                            cs = d.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            valid = [c for c in cs if c]
+                            if len(valid) > n_days_hist:
+                                hist_prices = np.array(valid[-n_days_hist:], dtype=float)
+                                gia_goc = hist_prices[0]
+                                r_real = pd.Series(valid).pct_change().dropna()
+                                if len(r_real) > 20:
+                                    daily_vol_ai = float(r_real.std())
+                    except Exception:
+                        pass
+                    if hist_prices is not None:
+                        hist = hist_prices
+                    else:
+                        ret = np.random.randn(n_days_hist + n_days_pred) * daily_vol_ai + trend
+                        all_prices = gia_goc * np.exp(np.cumsum(ret))
+                        hist = all_prices[:n_days_hist]
                     X = np.arange(n_days_hist).reshape(-1, 1)
                     y = hist
                     model = LinearRegression()
@@ -5882,6 +5919,209 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.info("⚠️ DM chưa có mã nào có số lượng > 0.")
         else:
             st.info("⚠️ Cần DM có dữ liệu.")
+
+        st.write("---")
+        st.write("## 🔄 Real Sector Rotation Matrix — Hiệu suất ngành theo thời kỳ")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=1800)
+            def _compute_sector_rotation(symbols, sectors):
+                import requests as _rq_sr
+                period_returns = {"1W": 5, "1M": 21, "3M": 63, "6M": 126, "1Y": 252}
+                sector_data = {}
+                for s, ng in zip(symbols, sectors):
+                    try:
+                        r = _rq_sr.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=1y&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            data = r.json()
+                            result = data.get("chart", {}).get("result", [{}])[0]
+                            closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            valid = [c for c in closes if c]
+                            if len(valid) > 30:
+                                cur = float(valid[-1])
+                                returns = {}
+                                for label, n in period_returns.items():
+                                    if len(valid) > n:
+                                        prev = float(valid[-n-1])
+                                        returns[label] = (cur / prev - 1) * 100
+                                sector_data.setdefault(ng, []).append(returns)
+                    except Exception:
+                        continue
+                out = []
+                for ng, lst in sector_data.items():
+                    if lst:
+                        med = {k: float(np.median([r.get(k, 0) for r in lst if r])) for k in period_returns.keys()}
+                        out.append({"nganh": ng, "so_ma": len(lst), **med})
+                return out
+            with st.spinner(f"📡 Tính sector rotation cho {len(market_data)} mã..."):
+                rot = _compute_sector_rotation(
+                    tuple([d["ma"] for d in market_data]),
+                    tuple([d.get("nganh", "Khác") for d in market_data])
+                )
+            if rot:
+                df_rot = pd.DataFrame(rot).sort_values("1M", ascending=False)
+                st.write("**📊 Sector Rotation Matrix (return % theo từng kỳ):**")
+                st.dataframe(df_rot[["nganh", "so_ma", "1W", "1M", "3M", "6M", "1Y"]].round(2),
+                    use_container_width=True, hide_index=True)
+                fig_rot = go.Figure()
+                for col in ["1W", "1M", "3M", "6M", "1Y"]:
+                    fig_rot.add_trace(go.Bar(name=col, x=df_rot["nganh"], y=df_rot[col]))
+                fig_rot.update_layout(barmode="group", title="Sector Performance theo thời kỳ (%)",
+                    xaxis_title="Ngành", yaxis_title="Return %",
+                    height=400, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_rot, use_container_width=True)
+                top_1m = df_rot.iloc[0]
+                worst_1y_idx = df_rot["1Y"].idxmin()
+                st.caption(f"📊 Tính từ {len(market_data)} mã từ yfinance chart API 1Y. Ngành nóng nhất 1M: **{top_1m['nganh']}** ({top_1m['1M']:+.2f}%). Ngành yếu nhất 1Y: **{df_rot.loc[worst_1y_idx, 'nganh']}** ({df_rot.loc[worst_1y_idx, '1Y']:+.2f}%).")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 💎 Real Earnings Yield vs Bond Yield — So sánh thu nhập thật")
+        if market_data and len(market_data) >= 5:
+            with st.spinner("📡 Tải P/E + lãi suất trái phiếu VN..."):
+                pe_dist_ey = _get_pe_distribution(tuple([d["ma"] for d in market_data]))
+                bond_yield = _fetch_vn_bond_yield()
+            bond_yield_pct = float(bond_yield.iloc[-1] * 100) if bond_yield is not None and len(bond_yield) > 0 else 7.05
+            if pe_dist_ey:
+                ey_rows = []
+                for r in pe_dist_ey:
+                    pe = r.get("pe", 0)
+                    if pe and pe > 0:
+                        ey = 100.0 / pe
+                        spread = ey - bond_yield_pct
+                        ey_rows.append({"ma": r["ma"], "pe": pe, "earnings_yield": ey,
+                            "spread_vs_bond": spread,
+                            "status": "🟢 Hấp dẫn" if spread > 3 else ("🟡 Hợp lý" if spread > 0 else "🔴 Kém hấp dẫn")})
+                if ey_rows:
+                    df_ey = pd.DataFrame(ey_rows).sort_values("spread_vs_bond", ascending=False)
+                    ey1, ey2, ey3 = st.columns(3)
+                    ey1.metric("🏛️ Lãi suất TP VN (10Y)", f"{bond_yield_pct:.2f}%",
+                        help="Lãi suất trái phiếu chính phủ VN 10 năm từ yfinance")
+                    ey2.metric("📊 Earnings Yield TB", f"{df_ey['earnings_yield'].mean():.2f}%",
+                        help="Trung bình 1/PE của các mã VN")
+                    ey3.metric("💰 Spread TB", f"{df_ey['spread_vs_bond'].mean():+.2f}%",
+                        help="EY - Bond Yield. Dương = CP hấp dẫn hơn TP, Âm = nên mua TP")
+                    st.write("**Top 10 mã có EY - Bond Yield cao nhất (CP hấp dẫn hơn TP):**")
+                    st.dataframe(df_ey.head(10)[["ma", "pe", "earnings_yield", "spread_vs_bond", "status"]].round(2),
+                        use_container_width=True, hide_index=True)
+                    st.write("**Top 10 mã có EY - Bond Yield thấp nhất (CP kém hấp dẫn):**")
+                    st.dataframe(df_ey.tail(10)[["ma", "pe", "earnings_yield", "spread_vs_bond", "status"]].round(2),
+                        use_container_width=True, hide_index=True)
+                    st.caption(f"📊 Earnings Yield = 1/P/E. Spread > 0% = CP sinh lời nhiều hơn TP. Spread > 3% = rất hấp dẫn (Buffett favorite). Tính từ {len(ey_rows)} mã có P/E thật từ yfinance + bond yield ^VN10Y/VNI10Y.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 💱 Real Currency Strength — Sức mạnh đồng tiền thật")
+        @st.cache_data(ttl=3600, show_spinner="📡 Tải tỷ giá...")
+        def _get_currency_strength():
+            try:
+                import yfinance as _yf_fx
+                pairs = {
+                    "USD/VND": "USDVND=X",
+                    "EUR/VND": "EURVND=X",
+                    "JPY/VND": "JPYVND=X",
+                    "GBP/VND": "GBPVND=X",
+                    "CNY/VND": "CNYVND=X",
+                    "DXY (Dollar Index)": "DX-Y.NYB",
+                    "BTC/USD": "BTC-USD",
+                    "Gold (XAU/USD)": "GC=F",
+                }
+                out = []
+                for label, sym in pairs.items():
+                    try:
+                        s = _yf_fx.Ticker(sym)
+                        hist = s.history(period="3mo", auto_adjust=True)
+                        if hist is not None and len(hist) > 5:
+                            cur = float(hist["Close"].iloc[-1])
+                            prev_d = float(hist["Close"].iloc[-2]) if len(hist) > 1 else cur
+                            prev_w = float(hist["Close"].iloc[-6]) if len(hist) > 5 else cur
+                            prev_m = float(hist["Close"].iloc[-22]) if len(hist) > 21 else cur
+                            chg_d = (cur / prev_d - 1) * 100
+                            chg_w = (cur / prev_w - 1) * 100
+                            chg_m = (cur / prev_m - 1) * 100
+                            out.append({"cap": label, "gia": cur, "1D": chg_d, "1W": chg_w, "1M": chg_m})
+                    except Exception:
+                        continue
+                return out
+            except Exception:
+                return []
+        with st.spinner("📡 Tải tỷ giá 8 cặp tiền tệ + vàng..."):
+            fx_data = _get_currency_strength()
+        if fx_data:
+            df_fx = pd.DataFrame(fx_data)
+            st.write("**💱 Sức mạnh đồng tiền so với VND + tài sản toàn cầu:**")
+            st.dataframe(df_fx.round(2), use_container_width=True, hide_index=True)
+            fig_fx = go.Figure()
+            for col, color in [("1D", "#2196F3"), ("1W", "#FF9800"), ("1M", "#4CAF50")]:
+                fig_fx.add_trace(go.Bar(name=col, x=df_fx["cap"], y=df_fx[col], marker_color=color))
+            fig_fx.update_layout(barmode="group", title="Biến động tỷ giá theo thời kỳ (%)",
+                xaxis_title="Cặp tiền/Tài sản", yaxis_title="% thay đổi",
+                height=400, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_fx, use_container_width=True)
+            st.caption(f"📊 Tỷ giá từ yfinance: USDVND=X, EURVND=X, JPYVND=X, GBPVND=X, CNYVND=X, DX-Y.NYB (Dollar Index), BTC-USD, GC=F (Vàng). Ảnh hưởng đến: nhập khẩu, lạm phát, vàng, crypto.")
+        else:
+            st.info("⚠️ Không tải được dữ liệu tỷ giá.")
+
+        st.write("---")
+        st.write("## 🌡️ Real Market Heat Index — Nhiệt độ thị trường")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=1800)
+            def _compute_heat_index(symbols):
+                import requests as _rq_h
+                out = []
+                for s in symbols:
+                    try:
+                        r = _rq_h.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=1mo&interval=1d",
+                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                        if r.status_code == 200:
+                            data = r.json()
+                            result = data.get("chart", {}).get("result", [{}])[0]
+                            quote = result.get("indicators", {}).get("quote", [{}])[0]
+                            closes = quote.get("close", [])
+                            volumes = quote.get("volume", [])
+                            if closes and len(closes) > 5:
+                                valid_c = [c for c in closes if c]
+                                valid_v = [v for v in volumes if v]
+                                if len(valid_c) > 5 and len(valid_v) > 5:
+                                    cur = float(valid_c[-1])
+                                    prev = float(valid_c[-2]) if len(valid_c) > 1 else cur
+                                    chg = (cur / prev - 1) * 100
+                                    avg_v = float(np.mean(valid_v[-20:])) if len(valid_v) >= 20 else float(np.mean(valid_v))
+                                    vol_today = float(valid_v[-1]) if valid_v else 0
+                                    vol_burst = (vol_today / avg_v) if avg_v > 0 else 0
+                                    spread = ((float(max(valid_c[-5:])) - float(min(valid_c[-5:]))) / cur * 100) if cur > 0 and len(valid_c) >= 5 else 0
+                                    heat = abs(chg) * 0.4 + min(vol_burst, 5) * 10 + min(spread, 10) * 5
+                                    out.append({"ma": s, "gia": cur, "chg": chg, "vol_burst": vol_burst,
+                                        "spread": spread, "heat": float(heat)})
+                    except Exception:
+                        continue
+                return out
+            with st.spinner(f"📡 Tính heat index cho {len(market_data)} mã..."):
+                heat_data = _compute_heat_index(tuple([d["ma"] for d in market_data]))
+            if heat_data:
+                df_heat = pd.DataFrame(heat_data).sort_values("heat", ascending=False)
+                h1, h2, h3 = st.columns(3)
+                h1.metric("🌡️ Heat Index TB", f"{df_heat['heat'].mean():.1f}",
+                    help="Heat = |% thay đổi| × 0.4 + vol_burst × 10 + spread × 5. Cao = thị trường nóng")
+                h2.metric("🔥 Mã NÓNG (heat > 50)", f"{(df_heat['heat']>50).sum()}/{len(df_heat)}",
+                    help="Số mã có heat > 50 = đáng chú ý đặc biệt")
+                h3.metric("❄️ Mã LẠNH (heat < 10)", f"{(df_heat['heat']<10).sum()}/{len(df_heat)}",
+                    help="Số mã có heat < 10 = im ắng, ít giao dịch")
+                st.write("**🔥 Top 10 mã NÓNG nhất hôm nay:**")
+                st.dataframe(df_heat.head(10)[["ma", "gia", "chg", "vol_burst", "spread", "heat"]].round(2),
+                    use_container_width=True, hide_index=True)
+                fig_heat = go.Figure()
+                colors = ['#F44336' if h > 50 else ('#FF9800' if h > 30 else ('#FFD700' if h > 15 else '#4CAF50')) for h in df_heat["heat"]]
+                fig_heat.add_trace(go.Bar(x=df_heat["ma"], y=df_heat["heat"], marker_color=colors, name='Heat Index'))
+                fig_heat.update_layout(title="Heat Index toàn thị trường",
+                    xaxis_title="Mã CP", yaxis_title="Heat Score",
+                    height=350, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_heat, use_container_width=True)
+                st.caption(f"📊 Heat = |change%|×0.4 + vol_burst(min 5)×10 + spread(min 10)×5. Tính từ {len(heat_data)} mã giá/vol 1T từ yfinance. Heat>50 = biến động mạnh, Heat<10 = im ắng.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
 
         st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
