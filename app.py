@@ -6430,18 +6430,18 @@ elif st.session_state.trang_thai == "deep_analysis":
                     pass
                 return ma, []
 
-            def _fetch_all_parallel(targets, range_, interval_, max_workers=20, progress_label="Đang tải"):
+            def _fetch_all_parallel(targets_with_suffix, range_, interval_, max_workers=20, progress_label="Đang tải"):
                 results = {}
-                prog = st.progress(0.0, f"{progress_label} 0/{len(targets)}")
+                prog = st.progress(0.0, f"{progress_label} 0/{len(targets_with_suffix)}")
                 done = 0
                 with ThreadPoolExecutor(max_workers=max_workers) as ex:
-                    futs = {ex.submit(_fetch_one_chart, (d["ma"], ".VN" if d.get("vung") == "VN" else ""), range_, interval_): d for d in targets}
+                    futs = {ex.submit(_fetch_one_chart, t, range_, interval_): t[0] for t in targets_with_suffix}
                     for fut in as_completed(futs):
                         ma, closes = fut.result()
                         if closes:
                             results[ma] = closes
                         done += 1
-                        prog.progress(min(1.0, done / len(targets)), f"{progress_label} {done}/{len(targets)}")
+                        prog.progress(min(1.0, done / len(targets_with_suffix)), f"{progress_label} {done}/{len(targets_with_suffix)}")
                 prog.empty()
                 return results
 
@@ -6459,7 +6459,7 @@ elif st.session_state.trang_thai == "deep_analysis":
 
             st.write("### 📅 Calendar Returns — 6 tháng qua (TOÀN BỘ 384 mã)")
             cal_targets = list(market_data)
-            cal_data = _fetch_returns_6mo(tuple([(d["ma"], d.get("vung", "VN")) for d in cal_targets]))
+            cal_data = _fetch_returns_6mo(tuple([(d["ma"], ".VN" if d.get("vung", "VN") == "VN" else "") for d in cal_targets]))
             if cal_data:
                 cal_rows = []
                 for d in cal_targets:
@@ -6518,7 +6518,7 @@ elif st.session_state.trang_thai == "deep_analysis":
 
             st.write("### 🧬 Higher Moments & Tail Risk — 384 mã (TOÀN BỘ thị trường)")
             hm_targets = list(market_data)
-            hm_prices = _fetch_returns_3mo_daily(tuple([(d["ma"], d.get("vung", "VN")) for d in hm_targets]))
+            hm_prices = _fetch_returns_3mo_daily(tuple([(d["ma"], ".VN" if d.get("vung", "VN") == "VN" else "") for d in hm_targets]))
             if hm_prices:
                 hm_rows = []
                 for d in hm_targets:
@@ -6549,7 +6549,7 @@ elif st.session_state.trang_thai == "deep_analysis":
 
             st.write("### 📉 Max Drawdown Distribution — 384 mã (TOÀN BỘ thị trường)")
             dd_targets = list(market_data)
-            dd_prices = _fetch_returns_6mo_daily(tuple([(d["ma"], d.get("vung", "VN")) for d in dd_targets]))
+            dd_prices = _fetch_returns_6mo_daily(tuple([(d["ma"], ".VN" if d.get("vung", "VN") == "VN" else "") for d in dd_targets]))
             if dd_prices:
                 dd_rows = []
                 for d in dd_targets:
@@ -6605,7 +6605,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             bench_prices, bench_label = _fetch_bench()
             if bench_prices is not None and len(bench_prices) > 30:
                 ba_rows = []
-                ba_prices = dd_prices if dd_prices else _fetch_returns_6mo_daily(tuple([(d["ma"], d.get("vung", "VN")) for d in market_data]))
+                ba_prices = dd_prices if dd_prices else _fetch_returns_6mo_daily(tuple([(d["ma"], ".VN" if d.get("vung", "VN") == "VN" else "") for d in market_data]))
                 for d in market_data:
                     ma = d["ma"]
                     closes = ba_prices.get(ma, [])
@@ -6677,9 +6677,91 @@ elif st.session_state.trang_thai == "deep_analysis":
                         st.caption(f"📊 Corr>0.7 = cùng nhóm (đỏ đậm), <0.3 = độc lập. Tính từ {len(corr_xc)} mã top 50 vốn hóa daily returns 3T yfinance.")
             except Exception as e:
                 st.warning(f"⚠️ Không tính được cross-correlation: {str(e)[:80]}")
-        else:
-            st.info("⚠️ Cần ≥10 mã trong market scan để deep analysis toàn thị trường.")
 
+        st.write("### 📊 PHÂN TÍCH CHUYÊN SÂU 384 MÃ — ĐẦY ĐỦ METRICS (Sharpe/Alpha/Beta/VaR/CVaR/Sortino/Calmar/MaxDD)")
+        if market_data and len(market_data) >= 10 and dd_prices:
+            try:
+                bench_label_dm = bench_label if bench_prices is not None else "VN30"
+                if bench_prices is None:
+                    bench_label_dm = "VN30"
+                metrics_rows = []
+                for d in market_data:
+                    ma = d["ma"]
+                    closes = dd_prices.get(ma, [])
+                    if len(closes) > 30:
+                        try:
+                            ps = pd.Series(closes)
+                            rets = ps.pct_change().dropna()
+                            if len(rets) < 30:
+                                continue
+                            ann_ret = float((1 + rets).prod() ** (252 / len(rets)) - 1) * 100
+                            vol_a = float(rets.std() * (252 ** 0.5) * 100)
+                            downside = rets[rets < 0]
+                            dd_a = float(downside.std() * (252 ** 0.5) * 100) if len(downside) > 0 else vol_a
+                            sharpe = (ann_ret - 3.0) / vol_a if vol_a > 0 else 0
+                            sortino = (ann_ret - 3.0) / dd_a if dd_a > 0 else 0
+                            cum = (1 + rets).cumprod()
+                            rm = cum.cummax()
+                            dd_pct = ((cum - rm) / rm)
+                            max_dd = float(dd_pct.min() * 100)
+                            calmar = ann_ret / abs(max_dd) if max_dd != 0 else 0
+                            var95 = float(np.percentile(rets, 5) * 100)
+                            cvar95 = float(rets[rets <= np.percentile(rets, 5)].mean() * 100) if len(rets[rets <= np.percentile(rets, 5)]) > 0 else var95
+                            if bench_prices is not None:
+                                common_idx_m = rets.index.intersection(bench_prices.index)
+                                if len(common_idx_m) > 20:
+                                    x_m = bench_prices.loc[common_idx_m].values
+                                    y_m = rets.loc[common_idx_m].values
+                                    if len(x_m) > 20 and float(np.std(x_m)) > 0:
+                                        beta_m, alpha_m = np.polyfit(x_m, y_m, 1)
+                                        info_ratio = float(alpha_m * 252 * 100 / (np.std(y_m - x_m) * (252 ** 0.5) * 100 + 0.001))
+                                    else:
+                                        beta_m, alpha_m, info_ratio = 0, 0, 0
+                                else:
+                                    beta_m, alpha_m, info_ratio = 0, 0, 0
+                            else:
+                                beta_m, alpha_m, info_ratio = 0, 0, 0
+                            metrics_rows.append({
+                                "Mã": ma, "Vùng": d.get("vung", ""),
+                                "Giá": round(float(closes[-1]), 0),
+                                "Return năm %": round(ann_ret, 2),
+                                "Vol %": round(vol_a, 1),
+                                "Sharpe": round(sharpe, 2),
+                                "Sortino": round(sortino, 2),
+                                "Calmar": round(calmar, 2),
+                                "Beta": round(float(beta_m), 2),
+                                "Alpha %/năm": round(float(alpha_m) * 252 * 100, 2),
+                                "Info Ratio": round(info_ratio, 2),
+                                "VaR 95% (1N) %": round(var95, 2),
+                                "CVaR 95%": round(cvar95, 2),
+                                "Max DD %": round(max_dd, 1),
+                                "Vốn hóa (tỷ)": round(d.get("von_hoa", 0) / 1e9, 0) if d.get("von_hoa", 0) > 0 else 0})
+                        except Exception:
+                            continue
+                if metrics_rows:
+                    df_metrics = pd.DataFrame(metrics_rows)
+                    st.caption(f"📊 Đầy đủ 13 metrics cho {len(df_metrics)}/{len(market_data)} mã từ giá thật yfinance 6T (annualized). So sánh: top theo từng chỉ số.")
+                    sort_opts = ["Sharpe", "Sortino", "Calmar", "Return năm %", "Info Ratio"]
+                    sort_opt = st.selectbox("Xếp hạng theo:", sort_opts, key="metrics_sort")
+                    df_show = df_metrics.sort_values(sort_opt, ascending=False).reset_index(drop=True)
+                    df_show.index = df_show.index + 1
+                    st.dataframe(df_show, use_container_width=True, hide_index=False, height=600)
+                    cnt_vn_m = sum(1 for r in metrics_rows if r["Vùng"] == "VN")
+                    cnt_tg_m = sum(1 for r in metrics_rows if r["Vùng"] == "TG")
+                    top_sharpe = df_metrics.nlargest(1, "Sharpe").iloc[0]
+                    top_calmar = df_metrics.nlargest(1, "Calmar").iloc[0]
+                    cm1, cm2, cm3, cm4 = st.columns(4)
+                    cm1.metric("🏆 Top Sharpe", f"{top_sharpe['Mã']} ({top_sharpe['Sharpe']:.2f})")
+                    cm2.metric("🏆 Top Calmar", f"{top_calmar['Mã']} ({top_calmar['Calmar']:.2f})")
+                    cm3.metric("📊 Sharpe TB toàn thị trường", f"{df_metrics['Sharpe'].mean():.2f}")
+                    cm4.metric("📊 Max DD TB", f"{df_metrics['Max DD %'].mean():.1f}%")
+                    st.caption(f"📊 Metrics: Return annualized, Vol annualized, Sharpe (rf=3%), Sortino (downside), Calmar (return/|maxDD|), Beta/Alpha vs {bench_label_dm}, VaR/CVaR 95% 1-day, Max DD 6T. Tính từ {len(df_metrics)} mã ({cnt_vn_m} VN + {cnt_tg_m} TG).")
+            except Exception as e:
+                st.warning(f"⚠️ Không tính được metrics 384 mã: {str(e)[:100]}")
+        else:
+            st.info("⚠️ Cần market scan + price data để tính metrics 384 mã.")
+
+        st.write("---")
         st.write("## 🔗 50-STOCK CORRELATION MATRIX — Ma trận tương quan 50 mã")
         if market_data and len(market_data) >= 5:
             @st.cache_data(ttl=1800)
