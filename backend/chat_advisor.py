@@ -1381,17 +1381,27 @@ def _xu_ly_smart(cau_hoi, cau_thuong, cau_khong_dau, ctx):
 
     intent_phan_tich_ma = ["phân tích mã", "phan tich ma", "đánh giá mã", "danh gia ma",
                            "mã này có tốt", "ma nay co tot", "review mã", "review ma",
-                           "thông tin về mã", "thong tin ve ma", "nên giữ", "nen giu"]
+                           "thông tin về mã", "thong tin ve ma", "nên giữ", "nen giu",
+                           "phân tích", "phan tich", "đánh giá", "danh gia", "review",
+                           "thông tin", "thong tin", "có tốt", "co tot"]
     ma_match = None
+    intent_kw_matched = False
     for kw in intent_phan_tich_ma:
         if kw in cau_thuong or kw in cau_khong_dau:
-            words = re.findall(r"\b[A-Z]{3,4}\b", cau_hoi.upper())
-            for w in words:
-                if w in (kpi or {}) or any(d.get("ma") == w for d in market_data or []):
-                    ma_match = w
-                    break
-            if ma_match:
+            intent_kw_matched = True
+            break
+    if intent_kw_matched or (kpi or market_data):
+        words = re.findall(r"\b[A-Z]{3,4}\b", cau_hoi.upper())
+        for w in words:
+            if w in (kpi or {}) or any(d.get("ma") == w for d in market_data or []):
+                ma_match = w
                 break
+        if not ma_match and intent_kw_matched:
+            for d in market_data or []:
+                ten_ma = (d.get("ma") or "").upper()
+                if ten_ma and ten_ma in cau_hoi.upper():
+                    ma_match = ten_ma
+                    break
     if ma_match and (kpi or market_data):
         ki = kpi.get(ma_match, {})
         md = next((d for d in market_data or [] if d.get("ma") == ma_match), None)
@@ -1400,9 +1410,12 @@ def _xu_ly_smart(cau_hoi, cau_thuong, cau_khong_dau, ctx):
             gia = (md.get("gia") if md else ki.get("gia", 0)) or 0
             ret3 = (md.get("ret_3m") if md else 0) or 0
             volr = (md.get("vol_ratio") if md else 0) or 0
-            roe = ki.get("roe", 0) or 0
+            roe_raw = ki.get("roe", 0) or 0
+            roe = roe_raw if roe_raw <= 1 else roe_raw / 100
             pe = ki.get("pe", 0) or 0
             pb = ki.get("pb", 0) or 0
+            if not pb and md:
+                pb = md.get("pb", 0) or 0
             nganh = ki.get("nganh") or (md.get("nganh") if md else "") or ""
             von_hoa = (md.get("von_hoa") if md else 0) or 0
             vh_fmt = f"{von_hoa/1e12:.1f} nghìn tỷ" if von_hoa > 1e12 else (f"{von_hoa/1e9:.0f} tỷ" if von_hoa > 0 else "N/A")
@@ -1441,11 +1454,22 @@ def _phan_tich_danh_muc_user(dm, kpi, real_prices, risk):
             "💡 *Hoặc dùng danh mục mẫu ở Sidebar để xem demo.*"
         )
 
+    if isinstance(dm, list):
+        dm_dict = {}
+        for item in dm:
+            if isinstance(item, dict) and "ma" in item:
+                ma = item["ma"]
+                dm_dict[ma] = item
+        dm = dm_dict
+
+    if not isinstance(dm, dict):
+        return f"{MO_DAU}⚠️ DM có định dạng không hợp lệ. Vui lòng kiểm tra lại."
+
     tong_gt = 0
     tong_lai_lo = 0
     rows = []
     for ma, info in dm.items():
-        gia_von = info.get("gia_von", 0) or 0
+        gia_von = info.get("gia_von", 0) or info.get("gia", 0) or 0
         sl = info.get("so_luong", 0) or 0
         if gia_von <= 0 or sl <= 0:
             continue
