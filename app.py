@@ -2920,6 +2920,50 @@ elif st.session_state.trang_thai == "deep_analysis":
             return out, metas
 
         @st.cache_data(ttl=3600, show_spinner=False)
+        def _fetch_real_prices_1y(_targets):
+            """Fetch 1 năm daily prices cho Rolling Vol / Volatility Cone / Beta Stability.
+            Dùng khi real_prices 6mo < 120 phiên.
+            """
+            import requests as _rq, pandas as _pd
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            out = {}
+
+            def _one(sym, suffix):
+                try:
+                    r = _rq.get(
+                        f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
+                        params={"range": "1y", "interval": "1d"},
+                        timeout=10,
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36"}
+                    )
+                    if r.status_code == 200:
+                        d = r.json()
+                        if not d.get('chart', {}).get('result'):
+                            return sym, None
+                        result = d['chart']['result'][0]
+                        ts = result.get('timestamp', [])
+                        closes_raw = result.get('indicators', {}).get('quote', [{}])[0].get('close', [])
+                        if not ts or not closes_raw:
+                            return sym, None
+                        pairs = [(t, c) for t, c in zip(ts, closes_raw) if c is not None]
+                        if len(pairs) < 60:
+                            return sym, None
+                        ts_v, cs_v = zip(*pairs)
+                        idx = _pd.to_datetime(list(ts_v), unit='s')
+                        return sym, _pd.Series(list(cs_v), index=idx)
+                except Exception:
+                    pass
+                return sym, None
+
+            with ThreadPoolExecutor(max_workers=20) as ex:
+                futs = [ex.submit(_one, sym, suffix) for sym, suffix in _targets]
+                for f in as_completed(futs):
+                    sym, s = f.result()
+                    if s is not None:
+                        out[sym] = s
+            return out
+
+        @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_real_fundamentals(_targets):
             import yfinance as _yf
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -3013,6 +3057,45 @@ elif st.session_state.trang_thai == "deep_analysis":
                     pass
             return None, None
 
+        @st.cache_data(ttl=1800, show_spinner=False)
+        def _build_vn30_synthetic(_real_prices_dict, _market_data_list):
+            """Build synthetic VN30 from top 30 VN stocks weighted by market cap.
+            Fallback khi Yahoo ETFs (E1VFVN30.VN, etc.) fail.
+            """
+            import pandas as _pd
+            if not _real_prices_dict:
+                return None, None
+            md = _market_data_list or []
+            md_vn = [d for d in md if d.get("vung") == "VN"]
+            md_map = {d.get("ma"): d for d in md_vn}
+            top30_caps = []
+            for ma, prices in _real_prices_dict.items():
+                if ma in md_map:
+                    cap = float(md_map[ma].get("von_hoa", 0) or 0)
+                    if cap > 0 and len(prices) >= 30:
+                        top30_caps.append((ma, cap, prices))
+            top30_caps.sort(key=lambda x: -x[1])
+            top30 = top30_caps[:30]
+            if len(top30) < 5:
+                return None, None
+            total_cap = sum(c for _, c, _ in top30)
+            if total_cap <= 0:
+                return None, None
+            all_dates = set()
+            for _, _, p in top30:
+                all_dates.update(p.index.tolist())
+            if not all_dates:
+                return None, None
+            common = sorted(all_dates)
+            weights = {ma: cap / total_cap for ma, cap, _ in top30}
+            series_vals = _pd.Series(0.0, index=common, dtype=float)
+            for ma, _, p in top30:
+                aligned = p.reindex(common).ffill().bfill()
+                norm = aligned / float(aligned.iloc[0]) if len(aligned) > 0 and float(aligned.iloc[0]) > 0 else aligned
+                series_vals += norm.astype(float) * weights[ma]
+            series_vals = series_vals * 1000.0
+            return series_vals, f"VN30 Synthetic (top {len(top30)} mã vốn hóa)"
+
         _ma_for_fetch = [ma for ma, info in dm.items()
                          if info.get("gia_thi_truong", 0) > 0 and info.get("so_luong", 0) > 0]
 
@@ -3041,6 +3124,23 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.session_state["_real_prices_cache"] = dict(real_prices)
         except Exception:
             pass
+        real_prices_1y = {}
+        try:
+            if real_prices is not None and len(real_prices) > 0:
+                n_short = sum(1 for p in real_prices.values() if len(p) < 120)
+                if n_short > 0 or len(real_prices) < 5:
+                    _vn_set = set((DOCS.get("co_phieu_vn") or {}).keys())
+                    _dm_targets_1y = tuple([(ma, ".VN" if ma in _vn_set else "") for ma in real_prices.keys()])
+                    real_prices_1y = _fetch_real_prices_1y(_dm_targets_1y)
+        except Exception:
+            pass
+        if real_prices_1y:
+            for ma, p1y in real_prices_1y.items():
+                if ma in real_prices:
+                    if len(real_prices[ma]) < len(p1y):
+                        real_prices[ma] = p1y
+                else:
+                    real_prices[ma] = p1y
         for ma, meta in real_metas.items():
             if ma in kpi and ma in dm:
                 w52h = meta.get('fiftyTwoWeekHigh')
@@ -3065,8 +3165,11 @@ elif st.session_state.trang_thai == "deep_analysis":
         except Exception:
             pass
         vn30_close, vn30_label = _fetch_vn30_proxy()
+        if vn30_close is None and has_real:
+            _md_for_vn30 = st.session_state.get("chat_market_data") or []
+            vn30_close, vn30_label = _build_vn30_synthetic(dict(real_prices), tuple(_md_for_vn30))
         has_real = len(real_prices) >= 2
-        has_vn30 = vn30_close is not None
+        has_vn30 = vn30_close is not None and len(vn30_close) >= 30
         has_fund = len(real_fund) >= 1
         usdvnd_close = _fetch_usdvnd()
         vn_bond_close = _fetch_vn_bond_yield()
