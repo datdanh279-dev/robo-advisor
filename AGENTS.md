@@ -134,8 +134,8 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - **Bond Yield 7584%**: `_fetch_vn_bond_yield` fallback `^GSPC` (S&P 500 ~5000 USD) → tính nhầm thành 5000%. Fix: bỏ `^GSPC`, chỉ giữ `^VN10Y/VN10Y=X/VNI10Y=X`. Validate `0<bv<1 → ×100`, `1≤bv<50 → giữ nguyên`, else 0. ERP chỉ tính khi `0<bond_yield<30`.
 - **CAPM Regression** (line 4529) + **Brinson Attribution** (line 5161): cùng bug `set(pd.Series(dm_equity).index) & set(vn30_close.index)` empty (int vs datetime). Fix: tạo `_dm_capm_series` / `_dm_br_series` từ `common_dates` thật.
 
-**Phase 7 (commit `9b22c98` + `b964057` + `e932866` + `9e08cd6`) — DEEP ANALYSIS TOÀN BỘ 384 MÃ:**
-- Section mới "🌐 DEEP ANALYSIS TOÀN THỊ TRƯỜNG — 384 mã (229 VN + 155 TG)" — VIẾT LẠI với **ThreadPoolExecutor (20 workers)** + **@st.cache_data(ttl=1800)**
+**Phase 7 (commit `9b22c98` + `b964057` + `e932866` + `9e08cd6` + `ba564e1`) — DEEP ANALYSIS TOÀN BỘ 384 MÃ:**
+- Section "🌐 DEEP ANALYSIS TOÀN THỊ TRƯỜNG — 384 mã (229 VN + 155 TG)" — VIẾT LẠI với **ThreadPoolExecutor (20 workers)** + **@st.cache_data(ttl=1800)**
 - 6 sub-section, **5 trong 6 phân tích TOÀN BỘ 384 mã**:
   1. **📅 Calendar Returns — 384 mã**: 6mo monthly data yfinance → Return 6M %
   2. **🌪️ Volatility Cone — 384 mã**: phân phối Vol full market scan, P10/P25/P50/P75/P90
@@ -143,9 +143,15 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
   4. **📉 Max Drawdown Distribution — 384 mã**: Top 15 sụt giảm + Top 15 RoMaD tốt nhất
   5. **⚖️ Beta & Alpha — 384 mã**: so với VN30/E1VFVN30, Top 15 phòng thủ + Top 15 tăng mạnh
   6. **🔗 Cross-Correlation Top 50**: heatmap 50×50 (giữ 50 vì matrix quá lớn sẽ chậm)
+- **Sub-section MỚI `ba564e1` — "PHÂN TÍCH CHUYÊN SÂU 384 MÃ — ĐẦY ĐỦ METRICS"**:
+  - 13 metrics cho TOÀN BỘ 384 mã (re-use `dd_prices` từ Max DD section)
+  - Return năm %, Vol %, Sharpe, Sortino, Calmar, Beta, Alpha, Info Ratio, VaR 95%, CVaR 95%, Max DD %, v.v.
+  - User chọn xếp hạng theo: Sharpe / Sortino / Calmar / Return / Info Ratio
+  - 4 metric tổng hợp: Top Sharpe, Top Calmar, Sharpe TB, Max DD TB
 - Helper functions: `_fetch_one_chart()`, `_fetch_all_parallel()`, `_fetch_returns_6mo()`, `_fetch_returns_3mo_daily()`, `_fetch_returns_6mo_daily()`, `_fetch_bench()`
 - Lần đầu: 30-60s với 20 workers song song. Sau đó cache 30 phút → tức thì
-- Đáp ứng yêu cầu user: "phân tích chuyên sâu phân tích được nhiều mã nhất, số liệu thật, không lỗi"
+- **Fix bug `ba564e1`**: `_fetch_all_parallel` sai iterate (dict vs tuple) → TypeError. Fix: đổi param name thành `targets_with_suffix`, iterate tuple `t[0], t[1]`. Fix 4 callsites `(d["ma"], d.get("vung"))` → `(d["ma"], ".VN" if d.get("vung") == "VN" else "")`
+- Đáp ứng yêu cầu user: "phân tích chuyên sâu phân tích được nhiều mã nhất, từ đầu đến cuối, số liệu thật, không lỗi"
 
 **File `_build_chat_context()` ở app.py:111** tổng hợp context (dm, kpi, market_data, risk_profile, real_prices) từ session_state. `tim_cau_tra_loi()` ở backend/chat_advisor.py:1186 xử lý intent trước khi gọi AI advisor.
 
