@@ -113,6 +113,44 @@ def _build_chat_context():
         return ctx
     except Exception:
         return {"dm": {}, "kpi": {}, "market_data": [], "risk_profile": "Trung bình", "real_prices": {}}
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _estimate_dm_vol_from_sector(dm_tuple, kpi_tuple):
+    """Ước lượng vol DM từ vol ngành thật của các mã trong DM (không hardcode 0.18)."""
+    try:
+        dm = dict(dm_tuple) if isinstance(dm_tuple, (list, tuple)) else {}
+        kpi = dict(kpi_tuple) if isinstance(kpi_tuple, (list, tuple)) else {}
+        if not dm:
+            return 0.0
+        import yfinance as _yf_v
+        sector_vols = {}
+        for ma, info in dm.items():
+            ng = (kpi.get(ma, {}).get("nganh", "") or info.get("nganh", "") or "Khác").strip() or "Khác"
+            if ng not in sector_vols:
+                try:
+                    s = _yf_v.Ticker(ma + ".VN")
+                    hist = s.history(period="3mo", auto_adjust=True)
+                    if hist is not None and len(hist) > 20:
+                        ret = hist["Close"].pct_change().dropna()
+                        v = float(ret.std() * (252**0.5)) if len(ret) > 20 else 0.0
+                        if v > 0:
+                            sector_vols[ng] = v
+                except Exception:
+                    continue
+        if not sector_vols:
+            return 0.0
+        total_w = sum(info.get("gia_thi_truong", 0) * info.get("so_luong", 0) for info in dm.values())
+        if total_w <= 0:
+            return sum(sector_vols.values()) / len(sector_vols)
+        vol_proxy = 0.0
+        for ma, info in dm.items():
+            ng = (kpi.get(ma, {}).get("nganh", "") or info.get("nganh", "") or "Khác").strip() or "Khác"
+            w = info.get("gia_thi_truong", 0) * info.get("so_luong", 0) / total_w
+            vol_proxy += w * sector_vols.get(ng, 0)
+        return float(vol_proxy) if vol_proxy > 0 else 0.0
+    except Exception:
+        return 0.0
 _GROQ_KEY = os.getenv("GROQ_API_KEY", "")
 if not _GROQ_KEY:
     try:
@@ -2659,16 +2697,58 @@ elif st.session_state.trang_thai == "deep_analysis":
     if not weights:
         st.error("Khong the tinh toan — du lieu danh muc khong hop le.")
     else:
-        SECTOR_DEFAULTS_FALLBACK = {
-            "Ngân hàng": {"pe": 9.5, "pb": 1.8, "roe": 0.20, "roa": 0.015, "dividend_yield": 0.02, "beta": 0.9, "eps": 4500},
-            "Công nghệ": {"pe": 18.0, "pb": 3.5, "roe": 0.22, "roa": 0.12, "dividend_yield": 0.015, "beta": 1.1, "eps": 5000},
-            "Thép": {"pe": 12.0, "pb": 1.5, "roe": 0.13, "roa": 0.07, "dividend_yield": 0.012, "beta": 1.3, "eps": 2500},
-            "Thực phẩm": {"pe": 15.0, "pb": 3.5, "roe": 0.25, "roa": 0.15, "dividend_yield": 0.04, "beta": 0.7, "eps": 4500},
-            "Bán lẻ": {"pe": 20.0, "pb": 3.0, "roe": 0.15, "roa": 0.06, "dividend_yield": 0.01, "beta": 1.2, "eps": 3000},
-            "Bất động sản": {"pe": 30.0, "pb": 2.5, "roe": 0.08, "roa": 0.03, "dividend_yield": 0.005, "beta": 1.1, "eps": 2000},
-            "Chứng khoán": {"pe": 10.0, "pb": 1.5, "roe": 0.15, "roa": 0.02, "dividend_yield": 0.03, "beta": 1.2, "eps": 3000},
-            "Khác": {"pe": 15.0, "pb": 2.5, "roe": 0.15, "roa": 0.08, "dividend_yield": 0.02, "beta": 1.0, "eps": 3500},
-        }
+        @st.cache_data(ttl=7200, show_spinner="📡 Tải sector median thật từ yfinance...")
+        def _fetch_sector_medians_yf():
+            try:
+                import yfinance as _yf_sec
+                sec_repr = {
+                    "Ngân hàng": ["VCB.VN", "BID.VN", "CTG.VN", "ACB.VN", "MBB.VN", "TCB.VN", "VPB.VN", "HDB.VN"],
+                    "Công nghệ": ["FPT.VN"],
+                    "Thép": ["HPG.VN"],
+                    "Thực phẩm": ["VNM.VN", "MSN.VN", "SAB.VN"],
+                    "Bán lẻ": ["MWG.VN", "PNJ.VN"],
+                    "Bất động sản": ["VIC.VN", "VHM.VN", "NVL.VN", "KDH.VN", "DXG.VN"],
+                    "Chứng khoán": ["SSI.VN", "VCI.VN", "HCM.VN"],
+                    "Dầu khí": ["PLX.VN", "GAS.VN", "PVD.VN", "PVS.VN", "BSR.VN"],
+                    "Điện": ["POW.VN", "BCM.VN"],
+                    "Khoáng sản": ["GVR.VN", "DCM.VN", "DPM.VN"],
+                    "Bảo hiểm": ["BVH.VN", "PVI.VN"],
+                    "Vận tải": ["VJC.VN", "GMD.VN", "HAH.VN", "VOS.VN", "PVT.VN"],
+                    "Xây dựng": ["CTD.VN", "HBC.VN", "LCG.VN", "CII.VN"],
+                    "Hàng không": ["VJC.VN"],
+                    "Khác": [],
+                }
+                result = {}
+                for sector, symbols in sec_repr.items():
+                    vals = {"pe": [], "pb": [], "roe": [], "roa": [], "dividend_yield": [], "beta": [], "eps": []}
+                    for sym in symbols:
+                        try:
+                            info = _yf_sec.Ticker(sym).info
+                            pe = info.get("trailingPE")
+                            pb = info.get("priceToBook")
+                            roe = info.get("returnOnEquity")
+                            roa = info.get("returnOnAssets")
+                            dy = info.get("dividendYield")
+                            beta = info.get("beta")
+                            eps = info.get("trailingEps")
+                            if pe and 0 < pe < 200: vals["pe"].append(float(pe))
+                            if pb and 0 < pb < 50: vals["pb"].append(float(pb))
+                            if roe and -0.5 < roe < 0.5: vals["roe"].append(float(roe))
+                            if roa and -0.3 < roa < 0.3: vals["roa"].append(float(roa))
+                            if dy and 0 <= dy < 0.3: vals["dividend_yield"].append(float(dy))
+                            if beta and 0 < beta < 3: vals["beta"].append(float(beta))
+                            if eps and eps > 0: vals["eps"].append(float(eps))
+                        except Exception:
+                            continue
+                    if vals["pe"]:
+                        result[sector] = {f: float(sum(v) / len(v)) for f, v in vals.items() if v}
+                return result
+            except Exception:
+                return {}
+        SECTOR_DEFAULTS_FALLBACK = _fetch_sector_medians_yf()
+        if not SECTOR_DEFAULTS_FALLBACK:
+            SECTOR_DEFAULTS_FALLBACK = {"Khác": {}}
+        SECTOR_DEFAULTS_FALLBACK.setdefault("Khác", {})
         _sector_medians = {}
         for _ma, _ki in kpi.items():
             _ng = (_ki.get("nganh", "") or "Khác").strip() or "Khác"
@@ -2876,13 +2956,13 @@ elif st.session_state.trang_thai == "deep_analysis":
                     if len(daily_ret_real) > 20:
                         vol_proxy = float(daily_ret_real.std() * (252 ** 0.5))
                     else:
-                        vol_proxy = 0.18
+                        vol_proxy = _estimate_dm_vol_from_sector(tuple(dm.items()), tuple(kpi.items()))
                 else:
-                    vol_proxy = 0.18
+                    vol_proxy = _estimate_dm_vol_from_sector(tuple(dm.items()), tuple(kpi.items()))
             except Exception:
-                vol_proxy = 0.18
+                vol_proxy = _estimate_dm_vol_from_sector(tuple(dm.items()), tuple(kpi.items()))
         else:
-            vol_proxy = 0.18
+            vol_proxy = _estimate_dm_vol_from_sector(tuple(dm.items()), tuple(kpi.items()))
         sharpe = (port_return - rf) / vol_proxy if vol_proxy > 0 else 0
         alpha = rp - (rf + port_beta * (rm - rf))
         treynor = (port_return - rf) / port_beta if port_beta > 0 else 0
@@ -5203,20 +5283,46 @@ elif st.session_state.trang_thai == "deep_analysis":
             sc1, sc2, sc3 = st.columns(3)
             with sc1:
                 min_ret_3m = st.number_input("Return 3M tối thiểu (%)", value=-100.0, step=5.0, key="scr_ret")
-                max_pe = st.number_input("P/E tối đa", value=30.0, step=1.0, key="scr_pe")
+                max_pe_input = st.number_input("P/E tối đa (0 = bỏ qua)", value=0.0, step=1.0, key="scr_pe", min_value=0.0)
             with sc2:
                 min_vol_ratio = st.number_input("Volume/TB20D tối thiểu", value=0.5, step=0.1, key="scr_vol")
                 max_change = st.number_input("Thay đổi hôm nay max (%)", value=10.0, step=0.5, key="scr_chg")
             with sc3:
                 sort_by = st.selectbox("Sắp xếp theo", ["ret_3m", "thay_doi", "vol_ratio", "von_hoa"], key="scr_sort")
                 ascending = st.checkbox("Tăng dần", value=False, key="scr_asc")
-            df_scr = df_mkt[(df_mkt["ret_3m"] >= min_ret_3m) &
-                            (df_mkt["vol_ratio"] >= min_vol_ratio) &
-                            (df_mkt["thay_doi"] <= max_change)].sort_values(sort_by, ascending=ascending)
-            st.write(f"**Tìm thấy {len(df_scr)} mã thỏa mãn:**")
-            st.dataframe(df_scr[["ma", "ten", "gia", "thay_doi", "ret_3m", "vol_ratio"]].head(20),
-                use_container_width=True, hide_index=True)
-            st.caption("📊 Screener dùng dữ liệu thật yfinance. Tùy chỉnh tiêu chí để tìm mã phù hợp chiến lược.")
+            use_pe_filter = max_pe_input > 0
+            if use_pe_filter:
+                with st.spinner(f"📡 Đang tải P/E cho {len(market_data)} mã..."):
+                    pe_dist = _get_pe_distribution(tuple([d["ma"] for d in market_data]))
+                if pe_dist:
+                    pe_map = {r["ma"]: r["pe"] for r in pe_dist}
+                    df_mkt["pe"] = df_mkt["ma"].map(pe_map)
+                    df_scr = df_mkt[(df_mkt["ret_3m"] >= min_ret_3m) &
+                                    (df_mkt["vol_ratio"] >= min_vol_ratio) &
+                                    (df_mkt["thay_doi"] <= max_change) &
+                                    (df_mkt["pe"].notna()) &
+                                    (df_mkt["pe"] > 0) &
+                                    (df_mkt["pe"] <= max_pe_input)].sort_values(sort_by, ascending=ascending)
+                    st.caption(f"📊 Đã lọc theo P/E ≤ {max_pe_input:.1f} ({len(pe_dist)} mã có P/E thật từ yfinance)")
+                    st.write(f"**Tìm thấy {len(df_scr)} mã thỏa mãn (P/E ≤ {max_pe_input:.1f}):**")
+                    st.dataframe(df_scr[["ma", "ten", "gia", "thay_doi", "ret_3m", "vol_ratio", "pe"]].head(20).round(2),
+                        use_container_width=True, hide_index=True)
+                else:
+                    df_scr = df_mkt[(df_mkt["ret_3m"] >= min_ret_3m) &
+                                    (df_mkt["vol_ratio"] >= min_vol_ratio) &
+                                    (df_mkt["thay_doi"] <= max_change)].sort_values(sort_by, ascending=ascending)
+                    st.info("⚠️ Không lấy được P/E — đang lọc không tính P/E.")
+                    st.write(f"**Tìm thấy {len(df_scr)} mã thỏa mãn:**")
+                    st.dataframe(df_scr[["ma", "ten", "gia", "thay_doi", "ret_3m", "vol_ratio"]].head(20),
+                        use_container_width=True, hide_index=True)
+            else:
+                df_scr = df_mkt[(df_mkt["ret_3m"] >= min_ret_3m) &
+                                (df_mkt["vol_ratio"] >= min_vol_ratio) &
+                                (df_mkt["thay_doi"] <= max_change)].sort_values(sort_by, ascending=ascending)
+                st.write(f"**Tìm thấy {len(df_scr)} mã thỏa mãn:**")
+                st.dataframe(df_scr[["ma", "ten", "gia", "thay_doi", "ret_3m", "vol_ratio"]].head(20),
+                    use_container_width=True, hide_index=True)
+            st.caption("📊 Screener dùng dữ liệu thật yfinance (chart + P/E từ .info). Đặt P/E max = 0 để bỏ qua lọc P/E.")
         else:
             st.info("⚠️ Cần dữ liệu thị trường để screener.")
 
@@ -5603,6 +5709,179 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.caption(f"📊 Tính từ high/low hàng ngày của {len(range_data)} mã từ yfinance 1T. Biên độ TB thị trường: {avg_rng:.2f}%/ngày. Biên độ rộng = cơ hội trading ngắn hạn.")
         else:
             st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 💰 Real Money Flow — Dòng tiền thật toàn thị trường")
+        if market_data and len(market_data) >= 5:
+            money_rows = []
+            for d in market_data:
+                gia = d.get("gia", 0) or 0
+                vol = d.get("vol", 0) or 0
+                change = d.get("thay_doi", 0) or 0
+                if gia > 0 and vol > 0:
+                    money_flow = gia * vol * (1 if change > 0 else -1 if change < 0 else 0)
+                    money_rows.append({"ma": d.get("ma"), "ten": d.get("ten", "")[:25], "gia": gia,
+                        "thay_doi": change, "vol": vol, "money_flow": money_flow})
+            if money_rows:
+                df_mf = pd.DataFrame(money_rows).sort_values("money_flow", ascending=False)
+                mf1, mf2 = st.columns(2)
+                with mf1:
+                    st.write("**🟢 Top 10 dòng tiền VÀO mạnh nhất (tăng giá + vol cao):**")
+                    top_in = df_mf.head(10)[["ma", "ten", "gia", "thay_doi", "vol", "money_flow"]].copy()
+                    top_in["money_flow_ty"] = (top_in["money_flow"] / 1e9).round(2)
+                    st.dataframe(top_in[["ma", "ten", "thay_doi", "money_flow_ty"]].rename(columns={"money_flow_ty": "Dòng tiền (tỷ VNĐ)"}),
+                        use_container_width=True, hide_index=True)
+                with mf2:
+                    st.write("**🔴 Top 10 dòng tiền RA mạnh nhất (giảm giá + vol cao):**")
+                    top_out = df_mf.tail(10)[["ma", "ten", "gia", "thay_doi", "vol", "money_flow"]].copy()
+                    top_out["money_flow_ty"] = (top_out["money_flow"] / 1e9).round(2)
+                    st.dataframe(top_out[["ma", "ten", "thay_doi", "money_flow_ty"]].rename(columns={"money_flow_ty": "Dòng tiền (tỷ VNĐ)"}),
+                        use_container_width=True, hide_index=True)
+                total_in = float(df_mf[df_mf["money_flow"] > 0]["money_flow"].sum())
+                total_out = abs(float(df_mf[df_mf["money_flow"] < 0]["money_flow"].sum()))
+                net_flow = total_in - total_out
+                mf_net1, mf_net2, mf_net3 = st.columns(3)
+                mf_net1.metric("🟢 Tổng dòng tiền VÀO", f"{total_in/1e12:.2f} nghìn tỷ VNĐ")
+                mf_net2.metric("🔴 Tổng dòng tiền RA", f"{total_out/1e12:.2f} nghìn tỷ VNĐ")
+                mf_net3.metric("💰 DÒNG TIỀN RÒNG", f"{net_flow/1e12:+.2f} nghìn tỷ VNĐ",
+                    delta=f"{'BULLISH' if net_flow > 0 else 'BEARISH'}")
+                st.caption(f"📊 Money flow = giá × volume × sign(change). Tính từ {len(money_rows)} mã từ yfinance chart API. Dương = tiền đang vào thị trường, Âm = tiền đang rút ra.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 🏛️ Real Sector P/E Benchmark — So sánh P/E mã vs ngành")
+        if market_data and len(market_data) >= 5:
+            with st.spinner("📡 Đang tải P/E + ngành cho 50 mã..."):
+                pe_dist_full = _get_pe_distribution(tuple([d["ma"] for d in market_data]))
+            if pe_dist_full:
+                pe_by_ma = {r["ma"]: r for r in pe_dist_full}
+                ng_by_ma = {d["ma"]: d.get("nganh", "Khác") for d in market_data}
+                sector_pe = {}
+                for ma, info in pe_by_ma.items():
+                    ng = ng_by_ma.get(ma, "Khác")
+                    sector_pe.setdefault(ng, []).append(info["pe"])
+                sector_med = {ng: float(np.median(v)) for ng, v in sector_pe.items() if v}
+                rows_bench = []
+                for ma, info in pe_by_ma.items():
+                    ng = ng_by_ma.get(ma, "Khác")
+                    pe_ma = info["pe"]
+                    pe_sec = sector_med.get(ng, 0)
+                    if pe_sec > 0:
+                        rel = (pe_ma / pe_sec - 1) * 100
+                        rows_bench.append({"ma": ma, "ten": info.get("ma", ma), "nganh": ng,
+                            "pe_ma": pe_ma, "pe_nganh": pe_sec, "chenh_lech_pct": rel,
+                            "dinh_gia": "RẺ" if rel < -20 else "ĐẮT" if rel > 20 else "HỢP LÝ"})
+                if rows_bench:
+                    df_bench = pd.DataFrame(rows_bench).sort_values("chenh_lech_pct")
+                    bl1, bl2 = st.columns(2)
+                    with bl1:
+                        st.write("**🟢 Top 10 mã RẺ hơn ngành (cơ hội value):**")
+                        st.dataframe(df_bench.head(10)[["ma", "nganh", "pe_ma", "pe_nganh", "chenh_lech_pct", "dinh_gia"]].round(2),
+                            use_container_width=True, hide_index=True)
+                    with bl2:
+                        st.write("**🔴 Top 10 mã ĐẮT hơn ngành (cẩn thận):**")
+                        st.dataframe(df_bench.tail(10)[["ma", "nganh", "pe_ma", "pe_nganh", "chenh_lech_pct", "dinh_gia"]].round(2),
+                            use_container_width=True, hide_index=True)
+                    fig_bench = go.Figure()
+                    fig_bench.add_trace(go.Bar(
+                        x=df_bench["ma"], y=df_bench["chenh_lech_pct"],
+                        marker_color=['#4CAF50' if x < 0 else '#F44336' for x in df_bench["chenh_lech_pct"]],
+                        name='Chênh lệch P/E vs ngành (%)'
+                    ))
+                    fig_bench.update_layout(title="P/E của mã so với P/E median ngành (%)",
+                        xaxis_title="Mã CP", yaxis_title="Chênh lệch %",
+                        height=350, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                    st.plotly_chart(fig_bench, use_container_width=True)
+                    st.caption(f"📊 P/E từng mã từ yfinance.info, P/E ngành = median tất cả mã cùng ngành. Rẻ hơn -20% = cơ hội value, đắt hơn +20% = cẩn thận bubble. Tính từ {len(rows_bench)} mã có P/E thật.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 🏦 Real Insider & Institutional Holdings — Tỷ lệ sở hữu thật")
+        if market_data and len(market_data) >= 5:
+            @st.cache_data(ttl=3600)
+            def _get_holders_market(symbols):
+                import yfinance as _yf_h
+                out = []
+                for s in symbols:
+                    try:
+                        tk = _yf_h.Ticker(s + ".VN")
+                        info = tk.info
+                        insider = info.get("heldPercentInsiders")
+                        inst = info.get("heldPercentInstitutions")
+                        if (insider is not None and insider > 0) or (inst is not None and inst > 0):
+                            out.append({"ma": s, "ten": (info.get("longName", s) or s)[:25],
+                                "insider_pct": float(insider or 0) * 100,
+                                "institution_pct": float(inst or 0) * 100,
+                                "free_float_pct": 100 - (float(insider or 0) + float(inst or 0)) * 100})
+                    except Exception:
+                        continue
+                return out
+            with st.spinner(f"📡 Tải holdings cho {len(market_data)} mã..."):
+                holders = _get_holders_market(tuple([d["ma"] for d in market_data]))
+            if holders:
+                df_h = pd.DataFrame(holders)
+                h1, h2, h3 = st.columns(3)
+                h1.metric("🏛️ Insider TB", f"{df_h['insider_pct'].mean():.1f}%",
+                    help="Tỷ lệ sở hữu của ban lãnh đạo/cổ đông nội bộ TB toàn thị trường")
+                h2.metric("🏛️ Institution TB", f"{df_h['institution_pct'].mean():.1f}%",
+                    help="Tỷ lệ sở hữu của tổ chức (quỹ, khối ngoại) TB toàn thị trường")
+                h3.metric("🔄 Free Float TB", f"{df_h['free_float_pct'].mean():.1f}%",
+                    help="Tỷ lệ cổ phiếu tự do giao dịch")
+                hl1, hl2 = st.columns(2)
+                with hl1:
+                    st.write("**🏛️ Top 10 mã Insider nắm giữ CAO (ban lãnh đạo tự tin):**")
+                    st.dataframe(df_h.nlargest(10, "insider_pct")[["ma", "ten", "insider_pct", "institution_pct"]].round(2),
+                        use_container_width=True, hide_index=True)
+                with hl2:
+                    st.write("**🌍 Top 10 mã Institution nắm giữ CAO (khối ngoại/quỹ ưa thích):**")
+                    st.dataframe(df_h.nlargest(10, "institution_pct")[["ma", "ten", "insider_pct", "institution_pct"]].round(2),
+                        use_container_width=True, hide_index=True)
+                st.caption(f"📊 heldPercentInsiders + heldPercentInstitutions từ yfinance.info cho {len(holders)} mã. Insider cao = ban lãnh đạo đồng hành cùng cổ đông. Institution cao = tổ chức lớn tin tưởng.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 📅 Real Earnings Calendar — Sự kiện công bố thật")
+        if dm and isinstance(dm, dict) and len(dm) > 0:
+            @st.cache_data(ttl=3600)
+            def _get_earnings_calendar(symbols):
+                import yfinance as _yf_e
+                out = []
+                for s in symbols:
+                    try:
+                        tk = _yf_e.Ticker(s + ".VN")
+                        cal = tk.calendar
+                        if cal is not None and isinstance(cal, dict) and "Earnings Date" in cal:
+                            ed = cal["Earnings Date"]
+                            if ed and len(ed) > 0:
+                                out.append({"ma": s, "earnings_date": str(ed[0])[:10] if hasattr(ed[0], 'strftime') else str(ed[0])[:10]})
+                        elif cal is not None and hasattr(cal, 'empty') and not cal.empty:
+                            for col in cal.columns:
+                                if "Earnings" in str(col):
+                                    ed = cal[col].iloc[0]
+                                    if ed and str(ed) != "NaT":
+                                        out.append({"ma": s, "earnings_date": str(ed)[:10]})
+                                    break
+                    except Exception:
+                        continue
+                return out
+            dm_symbols = [ma for ma in dm.keys() if dm[ma].get("so_luong", 0) > 0]
+            if dm_symbols:
+                with st.spinner(f"📡 Tải earnings calendar cho {len(dm_symbols)} mã trong DM..."):
+                    earnings = _get_earnings_calendar(tuple(dm_symbols))
+                if earnings:
+                    df_ear = pd.DataFrame(earnings).sort_values("earnings_date")
+                    st.write(f"**📅 Lịch công bố lợi nhuận sắp tới cho {len(earnings)}/{len(dm_symbols)} mã trong DM:**")
+                    st.dataframe(df_ear, use_container_width=True, hide_index=True)
+                    st.caption(f"📊 Từ yfinance Ticker.calendar (Earnings Date). Mã nào sắp công bố lợi nhuận = volatility cao, cẩn thận biến động giá trước/sau ngày này.")
+                else:
+                    st.info("⚠️ yfinance chưa có lịch earnings cho các mã VN này (thường chỉ có cho thị trường Mỹ).")
+            else:
+                st.info("⚠️ DM chưa có mã nào có số lượng > 0.")
+        else:
+            st.info("⚠️ Cần DM có dữ liệu.")
 
         st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
