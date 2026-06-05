@@ -95,6 +95,24 @@ except Exception:
 def _safe_html(text):
     """Escape user/AI text trước khi nhúng HTML — tránh DOM lỗi trên Streamlit."""
     return html_module.escape(str(text or "")).replace("\n", "<br>")
+
+def _build_chat_context():
+    """Build context dict cho chat thông minh — tổng hợp DM, KPI, market data, risk profile từ session state."""
+    try:
+        import streamlit as _st
+        ss = _st.session_state
+        ctx = {
+            "dm": ss.get("dm", {}) if isinstance(ss.get("dm"), dict) else {},
+            "kpi": ss.get("kpi", {}) if isinstance(ss.get("kpi"), dict) else {},
+            "market_data": ss.get("chat_market_data") or [],
+            "risk_profile": ss.get("risk_profile_label", "Trung bình"),
+            "real_prices": {},
+        }
+        if hasattr(ss, "_real_prices_cache"):
+            ctx["real_prices"] = ss._real_prices_cache
+        return ctx
+    except Exception:
+        return {"dm": {}, "kpi": {}, "market_data": [], "risk_profile": "Trung bình", "real_prices": {}}
 _GROQ_KEY = os.getenv("GROQ_API_KEY", "")
 if not _GROQ_KEY:
     try:
@@ -849,7 +867,7 @@ with sidebar:
     Dữ liệu: Yahoo Finance + VNDirect<br>
     Phí dịch vụ: <b style="color:#FFD700;">0,3%/năm</b> <span title="Phí dịch vụ nền tảng — trừ theo ngày trên tổng giá trị danh mục (NAV). Chỉ áp dụng khi dùng gói Premium, KHÔNG thu phí quản lý tài sản như quỹ ủy thác.">ℹ️</span><br>
     Đầu tư từ: <b style="color:#FFD700;">100.000 VNĐ</b><br>
-    Cập nhật: """ + datetime.now().strftime("%H:%M:%S %d/%m/%Y") + """
+    Cập nhật: """ + st.session_state.setdefault("_footer_ts", datetime.now().strftime("%H:%M:%S %d/%m/%Y")) + """
     </small>
     """,
         unsafe_allow_html=True,
@@ -2814,6 +2832,11 @@ elif st.session_state.trang_thai == "deep_analysis":
         _fetch_result = _fetch_real_prices(tuple(_ma_for_fetch))
         real_prices = _fetch_result[0] if isinstance(_fetch_result, tuple) else _fetch_result
         real_metas = _fetch_result[1] if isinstance(_fetch_result, tuple) and len(_fetch_result) > 1 else {}
+        try:
+            if real_prices is not None and hasattr(real_prices, 'items'):
+                st.session_state["_real_prices_cache"] = dict(real_prices)
+        except Exception:
+            pass
         for ma, meta in real_metas.items():
             if ma in kpi and ma in dm:
                 w52h = meta.get('fiftyTwoWeekHigh')
@@ -5139,6 +5162,10 @@ elif st.session_state.trang_thai == "deep_analysis":
             return out
         with st.spinner(f"📡 Đang quét {len(_all_vn_stocks)} mã toàn thị trường..."):
             market_data = _scan_market_stocks(tuple(_all_vn_stocks))
+            try:
+                st.session_state["chat_market_data"] = market_data
+            except Exception:
+                pass
         if not market_data or len(market_data) < 5:
             st.warning(f"⚠️ Chỉ quét được {len(market_data) if market_data else 0}/{len(_all_vn_stocks)} mã. Một số section bên dưới sẽ bị ẩn. Có thể Yahoo Finance đang giới hạn request — thử lại sau vài phút.")
         df_mkt = pd.DataFrame(market_data) if market_data and len(market_data) >= 5 else pd.DataFrame()
@@ -5737,7 +5764,8 @@ elif st.session_state.trang_thai == "chat":
     tab_chat, tab_expert = st.tabs(["💬 Chat", "👑 Hội đồng Chuyên gia"])
 
     with tab_chat:
-        st.markdown("Hỏi tôi về đầu tư, cổ phiếu, vàng, bất động sản, hay bất kỳ chủ đề tài chính nào!")
+        st.markdown("Hỏi tôi về đầu tư, cổ phiếu, vàng, bất động sản, hay bất kỳ chủ đề tài chính nào! 🤖💡")
+        st.markdown("💡 *Tôi hiểu được: phân tích DM của bạn, top mã tăng/giảm hôm nay, vol đột biến, gợi ý phân bổ vốn theo hồ sơ rủi ro...*")
         st.markdown("---")
 
         if not st.session_state.chat_history:
@@ -5764,8 +5792,9 @@ elif st.session_state.trang_thai == "chat":
                 with _qcols[_i % 2]:
                     if st.button(_q, key=f"qq_{_i}", use_container_width=True):
                         st.session_state.chat_history.append({"role": "user", "content": _q})
-                        with st.spinner("🤖 Robo-Advisor đang phân tích..."):
-                            tra_loi = tim_cau_tra_loi(_q, st.session_state.chat_history)
+                        with st.spinner("🤖 Robo-Advisor đang phân tích DM + thị trường..."):
+                            _ctx = _build_chat_context()
+                            tra_loi = tim_cau_tra_loi(_q, st.session_state.chat_history, context=_ctx)
                         st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
                         try:
                             username = st.session_state.get("username", "unknown")
@@ -5801,7 +5830,8 @@ elif st.session_state.trang_thai == "chat":
                 if submitted and cau_hoi:
                     st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
                     with st.spinner("🤖 Robo-Advisor đang suy nghĩ..."):
-                        tra_loi = tim_cau_tra_loi(cau_hoi, st.session_state.chat_history)
+                        _ctx = _build_chat_context()
+                        tra_loi = tim_cau_tra_loi(cau_hoi, st.session_state.chat_history, context=_ctx)
                     st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
                     username = st.session_state.get("username", "unknown")
                     try:

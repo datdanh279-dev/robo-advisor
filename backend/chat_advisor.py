@@ -1183,7 +1183,12 @@ def tim_quy(cau_thuong, cau_khong_dau):
                 return phan_tich_quy_lon(key, QUY_THE_GIOI[key])
     return None
 
-def tim_cau_tra_loi(cau_hoi, lich_su=None):
+def tim_cau_tra_loi(cau_hoi, lich_su=None, context=None):
+    """Smart AI chatbot — accepts optional context for personalized advice.
+
+    context keys: dm (danh mục dict), kpi (KPIs dict), market_data (50-mã scan),
+                  risk_profile (str), real_prices (dict {ma: pd.Series})
+    """
     global STOCK_INFO, WORLD_STOCK_INFO
     if not STOCK_INFO and DOCS.get("co_phieu_vn"):
         STOCK_INFO = _build_stock_info()
@@ -1191,6 +1196,291 @@ def tim_cau_tra_loi(cau_hoi, lich_su=None):
         WORLD_STOCK_INFO = _build_world_stock_info()
     cau_thuong = cau_hoi.lower().strip()
     cau_khong_dau = xu_ly_bo_dau(cau_thuong)
+    if context is None:
+        context = {}
+
+    smart = _xu_ly_smart(cau_hoi, cau_thuong, cau_khong_dau, context)
+    if smart:
+        return smart
+
+
+def _xu_ly_smart(cau_hoi, cau_thuong, cau_khong_dau, ctx):
+    """Trả lời thông minh dựa trên ngữ cảnh DM user + real-time market data.
+    Trả None nếu không match intent nào → để các handler khác xử lý.
+    """
+    if not ctx:
+        return None
+    dm = ctx.get("dm") or {}
+    kpi = ctx.get("kpi") or {}
+    market_data = ctx.get("market_data") or []
+    real_prices = ctx.get("real_prices") or {}
+    risk = ctx.get("risk_profile", "Trung bình")
+
+    intent_dm = ["danh mục của tôi", "danh muc cua toi", "dm của tôi", "dm cua toi",
+                 "phân tích danh mục", "phan tich danh muc", "review danh mục", "review dm",
+                 "nên tăng mã nào", "nen tang ma nao", "nên giảm mã nào", "nen giam ma nao",
+                 "danh mục hiện tại", "danh muc hien tai", "portfolio của tôi"]
+    if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_dm):
+        return _phan_tich_danh_muc_user(dm, kpi, real_prices, risk)
+
+    intent_top = ["mã nào đang tăng", "ma nao dang tang", "mã tăng mạnh", "ma tang manh",
+                  "top tăng", "top tang", "cổ phiếu tăng", "co phieu tang",
+                  "mã nào đang giảm", "ma nao dang giam", "mã giảm mạnh", "ma giam manh",
+                  "top giảm", "top giam", "cổ phiếu giảm", "co phieu giam",
+                  "mã nào hot", "ma nao hot", "mã nào đáng chú ý", "ma nao dang chu y"]
+    if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_top):
+        if not market_data:
+            return None
+        if any(kw in cau_thuong or kw in cau_khong_dau for kw in ["giảm", "giam", "giảm mạnh", "giam manh"]):
+            top_dn = sorted(market_data, key=lambda d: d.get("thay_doi", 0))[:5]
+            ds = "\n".join(
+                f"• **{d['ma']}** ({d.get('ten','')[:25]}): {d.get('thay_doi',0):+.2f}% — {d.get('gia',0):,.0f}₫"
+                for d in top_dn
+            )
+            return (
+                f"{MO_DAU}"
+                f"📉 **TOP 5 MÃ GIẢM MẠNH NHẤT HÔM NAY** (real-time từ yfinance)\n\n"
+                f"{ds}\n\n"
+                f"💡 *Gợi ý: Mã giảm mạnh có thể là cơ hội DCA nếu fundamentals vẫn tốt. "
+                f"Đừng bắt dao rơi — hãy kiểm tra kỹ trước khi mua.*"
+            )
+        else:
+            top_up = sorted(market_data, key=lambda d: d.get("thay_doi", 0), reverse=True)[:5]
+            ds = "\n".join(
+                f"• **{d['ma']}** ({d.get('ten','')[:25]}): {d.get('thay_doi',0):+.2f}% — {d.get('gia',0):,.0f}₫ (Vol {d.get('vol_ratio',0):.1f}x)"
+                for d in top_up
+            )
+            return (
+                f"{MO_DAU}"
+                f"🚀 **TOP 5 MÃ TĂNG MẠNH NHẤT HÔM NAY** (real-time từ yfinance)\n\n"
+                f"{ds}\n\n"
+                f"⚠️ *Mã tăng mạnh thường đi kèm Vol cao. Cẩn thận FOMO — "
+                f"chỉ vào lệnh nếu có setup kỹ thuật rõ ràng.*"
+            )
+
+    intent_volume = ["mã nào vol cao", "volume đột biến", "volume dot bien", "vol đột biến",
+                     "mã nào thanh khoản", "thanh khoản cao", "mã nào giao dịch nhiều"]
+    if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_volume):
+        if not market_data:
+            return None
+        top_vol = sorted(
+            [d for d in market_data if d.get("vol_ratio", 0) > 0],
+            key=lambda d: d.get("vol_ratio", 0), reverse=True
+        )[:5]
+        if not top_vol:
+            return f"{MO_DAU}⚠️ Chưa có dữ liệu volume hôm nay."
+        ds = "\n".join(
+            f"• **{d['ma']}** ({d.get('ten','')[:25]}): Vol ratio {d.get('vol_ratio',0):.1f}x TB20D — thay đổi {d.get('thay_doi',0):+.2f}%"
+            for d in top_vol
+        )
+        return (
+            f"{MO_DAU}"
+            f"🔥 **TOP 5 MÃ VOLUME ĐỘT BIẾN** (real-time từ yfinance)\n\n"
+            f"{ds}\n\n"
+            f"💡 *Vol đột biến >2x = có tin tức/ dòng tiền lớn. Xem chart + tin tức trước khi hành động.*"
+        )
+
+    intent_phan_bo = ["phân bổ vốn", "phan bo von", "phân bổ", "phan bo",
+                      "100 triệu", "100 trieu", "200 triệu", "200 trieu",
+                      "500 triệu", "500 trieu", "1 tỷ", "1 ty",
+                      "nên đầu tư gì", "nen dau tu gi", "chiến lược cho tôi", "chien luoc cho toi"]
+    if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_phan_bo):
+        return _goi_y_phan_bo(risk, market_data)
+
+    intent_co_tuc = ["cổ tức tốt", "co tuc tot", "cổ tức cao", "co tuc cao",
+                     "mã trả cổ tức", "ma tra co tuc", "dividend"]
+    if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_co_tuc):
+        if not market_data:
+            return None
+        try:
+            from .data_loader import DOCS as _D
+            cps = _D.get("co_phieu_vn", {})
+            div_rows = []
+            for ma, info in cps.items():
+                dy = info.get("co_tuc_pct", 0) or 0
+                if dy and dy > 0:
+                    div_rows.append((ma, info.get("ten", ma)[:30], dy, info.get("gia", 0), info.get("nganh", "")))
+            div_rows.sort(key=lambda x: -x[2])
+            top = div_rows[:5]
+            ds = "\n".join(
+                f"• **{ma}** ({ten}): yield **{dy:.1f}%** — giá {gia:,.0f}₫ — {nganh}"
+                for ma, ten, dy, gia, nganh in top
+            )
+            return (
+                f"{MO_DAU}"
+                f"💰 **TOP 5 MÃ CỔ TỨC CAO NHẤT** (từ dữ liệu thật)\n\n"
+                f"{ds}\n\n"
+                f"💡 *Cổ tức ổn định từ blue-chip (VCB, VNM, FPT) an toàn hơn cổ tức cao từ penny stock. "
+                f"Nhớ: cổ tức = chia lợi nhuận, KHÔNG phải tiền miễn phí.*"
+            )
+        except Exception:
+            return None
+
+    intent_nen_mua = ["có nên mua", "co nen mua", "nên mua không", "nen mua khong",
+                      "mua mã nào", "mua ma nao", "nên mua mã nào", "nen mua ma nao",
+                      "tôi nên mua", "toi nen mua"]
+    if any(kw in cau_thuong or kw in cau_khong_dau for kw in intent_nen_mua):
+        return _goi_y_mua_theo_risk(risk, market_data, dm, kpi)
+
+    return None
+
+
+def _phan_tich_danh_muc_user(dm, kpi, real_prices, risk):
+    if not dm:
+        return (
+            f"{MO_DAU}"
+            "📊 **PHÂN TÍCH DANH MỤC CỦA BẠN**\n\n"
+            "Bạn chưa có danh mục nào. Hãy vào tab **📊 Danh mục** để tạo danh mục đầu tư. "
+            "Sau đó quay lại đây để tôi phân tích chuyên sâu cho bạn.\n\n"
+            "💡 *Hoặc dùng danh mục mẫu ở Sidebar để xem demo.*"
+        )
+
+    tong_gt = 0
+    tong_lai_lo = 0
+    rows = []
+    for ma, info in dm.items():
+        gia_von = info.get("gia_von", 0) or 0
+        sl = info.get("so_luong", 0) or 0
+        if gia_von <= 0 or sl <= 0:
+            continue
+        gia_tt = info.get("gia_thi_truong", 0) or 0
+        if not gia_tt and real_prices.get(ma) is not None:
+            try:
+                gia_tt = float(real_prices[ma].iloc[-1])
+            except Exception:
+                gia_tt = gia_von
+        if not gia_tt:
+            gia_tt = gia_von
+        gt = gia_tt * sl
+        ll = (gia_tt - gia_von) * sl
+        pct = (gia_tt / gia_von - 1) * 100 if gia_von else 0
+        tong_gt += gt
+        tong_lai_lo += ll
+        rows.append((ma, gt, ll, pct, info.get("nganh", "")))
+
+    if not rows:
+        return f"{MO_DAU}⚠️ DM chưa có dữ liệu giá vốn/số lượng hợp lệ."
+
+    return_pct = (tong_lai_lo / max(1, tong_gt - tong_lai_lo)) * 100
+    top_win = sorted(rows, key=lambda x: -x[3])[:3]
+    top_lose = sorted(rows, key=lambda x: x[3])[:3]
+    nganh_count = {}
+    for _, _, _, _, ng in rows:
+        nganh_count[ng] = nganh_count.get(ng, 0) + 1
+    ds_nganh = ", ".join(f"{k} ({v})" for k, v in sorted(nganh_count.items(), key=lambda x: -x[1])[:3])
+
+    win_txt = "\n".join(f"• **{m}**: +{p:.2f}% — {gt:,.0f}₫" for m, gt, _, p, _ in top_win)
+    lose_txt = "\n".join(f"• **{m}**: {p:+.2f}% — {gt:,.0f}₫" for m, gt, _, p, _ in top_lose)
+
+    color = "#4CAF50" if tong_lai_lo > 0 else ("#F44336" if tong_lai_lo < 0 else "#FFD700")
+    msg = (
+        f"{MO_DAU}"
+        f"📊 **PHÂN TÍCH DANH MỤC CỦA BẠN** (real-time từ yfinance)\n\n"
+        f"💰 **Tổng giá trị:** {tong_gt:,.0f} ₫\n"
+        f"📈 **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ ({return_pct:+.2f}%)\n"
+        f"📦 **Số mã:** {len(rows)} | **Ngành phân bổ:** {ds_nganh or '—'}\n"
+        f"🎯 **Hồ sơ rủi ro:** {risk}\n\n"
+        f"🚀 **Top 3 mã LÃI:**\n{win_txt}\n\n"
+        f"💀 **Top 3 mã LỖ:**\n{lose_txt}\n\n"
+    )
+
+    if return_pct > 5:
+        msg += "✅ **DM đang sinh lời tốt.** Cân nhắc chốt lời 1 phần (20-30%) ở các mã đã tăng >30% để chốt profit, đồng thời DCA tiếp các mã còn fundamentals tốt.\n\n"
+    elif return_pct < -10:
+        msg += "⚠️ **DM đang lỗ nặng.** Không nên hoảng loạn bán tháo. Kiểm tra lại từng mã: mã nào fundamentals vẫn tốt thì giữ + DCA, mã nào fundamentals xấu đi thì cắt lỗ chuyển sang mã tốt hơn.\n\n"
+    else:
+        msg += "🟡 **DM đang đi ngang.** Đây là thời điểm tốt để review lại chiến lược: phân bổ ngành, tỷ trọng từng mã, mục tiêu lợi nhuận.\n\n"
+
+    if len(set(r[4] for r in rows)) == 1 and len(rows) > 2:
+        msg += "💡 **Gợi ý đa dạng hóa:** DM hiện tập trung 1 ngành. Nên thêm 1-2 mã ngành khác (công nghệ, thép, bán lẻ) để giảm rủi ro tập trung.\n\n"
+
+    msg += "👉 *Bạn có thể hỏi: \"mã nào đang tăng\", \"cổ tức tốt\", \"phân bổ vốn 100 triệu\"...*"
+    return msg
+
+
+def _goi_y_phan_bo(risk, market_data):
+    if risk in ["Bảo thủ", "Bao thu", "Conservative"]:
+        cp_pct, vang_pct, tk_pct, tp_pct = 30, 25, 35, 10
+        msg = "🛡️ **Hồ sơ BẢO THỦ** — ưu tiên bảo toàn vốn"
+    elif risk in ["Tích cực", "Tich cuc", "Aggressive", "Mạo hiểm", "Mao hiem"]:
+        cp_pct, vang_pct, tk_pct, tp_pct = 60, 15, 10, 15
+        msg = "🚀 **Hồ sơ TÍCH CỰC** — sẵn sàng chấp nhận rủi ro cao để tăng lợi nhuận"
+    else:
+        cp_pct, vang_pct, tk_pct, tp_pct = 50, 20, 20, 10
+        msg = "⚖️ **Hồ sơ TRUNG BÌNH** — cân bằng lợi nhuận/rủi ro"
+
+    msg += (
+        f"\n\n📊 **PHÂN BỔ ĐỀ XUẤT:**\n"
+        f"• 🟢 **Cổ phiếu VN**: {cp_pct}% (blue-chip: VCB, FPT, HPG, VNM, MBB, ACB)\n"
+        f"• 🟡 **Trái phiếu/Tiết kiệm**: {tk_pct + tp_pct}% (lãi suất ~5-6%/năm)\n"
+        f"• 🟠 **Vàng**: {vang_pct}% (SJC hoặc vàng nhẫn 24K)\n"
+    )
+    if market_data:
+        msg += f"\n📈 **Dữ liệu thị trường hôm nay:** VN-Index có tín hiệu "
+        n_up = sum(1 for d in market_data if d.get("thay_doi", 0) > 0)
+        pct_up = n_up / max(1, len(market_data)) * 100
+        if pct_up > 55:
+            msg += f"**TÍCH CỰC** ({pct_up:.0f}% mã tăng) — có thể tăng tỷ trọng CP lên 5-10%.\n"
+        elif pct_up < 45:
+            msg += f"**TIÊU CỰC** ({pct_up:.0f}% mã tăng) — nên giảm tỷ trọng CP, tăng tiết kiệm/trái phiếu chờ cơ hội.\n"
+        else:
+            msg += f"**TRUNG LẬP** ({pct_up:.0f}% mã tăng) — giữ tỷ trọng hiện tại, DCA đều đặn.\n"
+
+    msg += (
+        f"\n💡 **NGUYÊN TẮC VÀNG:**\n"
+        f"1. Quỹ khẩn cấp 6 tháng chi tiêu TRƯỚC KHI đầu tư\n"
+        f"2. DCA hàng tháng — đừng cố timing\n"
+        f"3. Đa dạng hóa — đừng bỏ tất cả vào 1 mã/1 ngành\n"
+        f"4. Tái cân bằng mỗi quý\n"
+    )
+    return msg
+
+
+def _goi_y_mua_theo_risk(risk, market_data, dm, kpi):
+    if not market_data:
+        return None
+    cps_have = set((dm or {}).keys())
+    candidates = []
+    for d in market_data:
+        ma = d.get("ma")
+        if not ma or ma in cps_have:
+            continue
+        ret_3m = d.get("ret_3m", 0) or 0
+        vol_ratio = d.get("vol_ratio", 0) or 0
+        change = d.get("thay_doi", 0) or 0
+        score = 0
+        if -20 < ret_3m < 15:
+            score += 2
+        if vol_ratio > 1.2:
+            score += 1
+        if -3 < change < 3:
+            score += 1
+        if d.get("von_hoa", 0) > 1e11:
+            score += 2
+        if score >= 4:
+            candidates.append((ma, d.get("ten", ma)[:25], ret_3m, vol_ratio, change, score))
+
+    if not candidates:
+        return f"{MO_DAU}⚠️ Hiện chưa có mã nào đủ tiêu chí kỹ thuật cơ bản để gợi ý. Thị trường đang biến động bất thường — chờ tín hiệu rõ hơn."
+
+    candidates.sort(key=lambda x: -x[5])
+    top = candidates[:5]
+    ds = "\n".join(
+        f"• **{m}** ({ten}): return 3M {r3:+.1f}%, hôm nay {ch:+.2f}%, vol {v:.1f}x — điểm {s}"
+        for m, ten, r3, v, ch, s in top
+    )
+    return (
+        f"{MO_DAU}"
+        f"🎯 **GỢI Ý MÃ ĐÁNG QUAN TÂM** (theo hồ sơ rủi ro **{risk}**)\n\n"
+        f"Dựa trên tiêu chí: blue-chip + Vol tăng + ổn định + chưa có trong DM:\n\n"
+        f"{ds}\n\n"
+        f"⚠️ *Đây chỉ là gợi ý kỹ thuật cơ bản. Bạn CẦN kiểm tra thêm:*\n"
+        f"• Báo cáo tài chính quý gần nhất\n"
+        f"• P/E so với ngành (P/E < 15 = rẻ, > 20 = đắt)\n"
+        f"• ROE > 15% = chất lượng tốt\n"
+        f"• Khối ngoại mua/bán ròng\n\n"
+        f"💡 *\"Đừng bao giờ mua cổ phiếu mà bạn không hiểu.\" — Warren Buffett*"
+    )
 
     for tu_khoa in ["tạm biệt", "cảm ơn", "hello", "xin chào"]:
         if tu_khoa in cau_thuong or xu_ly_bo_dau(tu_khoa) in cau_khong_dau:
