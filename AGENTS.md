@@ -174,6 +174,7 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - ✅ removeChild tab 6 Chuyên gia (30dc519) — `st.spinner` → `st.status` + session_state cache + `_safe_msg()`
 - ✅ removeChild tab Chat (79eca02) — `st.spinner` → `st.status` + try/except
 - ✅ DM mở rộng 8 → 16 mã (f838dce) — FPT, VCB, MBB, CTG, TCB, HPG, VIX, SSI, VNM, MSN, MWG, CTR, VIC, VHM, HVN, PNJ (tổng 97.4M₫, +9.82%)
+- ✅ **Fix Excel DM 8 → 16 mã (b8c8509)** — `doc_danh_muc()` đọc Excel "HỆ THỐNG QUẢN LÝ " TRƯỚC; nếu Excel có 8 mã thì JSON fallback 16 mã không bao giờ trigger → user thấy 8 mã. Fix: update Excel sheet rows 5-20 với 16 mã khớp JSON
 - ✅ st.progress trong @st.cache_data (b8d593d) — refactor `_fetch_all_parallel` thêm `progress_callback` param, 4 callsites wrap progress NGOÀI cached function
 
 **Phase 8 (commit `XXX` chưa push) — Mở rộng khảo sát rủi ro 12 → 24 câu (`backend/risk_profile.py`):**
