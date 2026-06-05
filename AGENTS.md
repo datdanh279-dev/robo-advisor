@@ -107,20 +107,36 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
   - `_get_pe_distribution` nhận tuple, tự động chọn suffix theo vùng
   - **Fix lỗi "Không đủ dữ liệu chung với VN30"** ở IR Decomposition + Upside/Downside Capture: nguyên nhân `dm_equity = dm_value_ts.values` (numpy array, không có datetime index) → `set(pd.Series(dm_equity).index) & set(vn30_close.index)` luôn rỗng. Fix: tạo `dm_eq_series = pd.Series(dm_equity, index=common_dates_local)` rồi mới tính common_idx.
 
-**Chat thông minh (6 intent mới, dùng real-data từ context):**
+**Chat thông minh (9 intent, dùng real-data từ context):**
 - "Phân tích DM của tôi" → real-time từ st.session_state.dm
-- "Mã nào đang tăng/giảm" → từ 50-mã market scan thật
+- "Mã nào đang tăng/giảm" → từ 384-mã market scan thật
 - "Vol đột biến" → real vol_ratio từ yfinance
 - "Phân bổ X triệu" → theo risk_profile thật (Bảo thủ/TB/Tích cực)
 - "Cổ tức tốt" → từ co_phieu_vn.json data
 - "Có nên mua mã nào" → scoring algorithm (blue-chip + vol + ổn định + chưa có trong DM)
+- **🛡️ Mã nào an toàn/rủi ro thấp** (commit `87b66ee`) → top 5 vol_ratio thấp + return 3M dương
+- **🏛️ Vốn hóa lớn nhất/blue chip** (commit `87b66ee`) → top 5 von_hoa cao nhất, format nghìn tỷ / tỷ
+- **🔍 Phân tích mã cụ thể (VD: "Phân tích VCB")** (commit `87b66ee`) → auto-detect mã 3-4 chữ in hoa bằng regex, hiển thị giá + return 3M + ROE + P/E + P/B + điểm 0-4 theo 4 tiêu chí (return>0, vol<1.5x, ROE>12%, P/E<18)
+
+**Phase 5 (commit `87b66ee`) — Fix `px.scatter` AttributeError + mở rộng Risk-Return Bubble lên 384 mã:**
+- **Bug:** Risk-Return Bubble (app.py:4797) chỉ dùng 8 mã trong DM, fail nếu `von_hoa=0`/`NaN` hoặc `market_cap=None`
+- **Fix:** rewrite section dùng `market_data` (229 VN + 155 TG = 384 mã)
+  - Vol proxy: `25% + (volr-1)*8%`, clip [15, 80]%
+  - Return 6M = `ret_3m * 2` (3M thật từ yfinance)
+  - Drop NaN/0 trước plot, clip `size_bubble >= 1`
+  - Top 50 vốn hóa lớn nhất hiển thị nhãn
+  - Color by `Nganh` nếu > 1 ngành
+  - Wrap try/except + warning nếu fail
+- Thêm 3 intent chat thông minh mới (xem trên)
 
 **File `_build_chat_context()` ở app.py:111** tổng hợp context (dm, kpi, market_data, risk_profile, real_prices) từ session_state. `tim_cau_tra_loi()` ở backend/chat_advisor.py:1186 xử lý intent trước khi gọi AI advisor.
 
 **Fix lỗi đã làm:**
 - ✅ `NameError df_mkt` (cb94103) — định nghĩa `df_mkt = pd.DataFrame()` ngay cả khi market_data rỗng
 - ✅ `AttributeError px.scatter` (7c0782a) — clip Vốn hóa >=0.1
+- ✅ `AttributeError px.scatter` Risk-Return Bubble (87b66ee) — rewrite dùng market_data 384 mã, drop NaN, clip size
 - ✅ `NameError dm_equity` (f340e88) — tính sớm sau khi fetch real_prices
 - ✅ 6 Chuyên gia asyncio + ThreadPoolExecutor (654cfaa)
 - ✅ NaN checks cho 52W/RSI/Vol/Range (5822942) — `pd.notna()`, `min(len())`, skip delisted
 - ✅ removeChild footer timestamp → session_state cached
+- ✅ "Không đủ dữ liệu chung với VN30" IR + Capture (641e7aa) — `dm_equity.values` numpy → `pd.Series(values, index=common_dates_local)`
