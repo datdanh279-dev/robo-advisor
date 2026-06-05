@@ -2861,10 +2861,22 @@ elif st.session_state.trang_thai == "deep_analysis":
                     ki["ytd"] = float(static_src.get("ytd", 0)) / 100.0
             if "w52_high" not in ki or ki.get("w52_high", 0) <= 0:
                 gia_tt = info.get("gia_thi_truong", 0)
-                ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
+                if ma in real_prices and len(real_prices[ma]) >= 60:
+                    try:
+                        ki["w52_high"] = float(real_prices[ma].tail(252).max())
+                    except Exception:
+                        ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
+                else:
+                    ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
             if "w52_low" not in ki or ki.get("w52_low", 0) <= 0:
                 gia_tt = info.get("gia_thi_truong", 0)
-                ki["w52_low"] = gia_tt * 0.85 if gia_tt > 0 else 0
+                if ma in real_prices and len(real_prices[ma]) >= 60:
+                    try:
+                        ki["w52_low"] = float(real_prices[ma].tail(252).min())
+                    except Exception:
+                        ki["w52_low"] = gia_tt * 0.85 if gia_tt > 0 else 0
+                else:
+                    ki["w52_low"] = gia_tt * 0.85 if gia_tt > 0 else 0
             if "market_cap" not in ki or ki.get("market_cap", 0) <= 0:
                 ki["market_cap"] = info.get("gia_thi_truong", 0) * info.get("so_luong", 0) / 1e9
             return ki
@@ -4225,24 +4237,52 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("## 💧 Phân tích thanh khoản (ADTV — Khối lượng giao dịch)")
         liq_rows = []
         for ma in dm.keys():
+            vol = 0
+            price = 0
+            vol_source = "yahoo.meta"
             if ma in real_metas:
                 vol = real_metas[ma].get('regularMarketVolume', 0) or 0
                 price = real_metas[ma].get('regularMarketPrice', 0) or 0
-                adtv_value = vol * price
-                if adtv_value > 0:
-                    value_dm = dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0)
-                    days_to_liquidate = value_dm / adtv_value if adtv_value > 0 else 999
-                    liq_rows.append({
-                        "Mã": ma,
-                        "ADTV (tỷ)": round(adtv_value/1e9, 1),
-                        "GT DM (tỷ)": round(value_dm/1e9, 1),
-                        "Ngày thoát hàng": round(days_to_liquidate, 1),
-                        "Thanh khoản": "🟢 Cao" if adtv_value > 5e9 else ("🟡 TB" if adtv_value > 1e9 else "🔴 Thấp")
-                    })
+            if (vol <= 0 or price <= 0) and ma in real_prices:
+                try:
+                    p_series = real_prices[ma]
+                    if len(p_series) >= 20:
+                        daily_ret = p_series.pct_change().dropna().abs()
+                        price = float(p_series.iloc[-1])
+                        vol_proxy = float(daily_ret.tail(20).mean() * 1000) + 1
+                        vol = max(vol, vol_proxy * 1000)
+                        vol_source = "price-derived (yahoo volume miss)"
+                except Exception:
+                    pass
+            if (vol <= 0 or price <= 0) and ma in kpi:
+                ki_ma = kpi[ma]
+                mc = float(ki_ma.get("market_cap", 0) or ki_ma.get("von_hoa", 0) or 0)
+                if mc > 0:
+                    price = float(dm[ma].get("gia_thi_truong", 0) or 0) or price
+                    if price > 0:
+                        vol = mc * 0.005 / max(price, 1) * 1e6
+                        vol_source = "sector estimate (0.5% mcap/ngay)"
+            if vol <= 0:
+                price = float(dm[ma].get("gia_thi_truong", 0) or 0) or price
+                if price > 0:
+                    vol = 100000
+                    vol_source = "default 100K shares (yahoo miss)"
+            adtv_value = vol * price
+            if adtv_value > 0:
+                value_dm = dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0)
+                days_to_liquidate = value_dm / adtv_value if adtv_value > 0 else 999
+                liq_rows.append({
+                    "Mã": ma,
+                    "ADTV (tỷ)": round(adtv_value/1e9, 2),
+                    "GT DM (tỷ)": round(value_dm/1e9, 1),
+                    "Ngày thoát hàng": round(days_to_liquidate, 1),
+                    "Thanh khoản": "🟢 Cao" if adtv_value > 5e9 else ("🟡 TB" if adtv_value > 1e9 else "🔴 Thấp"),
+                    "Nguồn": vol_source
+                })
         if liq_rows:
             df_liq = pd.DataFrame(liq_rows)
             st.dataframe(df_liq, use_container_width=True, hide_index=True)
-            st.caption("💡 ADTV > 5 tỷ = thanh khoản cao (mua/bán dễ). Ngày thoát hàng = GT mã / ADTV. >5 ngày = khó bán gấp.")
+            st.caption("💡 ADTV > 5 tỷ = thanh khoản cao (mua/bán dễ). Ngày thoát hàng = GT mã / ADTV. >5 ngày = khó bán gấp. Nguồn: yahoo.meta (real) → price-derived (synth từ |returns|) → sector estimate (0.5% mcap).")
         else:
             st.info("Không có dữ liệu volume từ yfinance.")
 
@@ -4270,8 +4310,16 @@ elif st.session_state.trang_thai == "deep_analysis":
                 fo = _sector_inst_med[ng]
                 fo_source = f"TB ngành ({len(_sector_inst_avg.get(ng, []))} mã có data thật)"
             else:
-                fo = 0
-                fo_source = "Không có data (yfinance miss)"
+                _sector_default = {
+                    "Ngân hàng": 0.45, "Bất động sản": 0.25, "Thép": 0.18,
+                    "Công nghệ": 0.30, "Chứng khoán": 0.22, "Bán lẻ": 0.20,
+                    "Xây dựng": 0.15, "Dầu khí": 0.28, "Điện": 0.30,
+                    "Dược phẩm": 0.25, "Thủy sản": 0.18, "Cảng biển": 0.32,
+                    "Vận tải": 0.20, "Cao su": 0.15, "Phân bón": 0.18,
+                    "Bảo hiểm": 0.50, "Hàng không": 0.25, "Xuất khẩu": 0.22
+                }
+                fo = _sector_default.get(ng, 0.20)
+                fo_source = f"Sector default {ng} ({fo*100:.0f}%)"
             v = gia_tt * sl
             ff_value = v * fo if fo > 0 else 0
             momentum_3m = 0
@@ -6005,9 +6053,9 @@ elif st.session_state.trang_thai == "deep_analysis":
             def _get_52w_data(symbols):
                 import requests as _rq_52
                 out = []
-                for s in symbols:
+                for s, suf in symbols:
                     try:
-                        r = _rq_52.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=1y&interval=1d",
+                        r = _rq_52.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}{suf}?range=1y&interval=1d",
                             headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
                         if r.status_code == 200:
                             data = r.json()
@@ -6028,7 +6076,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                         continue
                 return out
             with st.spinner(f"📡 Lấy 52W cho {len(market_data)} mã..."):
-                w52_data = _get_52w_data(tuple([d["ma"] for d in market_data]))
+                w52_targets = tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data])
+                w52_data = _get_52w_data(w52_targets)
             if w52_data:
                 df_52 = pd.DataFrame(w52_data)
                 nl1, nl2 = st.columns(2)
@@ -6325,9 +6374,9 @@ elif st.session_state.trang_thai == "deep_analysis":
             def _get_holders_market(symbols):
                 import yfinance as _yf_h
                 out = []
-                for s in symbols:
+                for s, suf in symbols:
                     try:
-                        tk = _yf_h.Ticker(s + ".VN")
+                        tk = _yf_h.Ticker(s + suf)
                         info = tk.info
                         insider = info.get("heldPercentInsiders")
                         inst = info.get("heldPercentInstitutions")
@@ -6338,9 +6387,23 @@ elif st.session_state.trang_thai == "deep_analysis":
                                 "free_float_pct": 100 - (float(insider or 0) + float(inst or 0)) * 100})
                     except Exception:
                         continue
+                if len(out) < 5:
+                    try:
+                        for _ma, _ki in (DOCS.get("co_phieu_vn") or {}).items():
+                            if len(out) >= 30: break
+                            _ins = float(_ki.get("insider_pct", 0) or 0)
+                            _ngoai = float(_ki.get("pct_ngoai", 0) or 0)
+                            if _ins > 0 or _ngoai > 0:
+                                out.append({"ma": _ma, "ten": _ki.get("ten", _ma)[:25],
+                                    "insider_pct": _ins,
+                                    "institution_pct": _ngoai,
+                                    "free_float_pct": max(0, 100 - _ins - _ngoai)})
+                    except Exception:
+                        pass
                 return out
             with st.spinner(f"📡 Tải holdings cho {len(market_data)} mã..."):
-                holders = _get_holders_market(tuple([d["ma"] for d in market_data]))
+                holders_targets = tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data])
+                holders = _get_holders_market(holders_targets)
             if holders:
                 df_h = pd.DataFrame(holders)
                 h1, h2, h3 = st.columns(3)
@@ -6370,9 +6433,9 @@ elif st.session_state.trang_thai == "deep_analysis":
             def _get_earnings_calendar(symbols):
                 import yfinance as _yf_e
                 out = []
-                for s in symbols:
+                for s, suf in symbols:
                     try:
-                        tk = _yf_e.Ticker(s + ".VN")
+                        tk = _yf_e.Ticker(s + suf)
                         cal = tk.calendar
                         if cal is not None and isinstance(cal, dict) and "Earnings Date" in cal:
                             ed = cal["Earnings Date"]
@@ -6391,7 +6454,8 @@ elif st.session_state.trang_thai == "deep_analysis":
             dm_symbols = [ma for ma in dm.keys() if dm[ma].get("so_luong", 0) > 0]
             if dm_symbols:
                 with st.spinner(f"📡 Tải earnings calendar cho {len(dm_symbols)} mã trong DM..."):
-                    earnings = _get_earnings_calendar(tuple(dm_symbols))
+                    earnings_targets = tuple([(ma, ".VN") for ma in dm_symbols])
+                    earnings = _get_earnings_calendar(earnings_targets)
                 if earnings:
                     df_ear = pd.DataFrame(earnings).sort_values("earnings_date")
                     st.write(f"**📅 Lịch công bố lợi nhuận sắp tới cho {len(earnings)}/{len(dm_symbols)} mã trong DM:**")
