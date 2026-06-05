@@ -3089,7 +3089,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                                     aligned = prices.reindex(common_dates).ffill().bfill()
                                     dm_value_ts += aligned.astype(float) * shares
                         if dm_value_ts.abs().sum() > 0:
-                            dm_equity = dm_value_ts.values
+                            dm_equity = dm_value_ts
                             daily_ret_real = dm_value_ts.pct_change().dropna()
                             daily_ret_real = daily_ret_real.replace([np.inf, -np.inf], np.nan).dropna()
                             if len(daily_ret_real) > 20:
@@ -3479,7 +3479,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("---")
         st.write("## 📈 Đường vốn (Equity Curve) 6 tháng qua")
         if has_real:
-            common_dates = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+            common_dates = sorted(set().union(*[set(s.index) for s in real_prices.values()]))
             if len(common_dates) >= 20:
                 dm_value_ts = pd.Series(0.0, index=common_dates, dtype=float)
                 for ma, prices in real_prices.items():
@@ -4712,7 +4712,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
                     _dm_capm_series = dm_equity
                 else:
-                    _cd_capm = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    _cd_capm = sorted(set().union(*[set(s.index) for s in real_prices.values()]))
                     if len(_cd_capm) > 30:
                         _dm_capm_series = pd.Series(dm_equity, index=_cd_capm)
             except Exception:
@@ -4869,7 +4869,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
                     dm_eq_series = dm_equity
                 else:
-                    common_dates_local = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    common_dates_local = sorted(set().union(*[set(s.index) for s in real_prices.values()]))
                     if len(common_dates_local) > 30:
                         dm_eq_series = pd.Series(dm_equity, index=common_dates_local)
             except Exception:
@@ -4917,7 +4917,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
                     dm_capture_series = dm_equity
                 else:
-                    common_dates_local2 = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    common_dates_local2 = sorted(set().union(*[set(s.index) for s in real_prices.values()]))
                     if len(common_dates_local2) > 30:
                         dm_capture_series = pd.Series(dm_equity, index=common_dates_local2)
             except Exception:
@@ -4961,7 +4961,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if ma in real_prices and len(real_prices[ma]) >= 30:
                     ret_dict[ma] = real_prices[ma].pct_change().dropna()
             if len(ret_dict) >= 3:
-                common_n = sorted(set.intersection(*[set(r.index) for r in ret_dict.values()]))
+                common_n = sorted(set().union(*[set(r.index) for r in ret_dict.values()]))
                 if len(common_n) > 20:
                     df_n = pd.DataFrame({ma: r.reindex(common_n) for ma, r in ret_dict.items()}).dropna()
                     corr_n = df_n.corr()
@@ -5309,7 +5309,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
                     _cd_cal = list(dm_equity.index)
                 else:
-                    _cd_cal = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    _cd_cal = sorted(set().union(*[set(s.index) for s in real_prices.values()]))
                 if _cd_cal and len(_cd_cal) > 60:
                     eq_s11 = pd.Series(dm_equity, index=pd.DatetimeIndex(_cd_cal))
                     monthly_ret = eq_s11.resample('ME').last().pct_change().dropna() * 100
@@ -5344,7 +5344,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
                     _dm_br_series = dm_equity
                 else:
-                    _cd_br = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    _cd_br = sorted(set().union(*[set(s.index) for s in real_prices.values()]))
                     if len(_cd_br) > 30:
                         _dm_br_series = pd.Series(dm_equity, index=_cd_br)
             except Exception:
