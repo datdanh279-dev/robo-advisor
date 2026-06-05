@@ -2911,11 +2911,13 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         def _fetch_vn_bond_yield():
             import yfinance as _yf
-            for sym in ["^VN10Y", "VN10Y=X", "VNI10Y=X", "^GSPC"]:
+            for sym in ["^VN10Y", "VN10Y=X", "VNI10Y=X"]:
                 try:
                     h = _yf.Ticker(sym).history(period="6mo", timeout=8)
                     if not h.empty and len(h) > 20:
-                        return h['Close']
+                        vals = h['Close'].dropna()
+                        if len(vals) > 0 and 0 < float(vals.iloc[-1]) < 50:
+                            return vals
                 except Exception:
                     continue
             return None
@@ -4418,8 +4420,14 @@ elif st.session_state.trang_thai == "deep_analysis":
                     weighted_eps_yield += (1/pe_v) * w
             bond_yield_now = 0
             if vn_bond_close is not None and len(vn_bond_close) > 0:
-                bond_yield_now = float(vn_bond_close.iloc[-1]) if vn_bond_close.iloc[-1] > 1 else float(vn_bond_close.iloc[-1]) * 100
-            if bond_yield_now > 0 and weighted_eps_yield > 0:
+                bv = float(vn_bond_close.iloc[-1])
+                if 0 < bv < 1:
+                    bond_yield_now = bv * 100
+                elif 1 <= bv < 50:
+                    bond_yield_now = bv
+                else:
+                    bond_yield_now = 0
+            if 0 < bond_yield_now < 30 and weighted_eps_yield > 0:
                 equity_risk_premium = (weighted_eps_yield - bond_yield_now) * 100
                 verdict = "✅ Hấp dẫn" if equity_risk_premium > 3 else ("🟡 Hợp lý" if equity_risk_premium > 0 else "🔴 Đắt")
                 erp1, erp2, erp3 = st.columns(3)
@@ -4518,10 +4526,21 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 📈 CAPM Regression — Đường hồi quy Stock vs Market")
+        _dm_capm_series = None
         if has_real and dm_equity is not None and len(dm_equity) > 30 and has_vn30:
-            common_idx = sorted(set(pd.Series(dm_equity).index) & set(vn30_close.index))
+            try:
+                if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
+                    _dm_capm_series = dm_equity
+                else:
+                    _cd_capm = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    if len(_cd_capm) > 30:
+                        _dm_capm_series = pd.Series(dm_equity, index=_cd_capm)
+            except Exception:
+                _dm_capm_series = None
+        if _dm_capm_series is not None and has_vn30 and len(_dm_capm_series) > 30:
+            common_idx = sorted(set(_dm_capm_series.index) & set(vn30_close.index))
             if len(common_idx) > 30:
-                dm_r = pd.Series(dm_equity, index=pd.Series(dm_equity).index).pct_change().dropna()
+                dm_r = _dm_capm_series.pct_change().dropna()
                 vn_r = vn30_close.pct_change().dropna()
                 common_idx2 = sorted(set(dm_r.index) & set(vn_r.index))
                 if len(common_idx2) > 30:
@@ -5105,15 +5124,26 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("---")
         st.write("## 📅 Calendar Returns — Hiệu suất theo tháng/quý")
         if has_real and dm_equity is not None and len(dm_equity) > 60:
-            eq_s11 = pd.Series(dm_equity, index=pd.to_datetime([d for d in pd.Series(dm_equity).index]))
-            monthly_ret = eq_s11.resample('M').last().pct_change().dropna() * 100
+            try:
+                _cd_cal = None
+                if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
+                    _cd_cal = list(dm_equity.index)
+                else:
+                    _cd_cal = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                if _cd_cal and len(_cd_cal) > 60:
+                    eq_s11 = pd.Series(dm_equity, index=pd.DatetimeIndex(_cd_cal))
+                    monthly_ret = eq_s11.resample('ME').last().pct_change().dropna() * 100
+                else:
+                    monthly_ret = pd.Series(dtype=float)
+            except Exception as _cal_ex:
+                monthly_ret = pd.Series(dtype=float)
             if len(monthly_ret) >= 3:
                 mr_df = pd.DataFrame({"Tháng": monthly_ret.index.strftime("%m/%Y"),
                     "Return %": monthly_ret.values.round(2),
                     "Tốt/Xấu": ["🟢" if r > 0 else "🔴" for r in monthly_ret.values]})
                 st.dataframe(mr_df, use_container_width=True, hide_index=True)
-                best_month = monthly_ret.max()
-                worst_month = monthly_ret.min()
+                best_month = float(monthly_ret.max())
+                worst_month = float(monthly_ret.min())
                 avg_month = float(monthly_ret.mean())
                 positive_months = int((monthly_ret > 0).sum())
                 total_months = len(monthly_ret)
@@ -5128,8 +5158,19 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 📐 Brinson Attribution — Stock Selection vs Sector Allocation")
+        _dm_br_series = None
         if has_real and len(real_prices) >= 2 and has_vn30 and dm_equity is not None and len(dm_equity) > 60:
-            common_br = sorted(set(pd.Series(dm_equity).index) & set(vn30_close.index))
+            try:
+                if isinstance(dm_equity, pd.Series) and hasattr(dm_equity, 'index') and len(dm_equity.index) > 0 and not isinstance(dm_equity.index[0], int):
+                    _dm_br_series = dm_equity
+                else:
+                    _cd_br = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
+                    if len(_cd_br) > 30:
+                        _dm_br_series = pd.Series(dm_equity, index=_cd_br)
+            except Exception:
+                _dm_br_series = None
+        if _dm_br_series is not None and has_vn30 and len(_dm_br_series) > 60:
+            common_br = sorted(set(_dm_br_series.index) & set(vn30_close.index))
             if len(common_br) > 60:
                 stock_rets = {}
                 for ma, info in dm.items():
@@ -6072,7 +6113,16 @@ elif st.session_state.trang_thai == "deep_analysis":
             with st.spinner("📡 Tải P/E + lãi suất trái phiếu VN..."):
                 pe_dist_ey = _get_pe_distribution(tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]))
                 bond_yield = _fetch_vn_bond_yield()
-            bond_yield_pct = float(bond_yield.iloc[-1] * 100) if bond_yield is not None and len(bond_yield) > 0 else 7.05
+            if bond_yield is not None and len(bond_yield) > 0:
+                bv2 = float(bond_yield.iloc[-1])
+                if 0 < bv2 < 1:
+                    bond_yield_pct = bv2 * 100
+                elif 1 <= bv2 < 50:
+                    bond_yield_pct = bv2
+                else:
+                    bond_yield_pct = 0
+            else:
+                bond_yield_pct = 0
             if pe_dist_ey:
                 ey_rows = []
                 for r in pe_dist_ey:
