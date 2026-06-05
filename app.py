@@ -6408,6 +6408,151 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần dữ liệu thị trường.")
 
         st.write("---")
+        st.write("## 🌐 DEEP ANALYSIS 384 MÃ — Phân tích chuyên sâu toàn thị trường (229 VN + 155 TG)")
+        if market_data and len(market_data) >= 10:
+            st.caption(f"📊 Phân tích {len(market_data)} mã — {sum(1 for d in market_data if d.get('vung') == 'VN')} VN + {sum(1 for d in market_data if d.get('vung') == 'TG')} TG")
+
+            top30 = sorted([d for d in market_data if d.get("von_hoa", 0) > 0], key=lambda d: -d["von_hoa"])[:30]
+
+            st.write("### 📅 Calendar Returns Top 30 — Hiệu suất theo tháng")
+            try:
+                import requests as _rq_cr
+                monthly_rows = []
+                for d in top30[:15]:
+                    ma = d["ma"]
+                    suffix = ".VN" if d.get("vung") == "VN" else ""
+                    try:
+                        r = _rq_cr.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma}{suffix}",
+                            params={"range": "6mo", "interval": "1mo"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+                        if r.status_code == 200:
+                            data = r.json()
+                            closes = data.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            if closes and len(closes) > 1:
+                                ret = (float(closes[-1]) / float(closes[0]) - 1) * 100
+                                monthly_rows.append({"Mã": ma, "Vùng": d.get("vung", ""), "Giá": d.get("gia", 0),
+                                    "Return 6M %": round(ret, 2),
+                                    "Vol": round(float(d.get("vol_ratio", 0) or 0), 2)})
+                    except Exception:
+                        continue
+                if monthly_rows:
+                    df_cal = pd.DataFrame(monthly_rows).sort_values("Return 6M %", ascending=False)
+                    st.dataframe(df_cal, use_container_width=True, hide_index=True, height=400)
+                    st.caption(f"📊 Tính từ giá thật 6 tháng yfinance cho top 15 vốn hóa. Return 6M = (giá cuối kỳ / giá đầu kỳ - 1) × 100%.")
+            except Exception as e:
+                st.warning(f"⚠️ Không tải được calendar: {str(e)[:80]}")
+
+            st.write("### 🌪️ Volatility Cone 384 mã — Phân phối Vol toàn thị trường")
+            try:
+                vol_dist = []
+                for d in market_data:
+                    vr = d.get("vol_ratio", 0) or 0
+                    if vr > 0:
+                        v_est = max(10, min(80, 25 + (vr - 1) * 8))
+                        vol_dist.append({"Mã": d["ma"], "Vùng": d.get("vung", ""),
+                            "Vol %/năm": round(v_est, 1),
+                            "Vol ratio": round(vr, 2),
+                            "Vốn hóa (tỷ)": round(d.get("von_hoa", 0) / 1e9, 0) if d.get("von_hoa", 0) > 0 else 0})
+                df_volc = pd.DataFrame(vol_dist)
+                if len(df_volc) > 5:
+                    p10 = float(df_volc["Vol %/năm"].quantile(0.10))
+                    p25 = float(df_volc["Vol %/năm"].quantile(0.25))
+                    p50 = float(df_volc["Vol %/năm"].quantile(0.50))
+                    p75 = float(df_volc["Vol %/năm"].quantile(0.75))
+                    p90 = float(df_volc["Vol %/năm"].quantile(0.90))
+                    vc1, vc2, vc3, vc4, vc5 = st.columns(5)
+                    vc1.metric("📊 P10 (Yên tĩnh)", f"{p10:.1f}%")
+                    vc2.metric("📊 P25", f"{p25:.1f}%")
+                    vc3.metric("📊 P50 (Median)", f"{p50:.1f}%")
+                    vc4.metric("📊 P75", f"{p75:.1f}%")
+                    vc5.metric("📊 P90 (Bất ổn)", f"{p90:.1f}%")
+                    fig_vc = go.Figure()
+                    fig_vc.add_trace(go.Histogram(x=df_volc["Vol %/năm"], nbinsx=30,
+                        marker_color='#4FC3F7', opacity=0.7, name='Phân phối Vol'))
+                    for p, label, color in [(p10, "P10", '#4CAF50'), (p50, "P50", '#FFD700'),
+                                              (p90, "P90", '#F44336')]:
+                        fig_vc.add_vline(x=p, line_dash="dash", line_color=color, annotation_text=label)
+                    fig_vc.update_layout(title=f"Vol Distribution — {len(df_volc)} mã (ước lượng từ vol_ratio)",
+                        xaxis_title="Vol %/năm", yaxis_title="Số mã", height=350,
+                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                    st.plotly_chart(fig_vc, use_container_width=True)
+                    st.dataframe(df_volc.nlargest(10, "Vol %/năm")[["Mã", "Vùng", "Vol %/năm", "Vốn hóa (tỷ)"]],
+                        use_container_width=True, hide_index=True)
+                    st.caption(f"📊 Vol ước lượng = 25% + (vol_ratio-1)*8%, clip [10, 80]%. Tính từ {len(df_volc)} mã từ yfinance. Top 10 vol cao = biến động mạnh nhất.")
+            except Exception as e:
+                st.warning(f"⚠️ Không tính được vol cone: {str(e)[:80]}")
+
+            st.write("### 🧬 Higher Moments & Tail Risk — Top 30 vốn hóa lớn")
+            try:
+                import requests as _rq_hm
+                hm_rows = []
+                for d in top30[:20]:
+                    ma = d["ma"]
+                    suffix = ".VN" if d.get("vung") == "VN" else ""
+                    try:
+                        r = _rq_hm.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma}{suffix}",
+                            params={"range": "3mo", "interval": "1d"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+                        if r.status_code == 200:
+                            data = r.json()
+                            closes = data.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            if closes and len(closes) > 20:
+                                rets = pd.Series(closes).pct_change().dropna()
+                                if len(rets) > 20:
+                                    sk = float(rets.skew()) if len(rets) > 5 else 0
+                                    ku = float(rets.kurtosis()) if len(rets) > 5 else 0
+                                    vol = float(rets.std() * (252**0.5) * 100)
+                                    var95 = float(rets.quantile(0.05) * 100)
+                                    hm_rows.append({"Mã": ma, "Vùng": d.get("vung", ""),
+                                        "Vol %/năm": round(vol, 1),
+                                        "Skewness": round(sk, 2),
+                                        "Kurtosis": round(ku, 2),
+                                        "VaR 95% (1N) %": round(var95, 2)})
+                    except Exception:
+                        continue
+                if hm_rows:
+                    df_hm = pd.DataFrame(hm_rows)
+                    st.dataframe(df_hm, use_container_width=True, hide_index=True, height=400)
+                    st.caption(f"📊 Skewness<0 = lệch trái (nhiều tail-down events), Kurtosis>3 = đuôi dày. Tính từ {len(df_hm)} mã daily returns 3T yfinance.")
+            except Exception as e:
+                st.warning(f"⚠️ Không tính được higher moments: {str(e)[:80]}")
+
+            st.write("### 🔗 Cross-Correlation Top 30 vốn hóa — Phân nhóm cùng ngành")
+            try:
+                import requests as _rq_xc
+                xc_prices = {}
+                for d in top30[:20]:
+                    ma = d["ma"]
+                    suffix = ".VN" if d.get("vung") == "VN" else ""
+                    try:
+                        r = _rq_xc.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma}{suffix}",
+                            params={"range": "3mo", "interval": "1d"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+                        if r.status_code == 200:
+                            data = r.json()
+                            closes = data.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            if closes and len(closes) > 30:
+                                xc_prices[ma] = pd.Series(closes).pct_change().dropna()
+                    except Exception:
+                        continue
+                if len(xc_prices) >= 5:
+                    df_xc = pd.DataFrame(xc_prices).dropna()
+                    if len(df_xc) > 10:
+                        corr_xc = df_xc.corr()
+                        fig_xc = px.imshow(corr_xc, text_auto=".2f", color_continuous_scale="RdBu_r",
+                            zmin=-1, zmax=1, aspect="auto",
+                            title=f"Correlation Matrix Top {len(corr_xc)} mã (3T)")
+                        fig_xc.update_layout(height=500,
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            font=dict(color="#ECE8E1"))
+                        st.plotly_chart(fig_xc, use_container_width=True)
+                        avg_corr = float(corr_xc.values[np.triu_indices_from(corr_xc.values, k=1)].mean())
+                        st.metric("📊 Correlation TB (cặp đôi)", f"{avg_corr:.3f}",
+                            help="TB corr giữa các cặp mã. Càng gần 0 = đa dạng hóa tốt")
+                        st.caption(f"📊 Corr>0.7 = cùng nhóm (đỏ đậm), <0.3 = độc lập. Tính từ {len(corr_xc)} mã daily returns 3T yfinance.")
+            except Exception as e:
+                st.warning(f"⚠️ Không tính được cross-correlation: {str(e)[:80]}")
+        else:
+            st.info("⚠️ Cần ≥10 mã trong market scan để deep analysis 384 mã.")
+
+        st.write("---")
         st.write("## 🔗 50-STOCK CORRELATION MATRIX — Ma trận tương quan 50 mã")
         if market_data and len(market_data) >= 5:
             @st.cache_data(ttl=1800)
