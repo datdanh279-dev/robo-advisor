@@ -5202,7 +5202,8 @@ elif st.session_state.trang_thai == "deep_analysis":
             if len(tail_days) > 0:
                 tr_rows2 = []
                 for ma, info in dm.items():
-                    if ma in real_prices and len(real_prices[ma]) < len(tail_days) + 5: continue
+                    if ma not in real_prices: continue
+                    if len(real_prices[ma]) < len(tail_days) + 5: continue
                     gia_tt = info.get("gia_thi_truong", 0)
                     sl = info.get("so_luong", 0)
                     if gia_tt <= 0 or sl <= 0: continue
