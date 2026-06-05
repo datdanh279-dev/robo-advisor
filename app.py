@@ -2861,22 +2861,10 @@ elif st.session_state.trang_thai == "deep_analysis":
                     ki["ytd"] = float(static_src.get("ytd", 0)) / 100.0
             if "w52_high" not in ki or ki.get("w52_high", 0) <= 0:
                 gia_tt = info.get("gia_thi_truong", 0)
-                if ma in real_prices and len(real_prices[ma]) >= 60:
-                    try:
-                        ki["w52_high"] = float(real_prices[ma].tail(252).max())
-                    except Exception:
-                        ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
-                else:
-                    ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
+                ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
             if "w52_low" not in ki or ki.get("w52_low", 0) <= 0:
                 gia_tt = info.get("gia_thi_truong", 0)
-                if ma in real_prices and len(real_prices[ma]) >= 60:
-                    try:
-                        ki["w52_low"] = float(real_prices[ma].tail(252).min())
-                    except Exception:
-                        ki["w52_low"] = gia_tt * 0.85 if gia_tt > 0 else 0
-                else:
-                    ki["w52_low"] = gia_tt * 0.85 if gia_tt > 0 else 0
+                ki["w52_low"] = gia_tt * 0.85 if gia_tt > 0 else 0
             if "market_cap" not in ki or ki.get("market_cap", 0) <= 0:
                 ki["market_cap"] = info.get("gia_thi_truong", 0) * info.get("so_luong", 0) / 1e9
             return ki
@@ -3168,6 +3156,17 @@ elif st.session_state.trang_thai == "deep_analysis":
                 for k, v in fund.items():
                     if v is not None and v != 0:
                         kpi[ma][k] = v
+        for _ma_w52, _ki_w52 in kpi.items():
+            if (not _ki_w52.get("w52_high") or _ki_w52.get("w52_high", 0) <= 0) and _ma_w52 in real_prices and len(real_prices[_ma_w52]) >= 60:
+                try:
+                    _ki_w52["w52_high"] = float(real_prices[_ma_w52].tail(252).max())
+                except Exception:
+                    pass
+            if (not _ki_w52.get("w52_low") or _ki_w52.get("w52_low", 0) <= 0) and _ma_w52 in real_prices and len(real_prices[_ma_w52]) >= 60:
+                try:
+                    _ki_w52["w52_low"] = float(real_prices[_ma_w52].tail(252).min())
+                except Exception:
+                    pass
         try:
             if _st_real_ph is not None:
                 _st_real_ph.update(
