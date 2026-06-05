@@ -1085,10 +1085,19 @@ with sidebar:
         st.markdown(f"**Điểm rủi ro:** {st.session_state.get('diem_rui_ro', 0)}/60")
 
     st.markdown("---")
-    if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = True
-    st.checkbox("🌙 Dark Mode", value=st.session_state.dark_mode, key="dark_toggle", help="Đã bật mặc định — tối ưu cho trader xem đêm")
-    st.session_state.dark_mode = st.session_state.get("dark_toggle", True)
+    if "theme_choice" not in st.session_state:
+        st.session_state.theme_choice = "sepia"
+    _theme_labels = {
+        "sepia": "📖 Sepia Ấm (mặc định — dễ nhìn nhất, xem lâu không mỏi mắt)",
+        "light": "🌞 Sáng (trắng sáng, chuyên nghiệp)",
+        "dark": "🌙 Tối mềm (dark mode dịu mắt)"
+    }
+    st.radio("🎨 Giao diện", options=list(_theme_labels.keys()),
+        format_func=lambda x: _theme_labels[x],
+        index=list(_theme_labels.keys()).index(st.session_state.theme_choice),
+        key="theme_radio_widget",
+        help="📖 Sepia: tông vàng ấm như Kindle, dễ nhìn lâu nhất. 🌞 Sáng: trắng sáng. 🌙 Tối mềm: dark mode dịu hơn pure black.")
+    st.session_state.theme_choice = st.session_state.get("theme_radio_widget", "sepia")
     st.markdown("---")
     st.caption(
         "⚠️ **Miễn trỡ trách nhiệm:** Đây là công cụ phân tích dữ liệu lịch sử, "
@@ -1101,6 +1110,204 @@ with sidebar:
         '⚖️ <a href="#disclaimer" style="color:#8E8E9A;">Miễn trừ</a></div>',
         unsafe_allow_html=True,
     )
+
+# ============================================
+# 🎨 THEME INJECTION (sau sidebar, dynamic)
+# 3 themes: sepia (mặc định) / light / dark
+# ============================================
+_themes = {
+    "sepia": {
+        "bg_main": "#F5EFE0", "bg_card": "rgba(255,250,238,0.92)", "bg_card2": "rgba(245,235,215,0.85)",
+        "bg_input": "#FFFCF0", "text_main": "#3E2723", "text_muted": "#7A6855", "cream": "#3E2723",
+        "gold": "#B45309", "gold_light": "#D97706", "gold_dark": "#92400E",
+        "prosperity": "#15803D", "border": "rgba(180,83,9,0.15)", "border_strong": "rgba(180,83,9,0.3)",
+        "shadow": "rgba(120,80,30,0.12)", "text_shadow": "none",
+        "good": "#15803D", "bad": "#B91C1C", "neutral": "#A16207", "info": "#1D4ED8",
+        "da_section_bg": "linear-gradient(135deg, rgba(255,250,238,0.95), rgba(250,240,220,0.98))",
+        "da_metric_bg": "linear-gradient(145deg, rgba(255,250,235,0.9), rgba(248,240,218,0.95))",
+        "da_metric_label": "#7A6855", "da_metric_value_text": "#3E2723", "da_section_text": "#3E2723",
+        "sidebar_bg": "rgba(248,238,215,0.98)", "header_text": "#B45309",
+        "plotly_bg": "rgba(245,239,224,0.5)", "plotly_font": "#3E2723",
+    },
+    "light": {
+        "bg_main": "#FAFBFC", "bg_card": "rgba(255,255,255,0.95)", "bg_card2": "rgba(248,250,252,0.95)",
+        "bg_input": "#FFFFFF", "text_main": "#0F172A", "text_muted": "#64748B", "cream": "#0F172A",
+        "gold": "#D97706", "gold_light": "#F59E0B", "gold_dark": "#B45309",
+        "prosperity": "#059669", "border": "rgba(15,23,42,0.1)", "border_strong": "rgba(15,23,42,0.2)",
+        "shadow": "rgba(15,23,42,0.08)", "text_shadow": "none",
+        "good": "#059669", "bad": "#DC2626", "neutral": "#D97706", "info": "#2563EB",
+        "da_section_bg": "linear-gradient(135deg, rgba(255,255,255,0.95), rgba(248,250,252,0.98))",
+        "da_metric_bg": "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(241,245,249,0.95))",
+        "da_metric_label": "#64748B", "da_metric_value_text": "#0F172A", "da_section_text": "#0F172A",
+        "sidebar_bg": "rgba(255,255,255,0.98)", "header_text": "#0F172A",
+        "plotly_bg": "rgba(255,255,255,0.5)", "plotly_font": "#0F172A",
+    },
+    "dark": {
+        "bg_main": "#0F172A", "bg_card": "rgba(30,41,59,0.85)", "bg_card2": "rgba(15,23,42,0.95)",
+        "bg_input": "#1E293B", "text_main": "#E2E8F0", "text_muted": "#94A3B8", "cream": "#E2E8F0",
+        "gold": "#FBBF24", "gold_light": "#FCD34D", "gold_dark": "#D97706",
+        "prosperity": "#34D399", "border": "rgba(148,163,184,0.15)", "border_strong": "rgba(148,163,184,0.3)",
+        "shadow": "rgba(0,0,0,0.4)", "text_shadow": "none",
+        "good": "#34D399", "bad": "#F87171", "neutral": "#FBBF24", "info": "#60A5FA",
+        "da_section_bg": "linear-gradient(135deg, rgba(30,41,59,0.7), rgba(15,23,42,0.95))",
+        "da_metric_bg": "linear-gradient(145deg, rgba(30,41,59,0.6), rgba(15,23,42,0.85))",
+        "da_metric_label": "#94A3B8", "da_metric_value_text": "#FBBF24", "da_section_text": "#E2E8F0",
+        "sidebar_bg": "rgba(15,23,42,0.95)", "header_text": "#FBBF24",
+        "plotly_bg": "rgba(15,23,42,0.5)", "plotly_font": "#E2E8F0",
+    },
+}
+_t = _themes.get(st.session_state.get("theme_choice", "sepia"), _themes["sepia"])
+st.markdown(f"""
+<style>
+:root {{
+    --bg-main: {_t['bg_main']};
+    --bg-card: {_t['bg_card']};
+    --bg-card2: {_t['bg_card2']};
+    --text-main: {_t['text_main']};
+    --text-muted: {_t['text_muted']};
+    --gold: {_t['gold']};
+    --gold-light: {_t['gold_light']};
+    --gold-dark: {_t['gold_dark']};
+    --prosperity: {_t['prosperity']};
+    --cream: {_t['cream']};
+    --border: {_t['border']};
+}}
+html, body, [data-testid="stAppViewContainer"], .stApp, .main {{
+    background: var(--bg-main) !important;
+    color: var(--text-main) !important;
+}}
+.main-header {{
+    background: linear-gradient(135deg, {_t['gold_light']}, {_t['gold']}, {_t['gold_dark']}) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    color: transparent !important;
+}}
+.card, .card-blue, .metric-box, .bot-message, .user-message {{
+    background: var(--bg-card) !important;
+    color: var(--cream) !important;
+    border-color: var(--border) !important;
+    box-shadow: 0 4px 24px {_t['shadow']} !important;
+}}
+.metric-box h4 {{
+    color: var(--text-muted) !important;
+}}
+.chat-message, .simple-explain {{
+    color: var(--cream) !important;
+}}
+.gold-divider {{
+    background: linear-gradient(90deg, transparent, {_t['gold']}, transparent) !important;
+}}
+.stButton > button {{
+    background: linear-gradient(135deg, {_t['border']}, transparent) !important;
+    color: var(--cream) !important;
+    border: 1px solid {_t['border_strong']} !important;
+}}
+.stButton > button:hover {{
+    background: linear-gradient(135deg, {_t['border_strong']}, {_t['border']}) !important;
+    color: {_t['gold']} !important;
+}}
+.stTabs [data-baseweb="tab-list"] {{
+    background: {_t['bg_card2']} !important;
+    border: 1px solid var(--border);
+}}
+.stTabs [data-baseweb="tab"] {{
+    color: var(--text-muted) !important;
+}}
+.stTabs [aria-selected="true"] {{
+    background: {_t['border']} !important;
+    color: {_t['gold']} !important;
+}}
+.disclaimer {{
+    background: {_t['bg_card2']} !important;
+    color: var(--cream) !important;
+    border: 1px solid {_t['border']} !important;
+}}
+.simple-explain {{
+    background: {_t['bg_card2']} !important;
+    border-color: {_t['border']} !important;
+    color: var(--cream) !important;
+}}
+div[data-testid="stDataFrame"] th {{
+    background: {_t['bg_card2']} !important;
+    color: {_t['gold']} !important;
+}}
+div[data-testid="stSidebar"] {{
+    background: {_t['sidebar_bg']} !important;
+    border-right: 1px solid var(--border);
+}}
+div[data-testid="stMetricValue"] {{
+    color: var(--cream) !important;
+}}
+div[data-testid="stMetricLabel"] {{
+    color: var(--text-muted) !important;
+}}
+div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stMarkdownContainer"] li,
+div[data-testid="stMarkdownContainer"] span {{
+    color: var(--cream);
+}}
+h1, h2, h3, h4, h5, h6 {{
+    color: {_t['header_text']} !important;
+}}
+.da-section {{
+    background: {_t['da_section_bg']} !important;
+    color: {_t['da_section_text']} !important;
+    border: 1px solid var(--border) !important;
+    border-left: 4px solid {_t['gold']} !important;
+    box-shadow: 0 4px 24px {_t['shadow']} !important;
+}}
+.da-section h2, .da-section h3 {{
+    color: {_t['da_section_text']} !important;
+}}
+.da-section p, .da-section li, .da-section span, .da-section div {{
+    color: {_t['da_section_text']} !important;
+}}
+.da-metric {{
+    background: {_t['da_metric_bg']} !important;
+    color: {_t['da_section_text']} !important;
+    border: 1px solid var(--border) !important;
+}}
+.da-metric .da-label {{
+    color: {_t['da_metric_label']} !important;
+}}
+.da-metric .da-value {{
+    background: linear-gradient(135deg, {_t['gold_light']}, {_t['gold']}) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    color: transparent !important;
+}}
+.da-good {{ color: {_t['good']} !important; }}
+.da-bad {{ color: {_t['bad']} !important; }}
+.da-neutral {{ color: {_t['neutral']} !important; }}
+.da-info {{ color: {_t['info']} !important; }}
+.da-banner {{
+    background: linear-gradient(135deg, rgba(21,128,61,0.1), rgba(37,99,235,0.1)) !important;
+    color: {_t['da_section_text']} !important;
+    border: 1px solid rgba(21,128,61,0.25) !important;
+}}
+.da-banner-warn {{
+    background: linear-gradient(135deg, rgba(217,119,6,0.1), rgba(245,158,11,0.1)) !important;
+    color: {_t['da_section_text']} !important;
+    border: 1px solid rgba(217,119,6,0.25) !important;
+}}
+input, textarea, select {{
+    background: {_t['bg_input']} !important;
+    color: {_t['text_main']} !important;
+    border: 1px solid var(--border) !important;
+}}
+.stDataFrame, [data-testid="stDataFrame"] {{
+    background: {_t['bg_input']} !important;
+    color: {_t['text_main']} !important;
+}}
+[data-testid="stAlert"] {{
+    background: {_t['bg_card2']} !important;
+    color: {_t['da_section_text']} !important;
+    border: 1px solid var(--border) !important;
+}}
+</style>
+""", unsafe_allow_html=True)
 
 # Business Plan — đã ẩn, xem file business_plan.html riêng
 # @st.dialog("Business Plan", width="large")
