@@ -813,6 +813,139 @@ div[data-testid="stSidebar"] {
 [data-testid="stDataFrame"] button[title="Download"] {
     display: none !important;
 }
+
+/* ============================================
+   PHÂN TÍCH CHUYÊN SÂU — BEAUTIFUL THEME
+   Màu mềm mại, dễ nhìn, không gây mỏi mắt
+   ============================================ */
+.da-section {
+    background: linear-gradient(135deg, rgba(20,30,55,0.85), rgba(10,18,38,0.95));
+    border: 1px solid rgba(120,180,255,0.12);
+    border-left: 4px solid var(--gold);
+    border-radius: 16px;
+    padding: 1.4rem 1.6rem;
+    margin: 1.2rem 0 1rem 0;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+}
+.da-section h2,
+.da-section h3 {
+    margin: 0 0 0.6rem 0 !important;
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    color: var(--cream) !important;
+    letter-spacing: 0.3px;
+}
+.da-section p,
+.da-section li,
+.da-section span,
+.da-section div {
+    color: var(--cream);
+    line-height: 1.55;
+}
+.da-good {
+    color: #4ADE80 !important;
+    font-weight: 600;
+}
+.da-bad {
+    color: #F87171 !important;
+    font-weight: 600;
+}
+.da-neutral {
+    color: #FBBF24 !important;
+    font-weight: 600;
+}
+.da-info {
+    color: #93C5FD !important;
+}
+.da-metric {
+    background: linear-gradient(145deg, rgba(30,45,80,0.6), rgba(15,25,50,0.85));
+    border: 1px solid rgba(150,200,255,0.1);
+    border-radius: 14px;
+    padding: 0.9rem 1rem;
+    text-align: center;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.2);
+}
+.da-metric .da-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 0.3rem;
+}
+.da-metric .da-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #FFF3C4, var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.da-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.25) 50%, transparent 100%);
+    margin: 1.5rem 0;
+}
+.da-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0 4px;
+}
+.da-pill-green {
+    background: rgba(74,222,128,0.12);
+    color: #4ADE80;
+    border: 1px solid rgba(74,222,128,0.25);
+}
+.da-pill-red {
+    background: rgba(248,113,113,0.12);
+    color: #F87171;
+    border: 1px solid rgba(248,113,113,0.25);
+}
+.da-pill-yellow {
+    background: rgba(251,191,36,0.12);
+    color: #FBBF24;
+    border: 1px solid rgba(251,191,36,0.25);
+}
+.da-pill-blue {
+    background: rgba(147,197,253,0.12);
+    color: #93C5FD;
+    border: 1px solid rgba(147,197,253,0.25);
+}
+.da-banner {
+    background: linear-gradient(135deg, rgba(74,222,128,0.08), rgba(96,165,250,0.08));
+    border: 1px solid rgba(74,222,128,0.2);
+    border-radius: 12px;
+    padding: 0.9rem 1.2rem;
+    color: var(--cream);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+.da-banner-warn {
+    background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(245,158,11,0.08));
+    border: 1px solid rgba(251,191,36,0.2);
+    color: var(--cream);
+    border-radius: 12px;
+    padding: 0.9rem 1.2rem;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+div[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+div[data-testid="stMetricValue"] {
+    font-size: 1.4rem !important;
+    font-weight: 800 !important;
+}
+div[data-testid="stMetricLabel"] {
+    color: var(--text-muted) !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
 </style>
 """,
         unsafe_allow_html=True,
@@ -5983,6 +6116,186 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.caption(f"⚠️ Mean Reversion lỗi: {str(_mre)[:80]}")
         else:
             st.info("⚠️ Cần giá thật 6T cho ≥5 mã để tính Mean Reversion.")
+
+        st.write("---")
+        st.markdown('<div class="da-section"><h3>🎯 Smart Score Rating — Đánh giá tổng hợp 0–100 cho từng mã</h3><p style="color:#93C5FD;">Tổng hợp 6 tiêu chí: <b>Return (25đ)</b> + <b>Sharpe (20đ)</b> + <b>Vol thấp (15đ)</b> + <b>ROE (15đ)</b> + <b>P/E hợp lý (15đ)</b> + <b>Momentum (10đ)</b>. Điểm 100 = mã hoàn hảo.</p></div>', unsafe_allow_html=True)
+        if has_real and len(real_prices) >= 3:
+            try:
+                ss_rows = []
+                for ma, ser in real_prices.items():
+                    if ser is None or len(ser) < 30:
+                        continue
+                    rets = ser.pct_change().dropna()
+                    if len(rets) < 20:
+                        continue
+                    ret_60d = (float(ser.iloc[-1]) / float(ser.iloc[-min(61, len(ser))]) - 1) if len(ser) >= 2 else 0
+                    vol_ann = float(rets.std()) * (252**0.5)
+                    sharpe = (float(rets.mean()) * 252) / vol_ann if vol_ann > 0 else 0
+                    score_ret = min(25, max(0, (ret_60d + 0.3) * 41.7))
+                    score_sharpe = min(20, max(0, (sharpe + 0.5) * 20))
+                    score_vol = min(15, max(0, 15 - (vol_ann - 0.2) * 50))
+                    roe = float(real_fund.get(ma, {}).get("roe", 0) or 0) if ma in real_fund else 0
+                    if roe > 1:
+                        roe = roe / 100
+                    score_roe = min(15, max(0, roe * 50))
+                    pe = float(real_fund.get(ma, {}).get("pe", 0) or 0) if ma in real_fund else 0
+                    score_pe = min(15, max(0, 15 - max(0, pe - 10) * 0.5)) if pe > 0 else 7.5
+                    px_now = float(ser.iloc[-1])
+                    ma20 = float(ser.tail(20).mean())
+                    momentum = (px_now - ma20) / ma20 if ma20 > 0 else 0
+                    score_mom = min(10, max(0, (momentum + 0.1) * 50))
+                    total = score_ret + score_sharpe + score_vol + score_roe + score_pe + score_mom
+                    if total >= 75:
+                        rating = "🏆 Xuất sắc"
+                        pill = "da-pill-green"
+                    elif total >= 60:
+                        rating = "✅ Tốt"
+                        pill = "da-pill-green"
+                    elif total >= 45:
+                        rating = "🟡 Trung bình"
+                        pill = "da-pill-yellow"
+                    elif total >= 30:
+                        rating = "⚠️ Yếu"
+                        pill = "da-pill-red"
+                    else:
+                        rating = "🔴 Tránh"
+                        pill = "da-pill-red"
+                    ss_rows.append({"Mã": ma, "Return 60D": f"{ret_60d*100:+.1f}%",
+                        "Sharpe": round(sharpe, 2), "Vol %": round(vol_ann * 100, 1),
+                        "ROE %": round(roe * 100, 1) if roe > 0 else "—",
+                        "P/E": round(pe, 1) if pe > 0 else "—",
+                        "Điểm": round(total, 1), "Xếp hạng": rating, "Pill": pill})
+                if ss_rows:
+                    df_ss = pd.DataFrame(ss_rows).sort_values("Điểm", ascending=False)
+                    st.write(f"**Tính cho {len(df_ss)} mã có ≥30 phiên giá. Xếp hạng: 🏆≥75 Xuất sắc | ✅≥60 Tốt | 🟡≥45 TB | ⚠️≥30 Yếu | 🔴<30 Tránh**")
+                    for _, r in df_ss.head(20).iterrows():
+                        st.markdown(f'<div class="da-metric" style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;"><div><b style="color:#FFD700;">{r["Mã"]}</b> <span class="da-info">{r["Return 60D"]}</span> | Sharpe {r["Sharpe"]} | Vol {r["Vol %"]}% | ROE {r["ROE %"]} | P/E {r["P/E"]}</div><div><span class="da-pill {r["Pill"]}">{r["Xếp hạng"]}</span> <b class="da-good" style="font-size:1.3rem;">{r["Điểm"]}</b></div></div>', unsafe_allow_html=True)
+                    top3 = df_ss.head(3)
+                    s1, s2, s3 = st.columns(3)
+                    for col, (_, r) in zip([s1, s2, s3], top3.iterrows()):
+                        col.markdown(f'<div class="da-metric"><div class="da-label">🏆 {r["Mã"]}</div><div class="da-value">{r["Điểm"]}</div><div style="color:#4ADE80;font-size:0.85rem;margin-top:4px;">{r["Xếp hạng"]}</div></div>', unsafe_allow_html=True)
+                    st.caption("📐 **Điểm = Return (25) + Sharpe (20) + Vol thấp (15) + ROE (15) + P/E hợp lý (15) + Momentum (10) = max 100.** Ưu tiên mã có điểm ≥60 và ROE >12%.")
+            except Exception as _sse:
+                st.caption(f"⚠️ Smart Score lỗi: {str(_sse)[:80]}")
+        else:
+            st.info("⚠️ Cần giá thật 6T cho ≥3 mã để tính Smart Score.")
+
+        st.write("---")
+        st.markdown('<div class="da-section"><h3>⏰ Real-time P&L Tracker — Lãi/Lỗ thời gian thực theo mã</h3><p style="color:#93C5FD;">Theo dõi lãi/lỗ từng mã trong DM, sắp xếp theo % lãi/lỗ từ cao → thấp. Màu <b style="color:#4ADE80;">xanh</b> = lãi, <b style="color:#F87171;">đỏ</b> = lỗ.</p></div>', unsafe_allow_html=True)
+        if has_real and dm and len(dm) > 0:
+            try:
+                pl_rows = []
+                for ma, d in dm.items():
+                    gia_von = float(d.get("gia_von", 0))
+                    gia_tt = float(d.get("gia_thi_truong", 0))
+                    sl = float(d.get("so_luong", 0))
+                    if gia_von <= 0 or gia_tt <= 0 or sl <= 0:
+                        continue
+                    von = gia_von * sl
+                    gt = gia_tt * sl
+                    lai_lo = gt - von
+                    pct = (lai_lo / von) * 100
+                    ser = real_prices.get(ma)
+                    if ser is not None and len(ser) >= 2:
+                        rets = ser.pct_change().dropna()
+                        vol_ann = float(rets.std()) * (252**0.5) * 100 if len(rets) > 1 else 0
+                    else:
+                        vol_ann = 0
+                    pl_rows.append({"Mã": ma, "Vốn (Tỷ)": round(von / 1e9, 2),
+                        "GT hiện tại (Tỷ)": round(gt / 1e9, 2),
+                        "Lãi/Lỗ (Tỷ)": round(lai_lo / 1e9, 2),
+                        "% Lãi/Lỗ": round(pct, 2), "Vol %": round(vol_ann, 1)})
+                if pl_rows:
+                    df_pl = pd.DataFrame(pl_rows).sort_values("% Lãi/Lỗ", ascending=False)
+                    st.write(f"**Tổng quan {len(df_pl)} mã có dữ liệu:**")
+                    tong_von = sum(r["Vốn (Tỷ)"] for r in pl_rows)
+                    tong_gt = sum(r["GT hiện tại (Tỷ)"] for r in pl_rows)
+                    tong_lai = tong_gt - tong_von
+                    tong_pct = (tong_lai / tong_von * 100) if tong_von > 0 else 0
+                    p1, p2, p3, p4 = st.columns(4)
+                    p1.metric("💰 Tổng vốn", f"{tong_von:.1f}Tỷ")
+                    p2.metric("📊 Tổng GT", f"{tong_gt:.1f}Tỷ")
+                    p3.metric("📈 Tổng Lãi/Lỗ", f"{tong_lai:+.1f}Tỷ", delta=f"{tong_pct:+.2f}%")
+                    winners = int((df_pl["% Lãi/Lỗ"] > 0).sum())
+                    losers = int((df_pl["% Lãi/Lỗ"] < 0).sum())
+                    p4.metric("✅ Lãi / 🔴 Lỗ", f"{winners} / {losers}")
+                    st.write("**Chi tiết từng mã (sắp xếp theo % Lãi/Lỗ):**")
+                    for _, r in df_pl.iterrows():
+                        color = "#4ADE80" if r["% Lãi/Lỗ"] > 0 else "#F87171" if r["% Lãi/Lỗ"] < 0 else "#FBBF24"
+                        icon = "🟢" if r["% Lãi/Lỗ"] > 0 else "🔴" if r["% Lãi/Lỗ"] < 0 else "🟡"
+                        st.markdown(f'<div class="da-metric" style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;text-align:left;"><div style="flex:1;"><b style="color:#FFD700;">{r["Mã"]}</b> <span class="da-info">Vol {r["Vol %"]}%</span></div><div style="flex:1;text-align:right;">Vốn: <b>{r["Vốn (Tỷ)"]}Tỷ</b> → GT: <b>{r["GT hiện tại (Tỷ)"]}Tỷ</b></div><div style="flex:0 0 130px;text-align:right;"><span style="color:{color};font-size:1.15rem;font-weight:800;">{icon} {r["% Lãi/Lỗ"]:+.2f}%</span><br><span style="color:{color};font-size:0.85rem;">{r["Lãi/Lỗ (Tỷ)"]:+.2f}Tỷ</span></div></div>', unsafe_allow_html=True)
+                    st.caption("📐 **% Lãi/Lỗ = (Giá hiện tại − Giá vốn) / Giá vốn × 100**. Vol = độ biến động năm (cao = rủi ro). Mã % cao + Vol thấp = lý tưởng.")
+            except Exception as _ple:
+                st.caption(f"⚠️ P&L Tracker lỗi: {str(_ple)[:80]}")
+        else:
+            st.info("⚠️ Cần DM có giá vốn + giá thị trường để tính P&L.")
+
+        st.write("---")
+        st.markdown('<div class="da-section"><h3>🎲 Earnings Surprise Tracker — Theo dõi bất ngờ lợi nhuận</h3><p style="color:#93C5FD;">Ước lượng earnings surprise dựa trên <b>xu hướng EPS</b> 3 tháng gần nhất. <b>Positive Surprise</b> = EPS tăng mạnh hơn kỳ vọng, <b>Negative Surprise</b> = EPS giảm.</p></div>', unsafe_allow_html=True)
+        if has_real and len(real_fund) > 0:
+            try:
+                es_rows = []
+                for ma, fund in real_fund.items():
+                    eps = fund.get("eps")
+                    if eps is None or eps == 0:
+                        continue
+                    ser = real_prices.get(ma)
+                    if ser is None or len(ser) < 60:
+                        continue
+                    rets = ser.pct_change().dropna()
+                    if len(rets) < 30:
+                        continue
+                    px_now = float(ser.iloc[-1])
+                    px_30d = float(ser.iloc[-31]) if len(ser) >= 31 else float(ser.iloc[0])
+                    px_60d = float(ser.iloc[-61]) if len(ser) >= 61 else float(ser.iloc[0])
+                    ret_30d = (px_now / px_30d - 1) * 100
+                    ret_60d = (px_now / px_60d - 1) * 100
+                    momentum = ret_30d
+                    if ret_30d > 10 and ret_60d > 15:
+                        signal = "🟢 Positive Surprise"
+                        pill = "da-pill-green"
+                        desc = "EPS tăng mạnh, giá phản ứng tích cực"
+                    elif ret_30d < -10 and ret_60d < -15:
+                        signal = "🔴 Negative Surprise"
+                        pill = "da-pill-red"
+                        desc = "EPS giảm, giá phản ứng tiêu cực"
+                    elif ret_30d > 5:
+                        signal = "🟢 Beat"
+                        pill = "da-pill-green"
+                        desc = "Vượt kỳ vọng nhẹ"
+                    elif ret_30d < -5:
+                        signal = "🔴 Miss"
+                        pill = "da-pill-red"
+                        desc = "Dưới kỳ vọng"
+                    else:
+                        signal = "🟡 In-line"
+                        pill = "da-pill-yellow"
+                        desc = "Đúng kỳ vọng"
+                    es_rows.append({"Mã": ma, "EPS": round(float(eps), 2),
+                        "Giá 30D trước": round(px_30d, 1), "Giá hiện tại": round(px_now, 1),
+                        "30D %": round(ret_30d, 1), "60D %": round(ret_60d, 1),
+                        "Tín hiệu": signal, "Pill": pill, "Diễn giải": desc})
+                if es_rows:
+                    df_es = pd.DataFrame(es_rows).sort_values("30D %", ascending=False)
+                    st.write(f"**Ước lượng earnings surprise cho {len(df_es)} mã có EPS thật + ≥60 phiên giá:**")
+                    beat = int(df_es["Tín hiệu"].str.contains("Beat|Positive").sum())
+                    miss = int(df_es["Tín hiệu"].str.contains("Miss|Negative").sum())
+                    inline = len(df_es) - beat - miss
+                    e1, e2, e3 = st.columns(3)
+                    e1.metric("🟢 Beat (vượt)", f"{beat} mã", f"{beat/len(df_es)*100:.0f}%")
+                    e2.metric("🔴 Miss (thất)", f"{miss} mã", f"{miss/len(df_es)*100:.0f}%")
+                    e3.metric("🟡 In-line", f"{inline} mã", f"{inline/len(df_es)*100:.0f}%")
+                    st.write("**Top 10 Beat (vượt kỳ vọng):**")
+                    for _, r in df_es.head(10).iterrows():
+                        st.markdown(f'<div class="da-metric" style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;"><div><b style="color:#FFD700;">{r["Mã"]}</b> <span class="da-info">EPS {r["EPS"]}</span></div><div><span class="da-info">30D: {r["30D %"]:+.1f}% | 60D: {r["60D %"]:+.1f}%</span></div><div><span class="da-pill {r["Pill"]}">{r["Tín hiệu"]}</span></div></div>', unsafe_allow_html=True)
+                    st.write("**Top 10 Miss (thất vọng):**")
+                    for _, r in df_es.tail(10).iterrows():
+                        st.markdown(f'<div class="da-metric" style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;"><div><b style="color:#FFD700;">{r["Mã"]}</b> <span class="da-info">EPS {r["EPS"]}</span></div><div><span class="da-info">30D: {r["30D %"]:+.1f}% | 60D: {r["60D %"]:+.1f}%</span></div><div><span class="da-pill {r["Pill"]}">{r["Tín hiệu"]}</span></div></div>', unsafe_allow_html=True)
+                    st.caption("📐 **Earnings Surprise** ước lượng bằng <b>phản ứng giá 30D/60D</b>. Nếu giá tăng >10% trong 30D sau khi EPS công bố → Positive Surprise. Giảm >10% → Negative Surprise. Đây là chỉ báo <b>hành vi giá</b>, KHÔNG phải EPS thật (cần API earnings calendar thật).")
+            except Exception as _ese:
+                st.caption(f"⚠️ Earnings Surprise lỗi: {str(_ese)[:80]}")
+        else:
+            st.info("⚠️ Cần EPS + giá thật 6T để ước lượng Earnings Surprise.")
 
         st.write("---")
         st.write("## 🌍 Quét toàn thị trường — Top Movers & Volume Leaders")
