@@ -5413,15 +5413,18 @@ elif st.session_state.trang_thai == "deep_analysis":
             _vn_doc_keys = []
             _tg_doc_keys = []
         if not _vn_doc_keys:
-            _vn_doc_keys = ["VCB","BID","CTG","MBB","TCB","ACB","VPB","HDB","STB","VIB","TPB","SHB","EIB","MSB","OCB","LPB","VIC","VHM","VRE","NVL","KDH","DXG","PDR","DIG","NLG","IJC","FPT","HPG","VNM","MWG","MSN","SAB","PNJ","VJC","HVN","REE","CTD","PC1","SSI","VCI","HCM","BSI","MBS","PLX","GAS","PVS","PVD","PVT","POW","NT2","BSR","DCM","DPM","GVR","PHR","HSG","NKG","SVC","POM","HAG","HNG","DBC","TAR","VHC","ANV","IDI","IBC","VOS","VTO","CMX","VMD","SMC","BMP","AAA","VGC","QCG","PVD","PVT","PXS","PXT","PVS","PVC","PVB","PVC","GAS","PLX","DPM","DCM","PHR","VFG","CSV","VSI","HPI","TNG","MSH","VGT","GIL","LHG","HAH","GMD","VOS","SKG","TCL","DQC","HBC","DHA","HDG","HDC","HQC","SCR","SZC","KBC","BCM","SZL","LHG","VTR","SGP","ITA","PIT","BWE","TCH","CII","DC4","PTL","LCG","DPR","PBC","HID","TBD","TIX","CRC","VNE","BWS","STG","DLG","SJF","HHS","DPG","FMC","HAP","HCD","TNC","EVS","VCS","MKP","MCG","VCF","HNF","PAC","SJD","DST","SDA","NHA","VGS","PGS","PXL","BGC","HTL","VGP","NSC","MVC","SBA","IDV","HUT","CEO","HID","SGT","TST","SHP","PRC","HHC","CTG","BID","VCB","ACB","LPB","STB","NVB","PGB","BAB","MCO","KLB","ABB","VAB","NAB","SGB","OJB","EIB","HDB","TCB","MBB","VPB","VIB","TPB","SHB","MSB","OCB","SEB","VBB","ABB"]
+            _vn_doc_keys = list((DOCS.get("co_phieu_vn") or {}).keys())[:229]
         if not _tg_doc_keys:
-            _tg_doc_keys = ["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","JNJ","PG","KO","PEP","WMT","MCD","NKE","DIS","UNH","JPM","V","MA","HD","BAC","XOM","CVX","PFE","MRK","ABBV","TMO","ABT","COST","AVGO","ORCL","CRM","NFLX","ADBE","INTC","AMD","QCOM","TXN","MU","CSCO","IBM","GS","MS","WFC","C","BA","CAT","GE","F","GM","T","VZ","NEE","DUK","SO","NEE","LIN","APD","ECL","SHW","FCX","NEM","GOLD","BABA","PDD","TSM","ASML","TM","NVO","ORCL","SAP","UL","NSRGY","RACE","LVMUY","SHEL","BP","TTE","ENI","EQNR","SNOW","UBER","LYFT","ABNB","SHOP","SQ","PYPL","COIN","PLTR","SNAP","RBLX","ZM","DOCU","ROKU","TWLO","NET","CRWD","OKTA","DDOG","MDB","TEAM","ATVI","EA","TTWO","GME","AMC","BB","NOK","INTC","CSCO","ORCL","BABA","JD","PDD","BIDU","NTES","TCEHY","NIO","XPEV","LI","BILI","TME","VIPS","TAL","EDU","YUM","CMG","SBUX","MCD","DPZ"]
+            _tg_doc_keys = list((DOCS.get("co_phieu_tg") or {}).keys())[:155]
         _all_vn_stocks = list(_vn_doc_keys) + list(_tg_doc_keys)
         @st.cache_data(ttl=1800, show_spinner="📡 Quét toàn thị trường...")
         def _scan_market_stocks(symbols_tuple):
             import requests as _rq_s
+            from concurrent.futures import ThreadPoolExecutor, as_completed
             out = []
-            for entry in symbols_tuple:
+            lock = __import__("threading").Lock()
+
+            def _one(entry):
                 try:
                     sym, suffix = entry
                     r = _rq_s.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
@@ -5435,7 +5438,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                         if closes and len(closes) > 5:
                             cur = float(meta.get("regularMarketPrice") or (closes[-1] if closes[-1] else 0) or 0)
                             if cur <= 0:
-                                continue
+                                return None
                             prev = float(closes[-2]) if len(closes) > 1 and closes[-2] else cur
                             chg_pct = (cur / prev - 1) * 100 if prev > 0 else 0
                             ret_3m = (cur / float(closes[-min(66, len(closes))]) - 1) * 100 if len(closes) > 5 else 0
@@ -5445,13 +5448,20 @@ elif st.session_state.trang_thai == "deep_analysis":
                             if not (vol_ratio != vol_ratio) and not (chg_pct != chg_pct) and not (ret_3m != ret_3m):
                                 region = "VN" if suffix else "TG"
                                 display_sym = sym if suffix else sym
-                                out.append({"ma": display_sym, "ten": (meta.get("longName", sym) or sym)[:30],
+                                return {"ma": display_sym, "ten": (meta.get("longName", sym) or sym)[:30],
                                     "nganh": (meta.get("industry") or "Khác"),
                                     "vung": region, "tien": (meta.get("currency") or "VND"),
                                     "gia": cur, "thay_doi": chg_pct, "ret_3m": ret_3m,
-                                    "vol": vol_today, "vol_ratio": vol_ratio, "von_hoa": float(meta.get("marketCap") or 0)})
+                                    "vol": vol_today, "vol_ratio": vol_ratio, "von_hoa": float(meta.get("marketCap") or 0)}
                 except Exception:
-                    continue
+                    return None
+
+            with ThreadPoolExecutor(max_workers=20) as ex:
+                futs = [ex.submit(_one, e) for e in symbols_tuple]
+                for f in as_completed(futs):
+                    r = f.result()
+                    if r is not None:
+                        out.append(r)
             return out
         _scan_list = []
         for _s in _vn_doc_keys:
