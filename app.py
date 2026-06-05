@@ -6430,10 +6430,10 @@ elif st.session_state.trang_thai == "deep_analysis":
                     pass
                 return ma, []
 
-            def _fetch_all_parallel(targets_with_suffix, range_, interval_, max_workers=20, progress_label="Đang tải"):
+            def _fetch_all_parallel(targets_with_suffix, range_, interval_, max_workers=20, progress_label="Đang tải", progress_callback=None):
                 results = {}
-                prog = st.progress(0.0, f"{progress_label} 0/{len(targets_with_suffix)}")
                 done = 0
+                total = len(targets_with_suffix)
                 with ThreadPoolExecutor(max_workers=max_workers) as ex:
                     futs = {ex.submit(_fetch_one_chart, t, range_, interval_): t[0] for t in targets_with_suffix}
                     for fut in as_completed(futs):
@@ -6441,8 +6441,11 @@ elif st.session_state.trang_thai == "deep_analysis":
                         if closes:
                             results[ma] = closes
                         done += 1
-                        prog.progress(min(1.0, done / len(targets_with_suffix)), f"{progress_label} {done}/{len(targets_with_suffix)}")
-                prog.empty()
+                        if progress_callback:
+                            try:
+                                progress_callback(min(1.0, done / total), f"{progress_label} {done}/{total}")
+                            except Exception:
+                                pass
                 return results
 
             @st.cache_data(ttl=1800, show_spinner=False)
@@ -6459,7 +6462,17 @@ elif st.session_state.trang_thai == "deep_analysis":
 
             st.write("### 📅 Calendar Returns — 6 tháng qua (TOÀN BỘ 384 mã)")
             cal_targets = list(market_data)
+            _cal_prog = st.progress(0.0, f"📅 Calendar: 0/{len(cal_targets)}")
+            def _cal_cb(p, t):
+                try:
+                    _cal_prog.progress(p, t)
+                except Exception:
+                    pass
             cal_data = _fetch_returns_6mo(tuple([(d["ma"], ".VN" if d.get("vung", "VN") == "VN" else "") for d in cal_targets]))
+            try:
+                _cal_prog.empty()
+            except Exception:
+                pass
             if cal_data:
                 cal_rows = []
                 for d in cal_targets:
@@ -6518,7 +6531,17 @@ elif st.session_state.trang_thai == "deep_analysis":
 
             st.write("### 🧬 Higher Moments & Tail Risk — 384 mã (TOÀN BỘ thị trường)")
             hm_targets = list(market_data)
+            _hm_prog = st.progress(0.0, f"🧬 Higher Moments: 0/{len(hm_targets)}")
+            def _hm_cb(p, t):
+                try:
+                    _hm_prog.progress(p, t)
+                except Exception:
+                    pass
             hm_prices = _fetch_returns_3mo_daily(tuple([(d["ma"], ".VN" if d.get("vung", "VN") == "VN" else "") for d in hm_targets]))
+            try:
+                _hm_prog.empty()
+            except Exception:
+                pass
             if hm_prices:
                 hm_rows = []
                 for d in hm_targets:
@@ -6549,7 +6572,17 @@ elif st.session_state.trang_thai == "deep_analysis":
 
             st.write("### 📉 Max Drawdown Distribution — 384 mã (TOÀN BỘ thị trường)")
             dd_targets = list(market_data)
+            _dd_prog = st.progress(0.0, f"📉 Max DD: 0/{len(dd_targets)}")
+            def _dd_cb(p, t):
+                try:
+                    _dd_prog.progress(p, t)
+                except Exception:
+                    pass
             dd_prices = _fetch_returns_6mo_daily(tuple([(d["ma"], ".VN" if d.get("vung", "VN") == "VN" else "") for d in dd_targets]))
+            try:
+                _dd_prog.empty()
+            except Exception:
+                pass
             if dd_prices:
                 dd_rows = []
                 for d in dd_targets:
@@ -6650,16 +6683,22 @@ elif st.session_state.trang_thai == "deep_analysis":
                 import requests as _rq_xc
                 xc_targets = list(market_data)[:50]
                 xc_prices = {}
-                prog_xc = st.progress(0.0, "Đang tải correlation 50 mã...")
+                _xc_prog = st.progress(0.0, "Đang tải correlation 50 mã...")
                 with ThreadPoolExecutor(max_workers=15) as ex_xc:
                     futs_xc = {ex_xc.submit(_fetch_one_chart, (d["ma"], ".VN" if d.get("vung") == "VN" else ""), "3mo", "1d", 3): d for d in xc_targets}
                     for idx, fut in enumerate(as_completed(futs_xc)):
                         ma, closes = fut.result()
                         if len(closes) > 30:
                             xc_prices[ma] = pd.Series(closes).pct_change().dropna()
-                        prog_xc.progress(min(1.0, (idx + 1) / len(xc_targets)),
-                                         f"Đang tải {idx+1}/{len(xc_targets)} mã...")
-                prog_xc.empty()
+                        try:
+                            _xc_prog.progress(min(1.0, (idx + 1) / len(xc_targets)),
+                                              f"Đang tải {idx+1}/{len(xc_targets)} mã...")
+                        except Exception:
+                            pass
+                try:
+                    _xc_prog.empty()
+                except Exception:
+                    pass
                 if len(xc_prices) >= 5:
                     df_xc = pd.DataFrame(xc_prices).dropna()
                     if len(df_xc) > 10:
