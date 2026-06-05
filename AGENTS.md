@@ -198,6 +198,11 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
     - Field mapping: pe, pb, roe, eps, dividend_yield (=co_tuc_pct/100), von_hoa, market_cap, current_price
     - Thêm source tag "co_phieu_vn.json (fallback khi yfinance miss)"
   - **Kết quả**: Phân tích cơ bản (P/E, P/B, ROE, EPS, Cổ tức, Vốn hóa) hiển thị data cho TẤT CẢ 200 mã DM, không còn 0
+- ✅ **Phase 12 (chưa commit) — SỬA dm_equity build chấp nhận ALL dates (không strict intersection):**
+  - **Root cause**: `common_dates = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))` rất strict — nếu 1 trong 200+ mã có dates khác (vd thiếu 1 phiên) thì intersection = {} → `dm_equity` = None → tất cả sections 30+ hiển thị "Cần giá thật 6T"
+  - **Fix**: dùng `all_dates = set()` (UNION) thay vì intersection, vẫn reindex từng mã + ffill/bfill. Wrap try/except để fallback về sector vol estimate
+  - **Kết quả**: dm_equity có len = số phiên của union, gần = max(len) thay vì min(len). Tất cả 30+ sections (Underwater, Risk Contribution, Rolling Vol, Factor, Performance Attribution, Tail Risk, CAPM, Brinson, v.v.) sẽ chạy được với real data
+  - Đợi redeploy ~1-3 phút + Ctrl+Shift+R
 - ⚠️ **Mở rộng 384 → 800 mã (500 VN + 300 TG)**: Cần data sourcing mới. Hiện tại vẫn dùng 229+155=384 từ JSON có sẵn.
 - ⚠️ **Còn nhiều section hiển thị "Cần giá thật 6T"**: Sau khi DM 200 mã, các section này sẽ tự động có data vì loop qua `dm.items()` thay vì `real_prices.keys()`. Cần F5 web sau redeploy để thấy kết quả.
 - ⚠️ **VỐ HÓA TỶ chưa có số liệu** ở section "PHÂN TÍCH CHUYÊN SÂU 384 MÃ": Có thể do `dd_prices` (data cho Max DD section) chưa có đủ — cần xem lại log

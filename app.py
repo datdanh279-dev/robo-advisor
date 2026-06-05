@@ -3075,18 +3075,29 @@ elif st.session_state.trang_thai == "deep_analysis":
         dm_equity = None
         if has_real and len(real_prices) >= 2:
             try:
-                common_dates = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))
-                if len(common_dates) > 20:
-                    dm_value_ts = pd.Series(0.0, index=common_dates, dtype=float)
-                    for ma, prices in real_prices.items():
-                        if ma in dm:
-                            shares = dm[ma].get("so_luong", 0)
-                            aligned = prices.reindex(common_dates).ffill().bfill()
-                            dm_value_ts += aligned.astype(float) * shares
-                    dm_equity = dm_value_ts.values
-                    daily_ret_real = dm_value_ts.pct_change().dropna()
-                    if len(daily_ret_real) > 20:
-                        vol_proxy = float(daily_ret_real.std() * (252 ** 0.5))
+                all_dates = set()
+                for s in real_prices.values():
+                    all_dates.update(s.index.tolist())
+                if all_dates:
+                    common_dates = sorted(all_dates)
+                    if len(common_dates) > 20:
+                        dm_value_ts = pd.Series(0.0, index=common_dates, dtype=float)
+                        for ma, prices in real_prices.items():
+                            if ma in dm:
+                                shares = dm[ma].get("so_luong", 0)
+                                if shares > 0:
+                                    aligned = prices.reindex(common_dates).ffill().bfill()
+                                    dm_value_ts += aligned.astype(float) * shares
+                        if dm_value_ts.abs().sum() > 0:
+                            dm_equity = dm_value_ts.values
+                            daily_ret_real = dm_value_ts.pct_change().dropna()
+                            daily_ret_real = daily_ret_real.replace([np.inf, -np.inf], np.nan).dropna()
+                            if len(daily_ret_real) > 20:
+                                vol_proxy = float(daily_ret_real.std() * (252 ** 0.5))
+                            else:
+                                vol_proxy = _estimate_dm_vol_from_sector(tuple(dm.items()), tuple(kpi.items()))
+                        else:
+                            vol_proxy = _estimate_dm_vol_from_sector(tuple(dm.items()), tuple(kpi.items()))
                     else:
                         vol_proxy = _estimate_dm_vol_from_sector(tuple(dm.items()), tuple(kpi.items()))
                 else:
