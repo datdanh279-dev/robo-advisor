@@ -6549,6 +6549,111 @@ elif st.session_state.trang_thai == "deep_analysis":
                         st.caption(f"📊 Corr>0.7 = cùng nhóm (đỏ đậm), <0.3 = độc lập. Tính từ {len(corr_xc)} mã daily returns 3T yfinance.")
             except Exception as e:
                 st.warning(f"⚠️ Không tính được cross-correlation: {str(e)[:80]}")
+
+            st.write("### 📉 Max Drawdown Distribution Top 30 — Mã nào sụt giảm mạnh nhất")
+            try:
+                import requests as _rq_dd
+                dd_rows = []
+                for d in top30[:20]:
+                    ma = d["ma"]
+                    suffix = ".VN" if d.get("vung") == "VN" else ""
+                    try:
+                        r = _rq_dd.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma}{suffix}",
+                            params={"range": "6mo", "interval": "1d"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+                        if r.status_code == 200:
+                            data = r.json()
+                            closes = data.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            valid = [c for c in closes if c]
+                            if len(valid) > 30:
+                                ps = pd.Series(valid)
+                                rm = ps.cummax()
+                                dd = ((ps - rm) / rm * 100).min()
+                                ret6m = (float(valid[-1]) / float(valid[0]) - 1) * 100
+                                dd_rows.append({"Mã": ma, "Vùng": d.get("vung", ""),
+                                    "Return 6M %": round(ret6m, 2),
+                                    "Max DD %": round(dd, 2),
+                                    "RoMaD": round(ret6m / abs(dd), 2) if dd != 0 else 0})
+                    except Exception:
+                        continue
+                if dd_rows:
+                    df_dd = pd.DataFrame(dd_rows)
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.write("**📉 Top 10 sụt giảm mạnh nhất:**")
+                        st.dataframe(df_dd.nsmallest(10, "Max DD %"), use_container_width=True, hide_index=True, height=350)
+                    with c2:
+                        st.write("**🏆 Top 10 RoMaD tốt nhất (Return/MaxDD):**")
+                        st.dataframe(df_dd.nlargest(10, "RoMaD"), use_container_width=True, hide_index=True, height=350)
+                    avg_dd = float(df_dd["Max DD %"].mean())
+                    best_romad = df_dd.nlargest(1, "RoMaD").iloc[0]
+                    st.metric("📊 Max DD TB toàn thị trường", f"{avg_dd:.1f}%",
+                        help=f"Top performer: {best_romad['Mã']} (RoMaD={best_romad['RoMaD']:.2f})")
+                    st.caption(f"📊 Max DD tính từ drawdown peak-to-trough 6T. RoMaD = Return 6M / |Max DD|. >2 = chất lượng cao. Tính từ {len(df_dd)} mã top 30 vốn hóa.")
+            except Exception as e:
+                st.warning(f"⚠️ Không tính được Max DD: {str(e)[:80]}")
+
+            st.write("### ⚖️ Beta & Alpha toàn thị trường — Đo lường rủi ro hệ thống")
+            try:
+                import requests as _rq_ba
+                bench_prices = None
+                for bench_sym, bench_suf in [("VN30", ".VN"), ("^VN30", ""), ("E1VFVN30", ".VN")]:
+                    try:
+                        rb = _rq_ba.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{bench_sym}{bench_suf}",
+                            params={"range": "6mo", "interval": "1d"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+                        if rb.status_code == 200:
+                            cb = rb.json().get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            vb = [c for c in cb if c]
+                            if len(vb) > 30:
+                                bench_prices = pd.Series(vb).pct_change().dropna()
+                                break
+                    except Exception:
+                        continue
+                if bench_prices is not None and len(bench_prices) > 30:
+                    ba_rows = []
+                    for d in top30[:20]:
+                        ma = d["ma"]
+                        suffix = ".VN" if d.get("vung") == "VN" else ""
+                        try:
+                            r = _rq_ba.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma}{suffix}",
+                                params={"range": "6mo", "interval": "1d"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+                            if r.status_code == 200:
+                                data = r.json()
+                                closes = data.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                                valid = [c for c in closes if c]
+                                if len(valid) > 30:
+                                    rets = pd.Series(valid).pct_change().dropna()
+                                    common = rets.index.intersection(bench_prices.index)
+                                    if len(common) > 20:
+                                        x = bench_prices.loc[common].values
+                                        y = rets.loc[common].values
+                                        if len(x) > 20 and float(np.std(x)) > 0:
+                                            beta, alpha = np.polyfit(x, y, 1)
+                                            corr_v = float(np.corrcoef(x, y)[0, 1]) if float(np.std(y)) > 0 else 0
+                                            ba_rows.append({"Mã": ma, "Vùng": d.get("vung", ""),
+                                                "Beta": round(float(beta), 2),
+                                                "Alpha %/ngày": round(float(alpha) * 100, 3),
+                                                "Correlation": round(corr_v, 2),
+                                                "R²": round(corr_v ** 2, 2),
+                                                "Diễn giải": "🟢 Phòng thủ" if beta < 0.8 else ("🟡 Trung bình" if beta < 1.2 else "🔴 Tăng mạnh theo thị trường")})
+                        except Exception:
+                            continue
+                    if ba_rows:
+                        df_ba = pd.DataFrame(ba_rows).sort_values("Beta")
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.write("**🛡️ Top 10 Beta thấp (phòng thủ tốt):**")
+                            st.dataframe(df_ba.head(10), use_container_width=True, hide_index=True, height=350)
+                        with c2:
+                            st.write("**🚀 Top 10 Beta cao (tăng mạnh theo thị trường):**")
+                            st.dataframe(df_ba.nlargest(10, "Beta"), use_container_width=True, hide_index=True, height=350)
+                        avg_beta = float(df_ba["Beta"].mean())
+                        st.metric("📊 Beta TB toàn thị trường", f"{avg_beta:.2f}",
+                            help="Beta>1 = tăng mạnh hơn thị trường, <1 = phòng thủ")
+                        st.caption(f"📊 Beta = hệ số nhạy với benchmark. Tính từ {len(df_ba)} mã daily returns 6T. Alpha = return vượt benchmark/ngày.")
+                else:
+                    st.info("⚠️ Không fetch được VN30/E1VFVN30 để tính beta.")
+            except Exception as e:
+                st.warning(f"⚠️ Không tính được beta: {str(e)[:80]}")
         else:
             st.info("⚠️ Cần ≥10 mã trong market scan để deep analysis 384 mã.")
 
