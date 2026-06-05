@@ -175,7 +175,7 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
 - ✅ removeChild tab Chat (79eca02) — `st.spinner` → `st.status` + try/except
 - ✅ DM mở rộng 8 → 16 mã (f838dce) — FPT, VCB, MBB, CTG, TCB, HPG, VIX, SSI, VNM, MSN, MWG, CTR, VIC, VHM, HVN, PNJ (tổng 97.4M₫, +9.82%)
 - ✅ **Fix Excel DM 8 → 16 mã (b8c8509)** — `doc_danh_muc()` đọc Excel "HỆ THỐNG QUẢN LÝ " TRƯỚC; nếu Excel có 8 mã thì JSON fallback 16 mã không bao giờ trigger → user thấy 8 mã. Fix: update Excel sheet rows 5-20 với 16 mã khớp JSON
-- ✅ **Phase 9 (commit `XXX` chưa push) — Mở rộng yfinance fetch từ 16 DM → 384 mã TOÀN THỊ TRƯỜNG (229 VN + 155 TG):**
+- ✅ **Phase 9 (commit `1dbb4b2`) — Mở rộng yfinance fetch từ 16 DM → 384 mã TOÀN THỊ TRƯỜNG (229 VN + 155 TG):**
   - `_fetch_real_prices(_targets)` — refactor: thay vòng `for sym in _symbols` (sequential) bằng `ThreadPoolExecutor(max_workers=20)` + `as_completed()`. Truyền `(symbol, suffix)` thay vì chỉ symbol → VN: `.VN`, TG: `""` (no suffix)
   - `_fetch_real_fundamentals(_targets)` — refactor tương tự với `ThreadPoolExecutor(max_workers=15)`
   - Build `_targets_all = [(ma, ".VN") for ma in co_phieu_vn] + [(ma, "") for ma in co_phieu_tg]` = 384 targets
@@ -183,6 +183,60 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
   - Progress: `st.status("📡 Tải yfinance: 0/384 mã (giá + lịch sử 6T)", expanded=True)` → update label qua 2 giai đoạn → `state="complete"` cuối
   - Lần đầu: ~60-90s với 20+15 workers song song. Sau đó cache 1h → tức thì
   - Metric sẽ hiển thị "Giá hiện tại & lịch sử: yfinance (X/384 mã)" và "P/E, P/B, ROE, EPS: yfinance (X/384 mã)"
+
+**Phase 10 (chưa commit) — Yêu cầu user 2026-06-05: "SỮA TẤT CẢ 385 MÃ" + "DANH MỤC 200 MÃ":**
+- **DM 16 → 200 mã**: Mở rộng DM user thật từ 16 mã hiện tại lên 200 mã (chọn 184 mã từ `co_phieu_vn.json` 229 mã + 16 mã hiện tại = 200 mã, đa dạng ngành). Cập nhật cả Excel + JSON.
+- **Fix 0-data sections**: Hầu hết sections (Underwater Drawdown, Risk Contribution, Rolling Vol, Factor Analysis, Performance Attribution, Tail Risk, v.v.) hiện loop qua `dm.keys()` (16 mã) thay vì `real_prices.keys()` (384 mã) → luôn trả 0 / "Cần giá thật". Fix: đổi sang `real_prices.keys()` để dùng TOÀN BỘ 384 mã yfinance.
+- **Mở rộng 384 → 800 mã** (500 VN + 300 TG): Yêu cầu data sourcing mới — tạo `co_phieu_vn_500.json` + `co_phieu_tg_300.json`. Có thể dùng Wikipedia/VSD/Stooq làm nguồn tickers.
+- **Sections cần fix ưu tiên** (user nêu tên):
+  1. 📊 Phân tích kỹ thuật từng mã (RSI/MACD/MA20/MA50) — 50 mã → 384 mã
+  2. 📊 Tỷ trọng & Beta từng 385 mã
+  3. 📊 Phân tích cơ bản từng 385 mã (P/E, P/B, ROE, EPS, Cổ tức)
+  4. 📊 Đóng góp lợi nhuận từng 385 mã (Contribution)
+  5. 📈 Momentum từng 385 mã (Returns 1M / 3M / 6M)
+  6. 🎯 Target Price & Stop Loss 385 mã
+  7. 🕯️ Biểu đồ nến Top 3 mã (Candlestick 6 tháng)
+  8. 🏭 So sánh ngành (Peer Comparison) 385 mã
+  9. 💵 Phân tích cổ tức (Dividend Income) 385 mã
+  10. 💧 Phân tích thanh khoản (ADTV) 385 mã
+  11. 🌍 Phân tích khối ngoại (Foreign Flow) 385 mã
+  12. 🤖 AI Phân tích tự động 385 mã
+  13. 📉 Underwater Drawdown 385 mã
+  14. 🧮 Risk Contribution 385 mã
+  15. 📊 Rolling Volatility & Beta 385 mã
+  16. 🧬 Factor Analysis 385 mã
+  17. 🎯 Performance Attribution 385 mã
+  18. 🔬 Pain/Ulcer/Tail 385 mã
+  19. 🔄 Sector Rotation 385 mã
+  20. 💰 Earnings Yield vs Lãi suất 385 mã
+  21. 📊 Skewness & Kurtosis 385 mã
+  22. 🏆 Composite Risk Score 385 mã
+  23. 📈 CAPM Regression 385 mã
+  24. 🎲 Win Rate & Profit Factor 385 mã
+  25. 📊 Volatility Cone 385 mã
+  26. 🔗 Higher Moments 385 mã
+  27. 📊 IR Decomposition 385 mã
+  28. 🎯 Upside/Downside Capture 385 mã
+  29. 🕸️ Correlation Network 385 mã
+  30. 💎 Risk-Return Bubble 385 mã
+  31. 💵 Tổng return vs Price return 385 mã
+  32. ⚠️ Tail Risk Decomposition 385 mã
+  33. 📉 Individual Stock Drawdown 385 mã
+  34. 🏆 RoMaD 385 mã
+  35. 🔥 Win/Loss Streaks 385 mã
+  36. 📊 Vol-Adj Momentum 385 mã
+  37. ⏱️ Autocorrelation 385 mã
+  38. 🔄 Beta Stability 385 mã
+  39. 📅 Calendar Returns 385 mã
+  40. 📐 Brinson Attribution 385 mã
+  41. ⏱️ Conditional VaR/CVaR 385 mã
+  42. 🎯 Sterling & Burke Ratio 385 mã
+  43. 🔬 Martin Ratio 385 mã
+  44. 📊 Active Share 385 mã
+  45. 🌊 Return Distribution Quantile 385 mã
+  46. 🎯 52W High/Low Scanner 385 mã
+  47. 📈 RSI Heatmap 385 mã
+  48. 🔥 Real Money Flow 385 mã
 - ✅ st.progress trong @st.cache_data (b8d593d) — refactor `_fetch_all_parallel` thêm `progress_callback` param, 4 callsites wrap progress NGOÀI cached function
 
 **Phase 8 (commit `XXX` chưa push) — Mở rộng khảo sát rủi ro 12 → 24 câu (`backend/risk_profile.py`):**
