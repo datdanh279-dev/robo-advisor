@@ -81,7 +81,7 @@ EXPERTS = [
         "id": "soros",
         "name": "George Soros",
         "title": "Bậc thầy Kinh tế Vĩ mô",
-        "model": "qwen/qwen3-32b",
+        "model": "llama-3.1-8b-instant",
         "backend": "groq",
         "color": "#2196F3",
         "prompt": (
@@ -215,7 +215,7 @@ async def _call_openai(session, prompt, question, api_key, model="gpt-4o", timeo
     return None
 
 
-async def _call_groq(session, prompt, question, api_key, model="llama-3.3-70b-versatile", timeout=45):
+async def _call_groq(session, prompt, question, api_key, model="llama-3.3-70b-versatile", timeout=90):
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
@@ -526,14 +526,18 @@ async def _run_expert_panel_async(question, api_keys, thi_truong_context=""):
         logger.info("Chế độ TOÀN DIỆN: gọi cả 6 chuyên gia + Chủ tịch")
 
     async with aiohttp.ClientSession() as session:
-        expert_tasks = {}
+        expert_tasks = []
+        expert_ids = []
         for exp in EXPERTS:
             if exp["id"] in can_chon:
-                expert_tasks[exp["id"]] = _call_expert(session, exp, question, api_keys, semaphore, thi_truong_context)
+                expert_tasks.append(_call_expert(session, exp, question, api_keys, semaphore, thi_truong_context))
+                expert_ids.append(exp["id"])
 
         raw = {}
-        for eid, task in expert_tasks.items():
-            raw[eid] = await task
+        if expert_tasks:
+            results = await asyncio.gather(*expert_tasks)
+            for eid, result in zip(expert_ids, results):
+                raw[eid] = result
 
         # Build full list: called experts get their result, others get placeholder
         expert_results = []
