@@ -22,14 +22,14 @@ _ESG_DAO_DUC_RULE = (
 def _la_cau_chao(value):
     """Câu chào / câu đơn giản — chỉ cần 1 chuyên gia"""
     c = value.lower().strip()
-    tu_khoa_don_gian = ["xin chào", "chào bạn", "hello", "hi", "có ai không",
-                        "bạn là ai", "giới thiệu", "cảm ơn", "thank", "bye",
+    tu_khoa_don_gian = ["xin chào", "chào bạn", "hello", "có ai không",
+                        "bạn là ai", "giới thiệu bản thân", "cảm ơn", "thank you",
                         "tạm biệt", "xin lỗi", "giúp tôi với"]
     return any(t in c for t in tu_khoa_don_gian)
 
 def _la_cau_so_sanh(c):
     c = c.lower().strip()
-    tu_khoa_trung_binh = ["so sánh", "vs", "hay", "nên mua", "nên đầu tư",
+    tu_khoa_trung_binh = ["so sánh", "nên mua", "nên đầu tư",
                           "cổ phiếu nào", "mã nào", "đánh giá"]
     return any(t in c for t in tu_khoa_trung_binh)
 
