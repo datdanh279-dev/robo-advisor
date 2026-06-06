@@ -9081,7 +9081,7 @@ elif st.session_state.trang_thai == "chat":
             pass
 
     def _expert_tab_ui():
-        st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
+        st.markdown("### 👑 Hội đồng Chuyên gia — Huyền thoại Đầu tư Thế giới")
         st.markdown(
             "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại**. "
             "Chủ tịch Hội đồng sẽ tổng hợp và chọn ra phương án tốt nhất."
@@ -9173,7 +9173,7 @@ elif st.session_state.trang_thai == "chat":
 
         if _status == "ok":
             _mode = st.session_state.get("expert_mode", "cao_cap")
-            _mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
+            _mode_labels = {"don_gian": "⚡ Tiết kiệm (1 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (2 chuyên gia)", "cao_cap": "🚀 Toàn diện (3 chuyên gia + Chủ tịch)"}
             _html_parts.append(f'<div style="color:#00C9A7;">✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}</div>')
         elif _status == "empty":
             _html_parts.append('<div style="color:#FF9800;">⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.</div>')

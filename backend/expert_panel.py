@@ -657,14 +657,14 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
     loai = phan_loai_cau_hoi(question)
 
     if loai == "don_gian":
-        can_chon = {"buffett", "munger"}
-        logger.info("Chế độ TIẾT KIỆM: chỉ gọi 2 chuyên gia")
+        can_chon = {"buffett"}
+        logger.info("Chế độ TIẾT KIỆM: chỉ gọi 1 chuyên gia")
     elif loai == "trung_binh":
-        can_chon = {"buffett", "lynch", "graham", "dalio"}
-        logger.info("Chế độ TIÊU CHUẨN: gọi 4 chuyên gia")
+        can_chon = {"buffett", "lynch"}
+        logger.info("Chế độ TIÊU CHUẨN: gọi 2 chuyên gia")
     else:
-        can_chon = {e["id"] for e in EXPERTS}
-        logger.info("Chế độ TOÀN DIỆN: gọi cả 6 chuyên gia + Chủ tịch")
+        can_chon = {"buffett", "lynch", "graham"}
+        logger.info("Chế độ TOÀN DIỆN: gọi 3 chuyên gia + Chủ tịch")
 
     # Gọi TUẦN TỰ — mỗi lần 1 chuyên gia, cách nhau 1s để tránh rate limit
     raw = {}
