@@ -549,11 +549,20 @@ if not st.session_state.authenticated:
 if 'is_pro' not in st.session_state:
     st.session_state.is_pro = False
 
+if 'deep_unlocked' not in st.session_state:
+    st.session_state.deep_unlocked = False
+
 try:
     PASSWORD_PRO = st.secrets.get("PRO_PASSWORD", "hdfkemr rmo8490hd")
 except Exception:
     PASSWORD_PRO = "hdfkemr rmo8490hd"
 _PWD_OK = {"hdfkemrrmo8490hd", "hdfkemr rmo8490hd"}
+
+try:
+    PASSWORD_DEEP = st.secrets.get("DEEP_PASSWORD", "viettracuu@2026")
+except Exception:
+    PASSWORD_DEEP = "viettracuu@2026"
+_DEEP_PWD_OK = {PASSWORD_DEEP, PASSWORD_DEEP.strip(), PASSWORD_DEEP.lower(), "viettracuu@2026", "viettracuu2026"}
 
 with st.sidebar:
     st.markdown("---")
@@ -1034,13 +1043,20 @@ with sidebar:
         st.session_state.trang_thai = "chat"
         st.rerun()
 
-    if st.session_state.is_pro:
+    if st.session_state.deep_unlocked:
         if st.button("📊 Phân tích chuyên sâu", width='stretch'):
             st.session_state.trang_thai = "deep_analysis"
             st.rerun()
     else:
-        if st.button("🔒 Phân tích chuyên sâu (Gói PRO)", width='stretch', disabled=True):
-            pass
+        with st.expander("🔑 Mở khóa Phân tích chuyên sâu", expanded=False):
+            deep_pwd = st.text_input("Mật khẩu truy cập:", type="password", key="deep_pwd_input")
+            if st.button("Xác nhận", key="activate_deep", use_container_width=True):
+                if deep_pwd in _DEEP_PWD_OK or deep_pwd.strip() in _DEEP_PWD_OK:
+                    st.session_state.deep_unlocked = True
+                    st.success("✅ Đã mở khóa! Nhấn nút bên dưới để vào.")
+                    st.rerun()
+                else:
+                    st.error("❌ Mật khẩu không chính xác!")
 
     st.markdown("---")
     if st.button("🔄 Cập nhật dữ liệu", width='stretch'):
@@ -3158,6 +3174,21 @@ elif st.session_state.trang_thai == "deep_analysis":
                 "n_periods": len(rets), "dd_info": dd_info}
         except Exception:
             return None
+
+    if not st.session_state.deep_unlocked:
+        st.markdown('<div class="login-container" style="padding-top:5vh;">'
+        '<div class="login-title" style="font-size:2rem;">🔒 PHÂN TÍCH CHUYÊN SÂU</div>'
+        '<div class="login-subtitle">Vui lòng nhập mật khẩu để truy cập</div>'
+        '</div>', unsafe_allow_html=True)
+        with st.form("deep_unlock_form"):
+            _deep_pwd = st.text_input("Mật khẩu Phân tích Chuyên sâu:", type="password", placeholder="Nhập mật khẩu...")
+            if st.form_submit_button("🔓 Mở khóa", use_container_width=True):
+                if _deep_pwd in _DEEP_PWD_OK or _deep_pwd.strip() in _DEEP_PWD_OK:
+                    st.session_state.deep_unlocked = True
+                    st.rerun()
+                else:
+                    st.error("❌ Mật khẩu không chính xác!")
+        st.stop()
 
     st.markdown("**🆕 VERSION 6.0** — 6 nhóm Tabs + 8 tính năng mới (thanh khoản, khối ngoại, AI, Bollinger, FX, VN30, lịch sử GD, thuế). Không thấy dòng này = Ctrl+Shift+R.")
     st.write("# 📊 PHÂN TÍCH CHUYÊN SÂU DANH MỤC")
@@ -8340,6 +8371,152 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.caption(f"📊 Boxplot P/E, ROE, Return 3M theo ngành từ {len(df_cs)} mã. Box rộng = variance lớn trong ngành. Dot outlier = mã đặc biệt.")
         else:
             st.info("⚠️ Cần dữ liệu thị trường.")
+
+        st.write("---")
+        st.write("## 🔥 Heatmap Tỷ suất Cổ tức theo Ngành — Sector Dividend Yield Map")
+        if market_data and len(market_data) >= 5:
+            _sector_dy = {}
+            for d in market_data:
+                ng = d.get("nganh", "Khác")
+                dy_val = d.get("dividend_yield") or d.get("co_tuc_pct", 0)
+                if dy_val and isinstance(dy_val, (int, float)) and 0 < float(dy_val) < 0.5:
+                    _sector_dy.setdefault(ng, []).append(float(dy_val) * 100)
+            if _sector_dy:
+                _sec_dy_df = pd.DataFrame([
+                    {"Ngành": ng, "Cổ tức TB %": round(np.mean(vals), 2),
+                     "Cổ tức Cao nhất %": round(max(vals), 2),
+                     "Số mã": len(vals)}
+                    for ng, vals in sorted(_sector_dy.items(), key=lambda x: np.mean(x[1]), reverse=True)
+                ])
+                fig_dy = go.Figure(data=go.Heatmap(
+                    z=[_sec_dy_df["Cổ tức TB %"].values],
+                    x=_sec_dy_df["Ngành"].values,
+                    y=["Cổ tức TB %"],
+                    colorscale="YlOrRd",
+                    text=[f"{v:.2f}%" for v in _sec_dy_df["Cổ tức TB %"].values],
+                    texttemplate="%{text}",
+                    hovertemplate="Ngành: %{x}<br>Cổ tức TB: %{z:.2f}%<extra></extra>"
+                ))
+                fig_dy.update_layout(height=200, margin=dict(l=20, r=20, t=10, b=60),
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_dy, use_container_width=True)
+                st.dataframe(_sec_dy_df, use_container_width=True, hide_index=True)
+                st.caption("🔥 Ngành có cổ tức trung bình cao nhất. Dữ liệu từ yfinance + co_phieu_vn.json.")
+            else:
+                st.info("⚠️ Chưa có dữ liệu cổ tức.")
+        else:
+            st.info("⚠️ Cần dữ liệu thị trường để phân tích cổ tức theo ngành.")
+
+        st.write("---")
+        st.write("## 🔄 Phân tích Mùa vụ — Seasonality Analysis (384 mã)")
+        if real_prices and len(real_prices) >= 5:
+            with st.spinner("📡 Tính toán seasonality từ daily returns..."):
+                _monthly_rets = {m: [] for m in range(1, 13)}
+                for _sym, _ser in real_prices.items():
+                    if len(_ser) < 60:
+                        continue
+                    _daily_rets = pd.Series(_ser).pct_change().dropna()
+                    _daily_rets.index = pd.to_datetime(_daily_rets.index)
+                    for _m in range(1, 13):
+                        _m_data = _daily_rets[_daily_rets.index.month == _m]
+                        if len(_m_data) >= 5:
+                            _monthly_rets[_m].append(float(_m_data.mean()) * 100)
+                _sea_rows = []
+                _month_names = ["", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"]
+                for _m in range(1, 13):
+                    if _monthly_rets[_m]:
+                        _vals = np.array(_monthly_rets[_m])
+                        _sea_rows.append({
+                            "Tháng": _month_names[_m],
+                            "Return TB %": round(float(np.mean(_vals)), 2),
+                            "Median %": round(float(np.median(_vals)), 2),
+                            "Tốt nhất %": round(float(np.max(_vals)), 2),
+                            "Tệ nhất %": round(float(np.min(_vals)), 2),
+                            "% Dương": round(float(np.mean(_vals > 0) * 100), 1),
+                            "Số mã": len(_vals),
+                        })
+                if _sea_rows:
+                    _df_sea = pd.DataFrame(_sea_rows)
+                    _df_sea["Màu"] = _df_sea["Return TB %"].apply(
+                        lambda x: "#4ADE80" if x > 0.3 else ("#F87171" if x < -0.3 else "#FBBF24"))
+                    _bar_colors = _df_sea["Màu"].tolist()
+                    fig_sea = go.Figure(data=[go.Bar(
+                        x=_df_sea["Tháng"], y=_df_sea["Return TB %"],
+                        marker_color=_bar_colors,
+                        text=[f"{v:+.2f}%" for v in _df_sea["Return TB %"]],
+                        textposition="outside"
+                    )])
+                    fig_sea.update_layout(
+                        title="Return trung bình theo tháng — 384 mã",
+                        height=380, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                        font=dict(color="#ECE8E1"),
+                        yaxis_title="Return TB %", xaxis_title="Tháng")
+                    st.plotly_chart(fig_sea, use_container_width=True)
+                    st.dataframe(_df_sea.drop(columns=["Màu"]), use_container_width=True, hide_index=True)
+                    st.caption("🔄 Return trung bình từng tháng tính trên daily returns của tất cả mã có dữ liệu. Tháng có bar xanh > dương, đỏ = âm. % Dương = tỷ lệ mã có return dương trong tháng đó.")
+        else:
+            st.info("⚠️ Cần dữ liệu giá thật 6 tháng để phân tích mùa vụ.")
+
+        st.write("---")
+        st.write("## 🌐 Tương quan Đa thị trường — VN vs Thế giới")
+        if real_prices and len(real_prices) >= 5:
+            with st.spinner("📡 Tải chỉ số quốc tế (S&P 500, Nikkei, Shanghai, VN-Index)..."):
+                import yfinance as _yf_global
+                _global_tickers = {
+                    "VN-Index": "^VNINDEX",
+                    "S&P 500": "^GSPC",
+                    "Nikkei 225": "^N225",
+                    "Shanghai": "000001.SS",
+                }
+                _global_data = {}
+                for _name, _ticker in _global_tickers.items():
+                    try:
+                        _t = _yf_global.Ticker(_ticker)
+                        _h = _t.history(period="6mo")
+                        if _h is not None and len(_h) >= 20:
+                            _global_data[_name] = _h["Close"]
+                    except Exception:
+                        pass
+                if len(_global_data) >= 2:
+                    _global_df = pd.DataFrame(_global_data).pct_change().dropna()
+                    _corr_global = _global_df.corr()
+                    fig_global = go.Figure(data=go.Heatmap(
+                        z=_corr_global.values,
+                        x=_corr_global.columns.tolist(),
+                        y=_corr_global.index.tolist(),
+                        colorscale="RdBu", zmid=0,
+                        text=np.round(_corr_global.values, 3),
+                        texttemplate="%{text}",
+                        hovertemplate="%{x} vs %{y}: %{z:.3f}<extra></extra>"
+                    ))
+                    fig_global.update_layout(height=450,
+                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                        font=dict(color="#ECE8E1"),
+                        title="Correlation Matrix — Thị trường Việt Nam vs Quốc tế (6 tháng qua)")
+                    st.plotly_chart(fig_global, use_container_width=True)
+                    _global_df["Date"] = _global_df.index
+                    _df_global_long = _global_df.melt(id_vars="Date", var_name="Chỉ số", value_name="Return")
+                    fig_global_ts = go.Figure()
+                    for _col in _global_df.columns:
+                        if _col == "Date":
+                            continue
+                        fig_global_ts.add_trace(go.Scatter(
+                            x=_global_df.index, y=(1 + _global_df[_col]).cumprod(),
+                            mode="lines", name=_col,
+                            hovertemplate="%{x|%d/%m}<br>%{y:.4f}<extra></extra>"
+                        ))
+                    fig_global_ts.update_layout(height=380,
+                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                        font=dict(color="#ECE8E1"),
+                        title="Hiệu suất tích lũy — So sánh VN với các thị trường lớn",
+                        yaxis_title="Tăng trưởng (x lần)")
+                    st.plotly_chart(fig_global_ts, use_container_width=True)
+                    st.caption("🌐 Tương quan và hiệu suất giữa VN-Index và 3 thị trường lớn (Mỹ, Nhật, Trung Quốc). Dữ liệu 6 tháng từ yfinance.")
+                else:
+                    st.info("⚠️ Không đủ dữ liệu chỉ số quốc tế. Thử lại sau vài phút.")
+        else:
+            st.info("⚠️ Cần dữ liệu giá thật để phân tích tương quan đa thị trường.")
 
         st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
