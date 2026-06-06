@@ -372,7 +372,7 @@ def _call_chairman(question, expert_results, api_key, api_keys):
                 ctx = ssl.create_default_context()
                 conn = http.client.HTTPSConnection("api.groq.com", timeout=60, context=ctx)
                 conn.request("POST", "/openai/v1/chat/completions",
-                              body=json.dumps({"model": "mixtral-8x7b-32768", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
+                              body=json.dumps({"model": "llama-3.2-3b-preview", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
                               headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
                 r = conn.getresponse()
                 body = r.read()
@@ -380,7 +380,7 @@ def _call_chairman(question, expert_results, api_key, api_keys):
                     data = json.loads(body)
                     return data["choices"][0]["message"]["content"].strip()
                 elif r.status == 429 and attempt < 2:
-                    time.sleep(4 * (attempt + 1))  # retry: 4s, 8s
+                    time.sleep(2 * (attempt + 1))  # retry: 2s, 4s
                     continue
                 logger.warning(f"Chairman Groq status {r.status}")
             except Exception as e:
@@ -551,7 +551,7 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
     chairman_result = None
     chairman_key = api_keys.get("groq") or api_keys.get("openai")
     if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
-        time.sleep(3)  # Chờ 3s để rate limit hồi phục trước khi gọi Chủ tịch
+        time.sleep(10)  # Đợi 10s để rate limit hồi phục
         try:
             chairman_result = _call_chairman(question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
         except Exception as e:
