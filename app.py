@@ -9111,6 +9111,14 @@ elif st.session_state.trang_thai == "chat":
             st.session_state.expert_results = None
         if "expert_pending" not in st.session_state:
             st.session_state.expert_pending = None
+        if "_last_expert_q" not in st.session_state:
+            st.session_state._last_expert_q = ""
+        if "expert_status" not in st.session_state:
+            st.session_state.expert_status = None
+
+        # Fixed-position containers (ALWAYS present - never conditional)
+        _keepalive = st.empty()
+        _output = st.empty()
 
         cau_hoi = st.chat_input(
             "VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
@@ -9120,67 +9128,95 @@ elif st.session_state.trang_thai == "chat":
             st.session_state.expert_pending = cau_hoi
             st.session_state.expert_results = None
             st.session_state.expert_status = None
+            st.session_state._last_expert_q = ""
 
         if st.session_state.get("expert_pending"):
             _q = st.session_state.expert_pending
             st.session_state.expert_pending = None
-            st.markdown(f"**Bạn:** {_q}")
-            st.markdown("⏳ Đang kết nối 6 chuyên gia (30-90 giây)...")
-            try:
-                results = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS)
-                if results and isinstance(results, dict) and results.get("experts"):
-                    st.session_state.expert_results = results
-                    st.session_state.expert_status = "ok"
-                    st.session_state.expert_mode = results.get("mode", "cao_cap")
-                else:
-                    st.session_state.expert_results = results
-                    st.session_state.expert_status = "empty"
-            except Exception as _expert_err:
-                st.session_state.expert_status = "error"
-                st.session_state.expert_error = str(_expert_err)
+            st.session_state._last_expert_q = _q
+            st.session_state.expert_status = "processing"
+            _keepalive.markdown("⏳ Đang kết nối 6 chuyên gia...")
+            _results_holder = []
+            _error_holder = []
+            def _worker():
+                try:
+                    r = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS)
+                    _results_holder.append(r)
+                except Exception as e:
+                    _error_holder.append(e)
+            import threading, time
+            t = threading.Thread(target=_worker, daemon=True)
+            t.start()
+            _elapsed = 0
+            while t.is_alive():
+                time.sleep(1)
+                _elapsed += 1
+                _keepalive.markdown(f"⏳ Đang kết nối 6 chuyên gia ({_elapsed}s)...")
+            if _error_holder:
+                raise _error_holder[0]
+            results = _results_holder[0] if _results_holder else None
+            if results and isinstance(results, dict) and results.get("experts"):
+                st.session_state.expert_results = results
+                st.session_state.expert_status = "ok"
+                st.session_state.expert_mode = results.get("mode", "cao_cap")
+            else:
+                st.session_state.expert_results = results
+                st.session_state.expert_status = "empty"
 
-        if st.session_state.get("expert_status") == "ok":
+        _html_parts = []
+        _q_text = st.session_state.get("_last_expert_q", "")
+        _status = st.session_state.get("expert_status")
+        _results = st.session_state.get("expert_results")
+
+        if _q_text:
+            _html_parts.append(f'<div style="color:#ECE8E1;margin-bottom:4px;"><b>Bạn:</b> {_q_text}</div>')
+
+        if _status == "ok":
             _mode = st.session_state.get("expert_mode", "cao_cap")
             _mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
-            st.write(f"✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}")
-        elif st.session_state.get("expert_status") == "empty":
-            st.write("⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.")
-        elif st.session_state.get("expert_status") == "error":
+            _html_parts.append(f'<div style="color:#00C9A7;">✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}</div>')
+        elif _status == "empty":
+            _html_parts.append('<div style="color:#FF9800;">⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.</div>')
+        elif _status == "error":
             _err = st.session_state.get("expert_error", "Lỗi không xác định")
-            st.write(f"❌ Lỗi khi gọi Hội đồng Chuyên gia: {_err}")
-            st.write("Vui lòng thử lại hoặc dùng tab Chat bên cạnh.")
+            _html_parts.append(f'<div style="color:#f44336;">❌ Lỗi: {_err}. Vui lòng thử lại hoặc dùng tab Chat.</div>')
 
-        if st.session_state.expert_results:
-            results = st.session_state.expert_results
-            if not isinstance(results, dict) or "experts" not in results:
-                st.warning("⚠️ Kết quả không hợp lệ. Vui lòng thử lại.")
-                st.session_state.expert_results = None
-            else:
-                parts = ['<hr style="border-color:rgba(255,215,0,0.2);">', '<h3 style="color:#FFD700;">🗳️ Ý kiến Chuyên gia</h3>']
-                for expert in results["experts"]:
+        if _results:
+            if isinstance(_results, dict) and "experts" in _results:
+                _html_parts.append('<hr style="border-color:rgba(255,215,0,0.2);">')
+                _html_parts.append('<h3 style="color:#FFD700;">🗳️ Ý kiến Chuyên gia</h3>')
+                for expert in _results["experts"]:
                     name = expert.get("name", "Chuyên gia")
                     title = expert.get("title", "")
                     resp = expert.get("response") or "⚠️ Không có phản hồi."
                     _safe_resp = resp.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-                    parts.append(
+                    _html_parts.append(
                         f'<details style="margin-bottom:8px;background:rgba(255,255,255,0.02);'
                         f'border:1px solid rgba(255,215,0,0.15);border-radius:8px;padding:8px 12px;">'
                         f'<summary style="font-weight:600;cursor:pointer;color:#FFD700;">{name} — {title}</summary>'
                         f'<div style="margin-top:8px;color:#ECE8E1;font-size:0.9rem;line-height:1.5;">{_safe_resp}</div>'
                         f'</details>'
                     )
-                chairman = results.get("chairman")
+                chairman = _results.get("chairman")
                 if chairman:
                     _safe_chair = chairman.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                    parts.append('<hr style="border-color:rgba(255,215,0,0.2);">')
-                    parts.append('<h4 style="color:#FFD700;">👑 Kết luận của Chủ tịch Hội đồng</h4>')
-                    parts.append(f'<div style="color:#ECE8E1;font-size:0.9rem;line-height:1.6;">{_safe_chair}</div>')
-                st.markdown("\n".join(parts), unsafe_allow_html=True)
+                    _html_parts.append('<hr style="border-color:rgba(255,215,0,0.2);">')
+                    _html_parts.append('<h4 style="color:#FFD700;">👑 Kết luận của Chủ tịch Hội đồng</h4>')
+                    _html_parts.append(f'<div style="color:#ECE8E1;font-size:0.9rem;line-height:1.6;">{_safe_chair}</div>')
+            else:
+                _html_parts.append('<div style="color:#FF9800;">⚠️ Kết quả không hợp lệ. Vui lòng thử lại.</div>')
 
-            if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
-                st.session_state.expert_results = None
-                st.session_state.expert_pending = None
-                st.rerun()
+        if not _html_parts:
+            _html_parts.append('<div style="height:1px;">&nbsp;</div>')
+
+        _output.markdown("\n".join(_html_parts), unsafe_allow_html=True)
+
+        if st.button("🗑️ Xóa kết quả", key="clear_expert", disabled=(not bool(_results)), use_container_width=True):
+            st.session_state.expert_results = None
+            st.session_state.expert_pending = None
+            st.session_state.expert_status = None
+            st.session_state._last_expert_q = ""
+            st.rerun()
 
     if tab_expert_v2 is not None:
         with tab_expert_v2:
