@@ -83,7 +83,7 @@ EXPERTS = [
         "id": "soros",
         "name": "George Soros",
         "title": "Bậc thầy Kinh tế Vĩ mô",
-        "model": "llama-3.1-8b-instant",
+        "model": "llama-3.3-70b-versatile",
         "backend": "groq",
         "color": "#2196F3",
         "prompt": (
@@ -118,7 +118,7 @@ EXPERTS = [
         "id": "dalio",
         "name": "Ray Dalio",
         "title": "Chiến lược gia Nguyên tắc",
-        "model": "llama-3.1-8b-instant",
+        "model": "llama-3.3-70b-versatile",
         "backend": "groq",
         "color": "#9C27B0",
         "prompt": (
@@ -155,7 +155,7 @@ EXPERTS = [
         "id": "munger",
         "name": "Charlie Munger",
         "title": "Nhà tư duy Đa chiều",
-        "model": "llama-3.1-8b-instant",
+        "model": "llama-3.3-70b-versatile",
         "backend": "groq",
         "color": "#607D8B",
         "prompt": (
@@ -540,6 +540,7 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
     chairman_result = None
     chairman_key = api_keys.get("groq") or api_keys.get("openai")
     if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
+        time.sleep(2)  # Chờ 2s để rate limit hồi phục trước khi gọi Chủ tịch
         try:
             chairman_result = _call_chairman(question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
         except Exception as e:
