@@ -8933,7 +8933,23 @@ elif st.session_state.trang_thai == "chat":
         st.markdown("💡 *Tôi hiểu được: phân tích DM của bạn, top mã tăng/giảm hôm nay, vol đột biến, gợi ý phân bổ vốn theo hồ sơ rủi ro...*")
         st.markdown("---")
 
-        if not st.session_state.chat_history:
+        if "chat_pending" not in st.session_state:
+            st.session_state.chat_pending = None
+        if "chat_working" not in st.session_state:
+            st.session_state.chat_working = False
+        if "chat_pending_q" not in st.session_state:
+            st.session_state.chat_pending_q = None
+
+        if st.session_state.chat_pending and not st.session_state.chat_working:
+            st.session_state.chat_working = True
+            st.session_state.chat_pending_q = st.session_state.chat_pending
+            st.session_state.chat_pending = None
+            st.rerun()
+
+        if st.session_state.chat_working:
+            if st.session_state.chat_pending_q:
+                st.info("⏳ Đang xử lý câu hỏi...")
+        elif not st.session_state.chat_history:
             st.markdown(
                 '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.05),rgba(33,150,243,0.03));'
                 'border:1px solid rgba(255,215,0,0.15);border-radius:12px;padding:14px 18px;margin-bottom:14px;">'
@@ -8957,25 +8973,7 @@ elif st.session_state.trang_thai == "chat":
                 with _qcols[_i % 2]:
                     if st.button(_q, key=f"qq_{_i}", use_container_width=True):
                         st.session_state.chat_history.append({"role": "user", "content": _q})
-                        _chat_status = st.status("🤖 Robo-Advisor đang phân tích DM + thị trường...", expanded=False)
-                        try:
-                            _ctx = _build_chat_context()
-                            tra_loi = tim_cau_tra_loi(_q, st.session_state.chat_history, context=_ctx)
-                            _chat_status.update(label="✅ Xong", state="complete")
-                        except Exception as _chat_err:
-                            _chat_status.update(label="❌ Lỗi", state="error")
-                            tra_loi = f"Xin lỗi, đã xảy ra lỗi: {_chat_err}"
-                        try:
-                            _chat_status.empty()
-                        except Exception:
-                            pass
-                        st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
-                        try:
-                            username = st.session_state.get("username", "unknown")
-                            save_chat(username, "user", _q)
-                            save_chat(username, "bot", tra_loi)
-                        except Exception:
-                            pass
+                        st.session_state.chat_pending = _q
                         st.rerun()
             st.markdown("---")
 
@@ -9003,33 +9001,44 @@ elif st.session_state.trang_thai == "chat":
                 submitted = st.form_submit_button("Gửi", use_container_width=True)
                 if submitted and cau_hoi:
                     st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
-                    _chat_status = st.status("🤖 Robo-Advisor đang suy nghĩ...", expanded=False)
-                    try:
-                        _ctx = _build_chat_context()
-                        tra_loi = tim_cau_tra_loi(cau_hoi, st.session_state.chat_history, context=_ctx)
-                        _chat_status.update(label="✅ Xong", state="complete")
-                    except Exception as _chat_err:
-                        _chat_status.update(label="❌ Lỗi", state="error")
-                        tra_loi = f"Xin lỗi, đã xảy ra lỗi: {_chat_err}"
-                    try:
-                        _chat_status.empty()
-                    except Exception:
-                        pass
-                    st.session_state.chat_history.append({"role": "bot", "content": tra_loi})
-                    username = st.session_state.get("username", "unknown")
-                    try:
-                        save_chat(username, "user", cau_hoi)
-                        save_chat(username, "bot", tra_loi)
-                    except Exception:
-                        pass
+                    st.session_state.chat_pending = cau_hoi
                     st.rerun()
         with col3:
             if st.session_state.chat_history and st.button("🗑️ Xóa", key="clear_chat", use_container_width=True, help="Xóa lịch sử chat"):
                 st.session_state.chat_history = []
+                st.session_state.chat_pending = None
+                st.session_state.chat_working = False
                 st.rerun()
+
+    # Deferred chat processing: no inline st.status/empty — avoids React removeChild
+    if st.session_state.get("chat_working") and st.session_state.get("chat_pending_q"):
+        try:
+            _q = st.session_state.chat_pending_q
+            _ctx = _build_chat_context()
+            _tra_loi = tim_cau_tra_loi(_q, st.session_state.chat_history, context=_ctx)
+            st.session_state.chat_history.append({"role": "bot", "content": _tra_loi})
+            try:
+                username = st.session_state.get("username", "unknown")
+                save_chat(username, "user", _q)
+                save_chat(username, "bot", _tra_loi)
+            except Exception:
+                pass
+        except Exception as _chat_err:
+            st.session_state.chat_history.append({"role": "bot", "content": f"Xin lỗi, đã xảy ra lỗi: {_chat_err}"})
+        finally:
+            st.session_state.chat_working = False
+            st.session_state.chat_pending_q = None
+            st.rerun()
+
+    if "expert_pending" not in st.session_state:
+        st.session_state.expert_pending = None
+    if "expert_working" not in st.session_state:
+        st.session_state.expert_working = False
 
     if tab_expert_v2 is not None:
         with tab_expert_v2:
+            if st.session_state.expert_working and not st.session_state.expert_pending:
+                st.info("⏳ Đang xử lý câu hỏi với 6 chuyên gia (30-90 giây)...")
             try:
                 st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
                 st.markdown(
@@ -9060,35 +9069,19 @@ elif st.session_state.trang_thai == "chat":
                 if "expert_results" not in st.session_state:
                     st.session_state.expert_results = None
 
-                with st.form(key="expert_form", clear_on_submit=True):
-                    cau_hoi = st.text_input(
-                        "Câu hỏi của bạn:",
-                        placeholder="VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
-                        key="expert_question",
-                        label_visibility="collapsed",
-                    )
-                    submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
-                    if submitted and cau_hoi:
-                        _status = st.status("🧠 Đang kết nối 6 chuyên gia AI...", expanded=True)
-                        try:
-                            _status.update(label="🧠 Đang gửi câu hỏi cho 6 chuyên gia (có thể mất 30-90 giây)...")
-                            results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
-                            _status.update(label="✅ Hoàn tất!", state="complete")
-                            if results and isinstance(results, dict) and results.get("experts"):
-                                st.session_state.expert_results = results
-                                st.session_state.expert_status = "ok"
-                                st.session_state.expert_mode = results.get("mode", "cao_cap")
-                            else:
-                                st.session_state.expert_results = results
-                                st.session_state.expert_status = "empty"
-                        except Exception as _expert_err:
-                            _status.update(label="❌ Lỗi", state="error")
-                            st.session_state.expert_status = "error"
-                            st.session_state.expert_error = str(_expert_err)
-                        try:
-                            _status.empty()
-                        except Exception:
-                            pass
+                if not st.session_state.expert_working:
+                    with st.form(key="expert_form", clear_on_submit=True):
+                        cau_hoi = st.text_input(
+                            "Câu hỏi của bạn:",
+                            placeholder="VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
+                            key="expert_question",
+                            label_visibility="collapsed",
+                        )
+                        submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
+                        if submitted and cau_hoi:
+                            st.session_state.expert_pending = cau_hoi
+                            st.session_state.expert_working = True
+                            st.rerun()
 
                 if st.session_state.get("expert_status") == "ok":
                     _mode = st.session_state.get("expert_mode", "cao_cap")
@@ -9128,10 +9121,32 @@ elif st.session_state.trang_thai == "chat":
 
                     if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
                         st.session_state.expert_results = None
+                        st.session_state.expert_pending = None
+                        st.session_state.expert_working = False
                         st.rerun()
             except Exception as _tab_err:
                 st.error(f"❌ Lỗi tab Chuyên gia: {_tab_err}")
                 st.info("Vui lòng thử lại hoặc dùng tab Chat.")
+
+    # Deferred expert processing: no inline st.status/empty — avoids React removeChild
+    if st.session_state.get("expert_working") and st.session_state.get("expert_pending"):
+        _q = st.session_state.expert_pending
+        st.session_state.expert_pending = None
+        try:
+            results = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS)
+            if results and isinstance(results, dict) and results.get("experts"):
+                st.session_state.expert_results = results
+                st.session_state.expert_status = "ok"
+                st.session_state.expert_mode = results.get("mode", "cao_cap")
+            else:
+                st.session_state.expert_results = results
+                st.session_state.expert_status = "empty"
+        except Exception as _expert_err:
+            st.session_state.expert_status = "error"
+            st.session_state.expert_error = str(_expert_err)
+        finally:
+            st.session_state.expert_working = False
+            st.rerun()
 
 
 
