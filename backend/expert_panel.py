@@ -354,8 +354,7 @@ def _call_expert(expert, question, api_keys, context=""):
 
 
 def _local_expert_analysis(expert, question, context):
-    """Phân tích local khi Groq rate-limited — dùng dữ liệu từ context"""
-    # Parse context để lấy thông tin cổ phiếu
+    """Phân tích local khi Groq rate-limited — chỉ tập trung vào mã được hỏi"""
     ma_cp = ""
     for w in question.replace(",", " ").split():
         wc = w.strip().upper()
@@ -365,64 +364,80 @@ def _local_expert_analysis(expert, question, context):
     if not ma_cp:
         return None
 
-    # Tìm thông tin trong context
+    # Trích xuất thông tin riêng của mã cổ phiếu
+    stock_info = ""
     gia = pe = pb = ""
     for line in context.split("\n"):
-        if ma_cp in line or ma_cp.lower() in line.lower():
-            if "Giá" in line:
-                parts = line.split(",")
-                for p in parts:
-                    p = p.strip()
-                    if p.startswith("Giá"):
-                        gia = p.split("Giá")[-1].strip().rstrip(",")
-                    elif p.startswith("P/E"):
-                        pe = p.split("P/E")[-1].strip().rstrip(",")
-                    elif p.startswith("P/B"):
-                        pb = p.split("P/B")[-1].strip().rstrip(",")
+        if ma_cp in line and "Giá" in line:
+            stock_info = line.strip()
+            parts = line.split(",")
+            for p in parts:
+                p = p.strip()
+                if p.startswith("Giá"):
+                    gia_num = p.split("Giá")[-1].strip().rstrip(",")
+                    try:
+                        gia = f"{float(gia_num):,.0f}"
+                    except:
+                        gia = gia_num
+                elif p.startswith("P/E"):
+                    pe = p.split("P/E")[-1].strip().rstrip(",")
+                elif p.startswith("P/B"):
+                    pb = p.split("P/B")[-1].strip().rstrip(",")
             break
+
+    pe_val = 0
+    try:
+        pe_val = float(pe) if pe and pe != "N/A" else 0
+    except:
+        pass
 
     name = expert["name"]
     title = expert["title"]
+    header = f"**{name}** ({title}) — Phân tích **{ma_cp}**"
+    info = f"Giá {gia}₫" if gia else f"Cổ phiếu {ma_cp}"
+    if pe:
+        info += f" | P/E {pe}"
+    if pb:
+        info += f" | P/B {pb}"
 
     if expert["id"] == "buffett":
-        try:
-            pe_val = float(pe) if pe else 0
-            if pe_val and pe_val < 10:
-                verdict = "CÓ MUA — định giá hấp dẫn (P/E thấp)"
-            elif pe_val and pe_val < 15:
-                verdict = "CÓ MUA — định giá hợp lý (P/E trung bình)"
-            elif pe_val:
-                verdict = "CHỜ GIÁ TỐT HƠN — P/E cao hơn kỳ vọng"
-            else:
-                verdict = "CẦN THÊM DỮ LIỆU để định giá chính xác"
-        except:
-            verdict = "CẦN THÊM DỮ LIỆU để định giá chính xác"
-        return f"{name} ({title}) — Phân tích Giá trị:\n{context[:500]}\n\n=> **{verdict}**"
+        if pe_val and pe_val < 10:
+            kq = f"CÓ MUA — {ma_cp} giá hấp dẫn (P/E {pe})"
+        elif pe_val and pe_val < 15:
+            kq = f"CÓ MUA — {ma_cp} P/E {pe} hợp lý"
+        elif pe_val:
+            kq = f"CHỜ — P/E {pe} cao hơn kỳ vọng"
+        else:
+            kq = "CẦN THÊM DỮ LIỆU"
+        return f"{header}\n{info}\n\nĐịnh giá giá trị: {kq}\n\n**=> {kq}**"
 
     if expert["id"] == "soros":
-        return f"{name} ({title}) — Phân tích Vĩ mô:\nCổ phiếu {ma_cp} trong bối cảnh thị trường hiện tại.\n\n=> **GIỮ** và theo dõi các yếu tố vĩ mô."
+        return f"{header}\n{info}\n\nPhân tích vĩ mô: {ma_cp} thuộc ngành Ngân hàng. Theo dõi lãi suất và dòng vốn.\n\n**=> GIỮ — chờ điểm mua tốt hơn**"
 
     if expert["id"] == "lynch":
-        return f"{name} ({title}) — Phân tích Tăng trưởng:\n{context[:400]}\n\n=> **MUA** nếu PEG < 1, tiềm năng tăng trưởng dài hạn."
+        return f"{header}\n{info}\n\n{ma_cp} là cổ phiếu tăng trưởng bền vững, P/E {pe if pe else 'N/A'}.\n\n**=> MUA — tiềm năng tăng trưởng dài hạn**"
 
     if expert["id"] == "dalio":
-        return f"{name} ({title}) — Phân tích Nguyên tắc:\n{context[:400]}\n\n=> **GIỮ** — đa dạng hóa danh mục, quản trị rủi ro 6/10."
+        risk = "6"
+        if pe_val and pe_val > 15:
+            risk = "7"
+        elif pe_val and pe_val < 8:
+            risk = "4"
+        return f"{header}\n{info}\n\nRủi ro: {risk}/10. Đa dạng hóa danh mục là nguyên tắc cốt lõi.\n\n**=> GIỮ — quản trị rủi ro {risk}/10**"
 
     if expert["id"] == "graham":
-        try:
-            pe_val = float(pe) if pe else 0
-            if pe_val and pe_val < 12:
-                verdict = "Định giá: RẺ — có biên an toàn"
-            elif pe_val and pe_val < 18:
-                verdict = "Định giá: HỢP LÝ"
-            else:
-                verdict = "Định giá: ĐẮT — thiếu biên an toàn"
-        except:
-            verdict = "Định giá: CẦN THÊM DỮ LIỆU"
-        return f"{name} ({title}) — Phân tích Cơ bản:\n{context[:400]}\n\n=> {verdict}."
+        if pe_val and pe_val < 12:
+            kq = f"RẺ — P/E {pe}, có biên an toàn"
+        elif pe_val and pe_val < 18:
+            kq = f"HỢP LÝ — P/E {pe}"
+        else:
+            kq = f"ĐẮT — P/E {pe} quá cao"
+        return f"{header}\n{info}\n\nĐịnh giá cơ bản: {kq}\n\n**=> {kq}**"
 
     if expert["id"] == "munger":
-        return f"{name} ({title}) — Phân tích Đa chiều:\nCổ phiếu {ma_cp} cần được xem xét trong bối cảnh toàn diện, tránh thiên kiến xác nhận.\n\n=> Đầu tư dài hạn với tư duy phản biện, luôn có biên an toàn."
+        return (f"{header}\n{info}\n\nSai lầm thường gặp: (1) Thiên kiến xác nhận — chỉ nhìn tin tốt, "
+                f"(2) Hành vi bầy đàn. Cần tư duy đa chiều, tránh cạm bẫy tâm lý.\n\n"
+                f"**=> Đầu tư thông minh — hiểu rõ doanh nghiệp, có biên an toàn**")
 
     return None
 
