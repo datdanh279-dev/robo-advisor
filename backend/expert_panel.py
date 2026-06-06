@@ -673,7 +673,8 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
 
     chairman_result = None
     chairman_key = api_keys.get("groq") or api_keys.get("openai")
-    if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
+    # Luôn thử Chủ tịch nếu có ít nhất 1 chuyên gia trả lời thành công
+    if chairman_key and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
         try:
             chairman_result = _call_chairman(question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
         except Exception as e:
