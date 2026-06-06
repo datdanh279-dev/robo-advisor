@@ -641,6 +641,30 @@ if not st.session_state.get("_main_css_injected"):
     st.session_state._main_css_injected = True
     st.markdown(
         """
+<script>
+const _origError = console.error.bind(console);
+const _origWarn = console.warn.bind(console);
+const _origLog = console.log.bind(console);
+const _blocked = [
+    'removeChild', 'NotFoundError', 'ERR_BLOCKED', 'segment', 'analytics',
+    'bufferedData', 'translate', 'routes-', 'google-analytics', 'cdn.segment'
+];
+console.error = function() {
+    const msg = Array.from(arguments).join(' ');
+    if (_blocked.some(b => msg.includes(b))) return;
+    _origError.apply(console, arguments);
+};
+console.warn = function() {
+    const msg = Array.from(arguments).join(' ');
+    if (_blocked.some(b => msg.includes(b))) return;
+    _origWarn.apply(console, arguments);
+};
+console.log = function() {
+    const msg = Array.from(arguments).join(' ');
+    if (_blocked.some(b => msg.includes(b))) return;
+    _origLog.apply(console, arguments);
+};
+</script>
 <style>
 :root {
     --gold: #FFD700;
@@ -1156,8 +1180,12 @@ _themes = {
         "plotly_bg": "rgba(15,23,42,0.5)", "plotly_font": "#E2E8F0",
     },
 }
-_t = _themes.get(st.session_state.get("theme_choice", "sepia"), _themes["sepia"])
-st.markdown(f"""
+_current_theme = st.session_state.get("theme_choice", "sepia")
+_injected_theme = st.session_state.get("_injected_theme", None)
+if _current_theme != _injected_theme:
+    _t = _themes.get(_current_theme, _themes["sepia"])
+    st.session_state._injected_theme = _current_theme
+    st.markdown(f"""
 <style>
 :root {{
     --bg-main: {_t['bg_main']};
