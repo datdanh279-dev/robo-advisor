@@ -5936,35 +5936,73 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## ⚠️ Tail Risk Decomposition — Mã nào gây lỗ đuôi?")
-        if has_real and dm_equity is not None and len(real_prices) >= 2 and len(dm_equity) > 60:
-            ret_s7 = pd.Series(dm_equity).pct_change().dropna()
-            var_5_threshold = float(ret_s7.quantile(0.05))
-            tail_days = ret_s7[ret_s7 <= var_5_threshold].index
-            if len(tail_days) > 0:
-                tr_rows2 = []
-                for ma, info in dm.items():
-                    if ma not in real_prices: continue
-                    if len(real_prices[ma]) < len(tail_days) + 5: continue
-                    gia_tt = info.get("gia_thi_truong", 0)
-                    sl = info.get("so_luong", 0)
-                    if gia_tt <= 0 or sl <= 0: continue
-                    w = (gia_tt * sl) / tong_gt
-                    tail_ret_ma = real_prices[ma].pct_change().dropna().reindex(tail_days).dropna()
-                    if len(tail_ret_ma) == 0: continue
-                    avg_tail_ret = float(tail_ret_ma.mean())
-                    contr = w * avg_tail_ret * 100
-                    tr_rows2.append({"Mã": ma, "Tỷ trọng %": round(w*100, 1),
-                        "Return TB ngày tệ": f"{avg_tail_ret*100:.2f}%",
-                        "Đóng góp vào đuôi %": round(contr, 3)})
-                if tr_rows2:
-                    df_tr2 = pd.DataFrame(tr_rows2).sort_values("Đóng góp vào đuôi %")
-                    st.dataframe(df_tr2, use_container_width=True, hide_index=True)
-                    worst_ma = tr_rows2[0]
-                    st.caption(f"📊 {len(tail_days)} phiên tệ nhất (VaR 5%). Mã **{worst_ma['Mã']}** đóng góp {worst_ma['Đóng góp vào đuôi %']:+.3f}% vào đuôi (gây lỗ nhiều nhất). Tính từ returns thật yfinance 6T.")
+        _tr_ma = [ma for ma, info in dm.items() if info.get("gia_thi_truong", 0) * info.get("so_luong", 0) > 0 and tong_gt > 0]
+        if len(_tr_ma) >= 2:
+            _vn_keys = set((DOCS.get("co_phieu_vn") or {}).keys())
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import requests as _rq_tr, pandas as _pd_tr
+            _tr_prices = {}
+            def _fetch_tr(sym, suffix):
+                try:
+                    r = _rq_tr.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
+                        params={"range": "6mo", "interval": "1d"},
+                        timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code == 200:
+                        d = r.json()
+                        quote = d.get("chart", {}).get("result", [{}])[0]
+                        ts = quote.get("timestamp", [])
+                        cs = quote.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                        pairs = [(t, c) for t, c in zip(ts, cs) if c]
+                        if len(pairs) >= 30:
+                            idx = _pd_tr.to_datetime([p[0] for p in pairs], unit="s")
+                            return sym, _pd_tr.Series([p[1] for p in pairs], index=idx)
+                except: pass
+                return sym, None
+            with ThreadPoolExecutor(max_workers=12) as ex_tr:
+                _futs_tr = {ex_tr.submit(_fetch_tr, m, ".VN" if m in _vn_keys else ""): m for m in _tr_ma}
+                for _f_tr in as_completed(_futs_tr):
+                    _s_tr, _p_tr = _f_tr.result()
+                    if _p_tr is not None:
+                        _tr_prices[_s_tr] = _p_tr
+            if len(_tr_prices) >= 2:
+                _tr_df = _pd_tr.DataFrame({k: v for k, v in _tr_prices.items()})
+                _tr_dm_eq = _tr_df.sum(axis=1) / len(_tr_df.columns)
+                _tr_ret = _tr_dm_eq.pct_change().dropna()
+                if len(_tr_ret) >= 20:
+                    _var_5 = float(_tr_ret.quantile(0.05))
+                    _tail = _tr_ret[_tr_ret <= _var_5].index
+                    if len(_tail) > 0:
+                        _tr_rows = []
+                        for _ma_tr, _info_tr in dm.items():
+                            if _ma_tr not in _tr_prices: continue
+                            _s_tr = _tr_prices[_ma_tr]
+                            if len(_s_tr) < len(_tail) + 5: continue
+                            _gt = float(_info_tr.get("gia_thi_truong", 0))
+                            _sl = float(_info_tr.get("so_luong", 0))
+                            if _gt <= 0 or _sl <= 0: continue
+                            _w = (_gt * _sl) / tong_gt
+                            _trm = _s_tr.pct_change().dropna().reindex(_tail).dropna()
+                            if len(_trm) == 0: continue
+                            _avg = float(_trm.mean())
+                            _contr = _w * _avg * 100
+                            _tr_rows.append({"Mã": _ma_tr, "Tỷ trọng %": round(_w*100, 1),
+                                "Return TB ngày tệ": f"{_avg*100:.2f}%",
+                                "Đóng góp vào đuôi %": round(_contr, 3)})
+                        if _tr_rows:
+                            _df_trr = _pd_tr.DataFrame(_tr_rows).sort_values("Đóng góp vào đuôi %")
+                            st.dataframe(_df_trr, use_container_width=True, hide_index=True)
+                            _worst = _tr_rows[0]
+                            st.caption(f"📊 {len(_tail)} phiên tệ nhất (VaR 5%). Mã **{_worst['Mã']}** đóng góp {_worst['Đóng góp vào đuôi %']:+.3f}% vào đuôi (gây lỗ nhiều nhất). Tính từ returns thật yfinance 6T.")
+                        else:
+                            st.info("⚠️ Không đủ dữ liệu returns để tính tail risk.")
+                    else:
+                        st.info("Không có phiên nào dưới VaR 5%.")
+                else:
+                    st.info("⚠️ Không đủ phiên giao dịch từ yfinance (< 20).")
             else:
-                st.info("Không có phiên nào dưới VaR 5%.")
+                st.info("⚠️ Yahoo Finance không trả dữ liệu. Refresh sau 5-10 phút.")
         else:
-            st.info("⚠️ Cần giá thật 6T để phân tích tail risk.")
+            st.info("Cần ≥2 mã trong danh mục để phân tích tail risk.")
 
         st.write("---")
         st.write("## 📉 Individual Stock Drawdown — Sụt giảm từng mã")
