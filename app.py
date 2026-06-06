@@ -8654,39 +8654,48 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🌐 Tương quan Đa thị trường — VN vs Thế giới")
-        _global_tickers = {
-            "VN-Index": ("^VNINDEX", ""),
-            "S&P 500": ("^GSPC", ""),
-            "Nikkei 225": ("^N225", ""),
-            "Shanghai": ("000001.SS", ""),
-        }
         _global_prices = {}
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        import requests as _rq_gbl, pandas as _pd_gbl
-        def _fetch_gbl(sym, suffix):
-            try:
-                r = _rq_gbl.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
-                    params={"range": "6mo", "interval": "1d"},
-                    timeout=12, headers={"User-Agent": "Mozilla/5.0"})
-                if r.status_code == 200:
-                    d = r.json()
-                    quote = d.get("chart", {}).get("result", [{}])[0]
-                    ts = quote.get("timestamp", [])
-                    cs = quote.get("indicators", {}).get("quote", [{}])[0].get("close", [])
-                    pairs = [(t, c) for t, c in zip(ts, cs) if c]
-                    if len(pairs) >= 20:
-                        return sym, _pd_gbl.Series([c for _, c in pairs], index=_pd_gbl.to_datetime([t for t, _ in pairs], unit="s"))
-            except: pass
-            return sym, None
-        with ThreadPoolExecutor(max_workers=4) as _ex_gbl:
-            _futs_gbl = {_ex_gbl.submit(_fetch_gbl, t, s): n for n, (t, s) in _global_tickers.items()}
-            for _f_gbl in as_completed(_futs_gbl):
-                _t_gbl, _s_gbl = _f_gbl.result()
-                _n_gbl = _futs_gbl[_f_gbl]
-                if _s_gbl is not None:
-                    _global_prices[_n_gbl] = _s_gbl
+        try:
+            import yfinance as _yf_gbl
+            _gbl_tickers = ["^VNINDEX", "^GSPC", "^N225", "000001.SS"]
+            _gbl_names = ["VN-Index", "S&P 500", "Nikkei 225", "Shanghai"]
+            _gbl_data = _yf_gbl.download(_gbl_tickers, period="6mo", progress=False, auto_adjust=True, timeout=30)
+            if _gbl_data is not None and not _gbl_data.empty and "Close" in _gbl_data.columns:
+                for _i, _t in enumerate(_gbl_tickers):
+                    _col = ("Close", _t)
+                    if _col in _gbl_data.columns:
+                        _series = _gbl_data[_col].dropna()
+                        if len(_series) >= 20:
+                            _global_prices[_gbl_names[_i]] = _series
+        except Exception:
+            pass
+        if len(_global_prices) < 2:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import requests as _rq_gbl2, pandas as _pd_gbl2
+            _gbl_fallback = {"VN-Index": "^VNINDEX", "S&P 500": "^GSPC", "Nikkei 225": "^N225", "Shanghai": "000001.SS"}
+            def _fetch_gbl2(ticker, name):
+                try:
+                    r = _rq_gbl2.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+                        params={"range": "6mo", "interval": "1d"},
+                        timeout=15, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+                    if r.status_code == 200:
+                        d = r.json()
+                        quote = d.get("chart", {}).get("result", [{}])[0]
+                        ts = quote.get("timestamp", [])
+                        cs = quote.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                        closes = [c for c in cs if c]
+                        if len(closes) >= 20:
+                            return name, _pd_gbl2.Series(closes, index=_pd_gbl2.to_datetime(ts[:len(closes)], unit="s"))
+                except: pass
+                return name, None
+            with ThreadPoolExecutor(max_workers=4) as _ex2:
+                _futs2 = {_ex2.submit(_fetch_gbl2, t, n): n for n, t in _gbl_fallback.items()}
+                for _f2 in as_completed(_futs2):
+                    _n2, _s2 = _f2.result()
+                    if _s2 is not None:
+                        _global_prices[_n2] = _s2
         if len(_global_prices) >= 2:
-            _global_df = _pd_gbl.DataFrame(_global_prices).pct_change().dropna()
+            _global_df = pd.DataFrame(_global_prices).pct_change().dropna()
             if len(_global_df) >= 5:
                 _corr_global = _global_df.corr()
                 fig_global = go.Figure(data=go.Heatmap(
@@ -8714,11 +8723,11 @@ elif st.session_state.trang_thai == "deep_analysis":
                     title="Hiệu suất tích lũy — VN vs Thế giới",
                     yaxis_title="Tăng trưởng (x lần)")
                 st.plotly_chart(fig_global_ts, use_container_width=True)
-                st.caption("🌐 Tương quan + hiệu suất giữa VN-Index, S&P 500, Nikkei 225, Shanghai. Dữ liệu 6 tháng từ yfinance.")
+                st.caption(f"🌐 Tương quan + hiệu suất giữa VN-Index, S&P 500, Nikkei 225, Shanghai ({len(_global_df)} phiên chung). Dữ liệu từ yfinance.")
             else:
-                st.info("⚠️ Không đủ phiên chung để tính tương quan.")
+                st.info(f"⚠️ Chỉ có {len(_global_df)} phiên chung, cần ≥5.")
         else:
-            st.info("⚠️ Yahoo Finance không trả dữ liệu chỉ số quốc tế. Refresh sau 5-10 phút.")
+            st.info("⚠️ Yahoo Finance không trả dữ liệu chỉ số quốc tế (rate-limit). Refresh sau 10-15 phút hoặc dùng mạng khác.")
 
         st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
