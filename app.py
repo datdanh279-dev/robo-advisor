@@ -562,7 +562,9 @@ try:
     PASSWORD_DEEP = st.secrets.get("DEEP_PASSWORD", "viettracuu@2026")
 except Exception:
     PASSWORD_DEEP = "viettracuu@2026"
-_DEEP_PWD_OK = {PASSWORD_DEEP, PASSWORD_DEEP.strip(), PASSWORD_DEEP.lower(), "viettracuu@2026", "viettracuu2026"}
+if not PASSWORD_DEEP:
+    PASSWORD_DEEP = "viettracuu@2026"
+_DEEP_PWD_OK = {PASSWORD_DEEP, PASSWORD_DEEP.strip(), "viettracuu@2026", "viettracuu2026"}
 
 with st.sidebar:
     st.markdown("---")
@@ -1212,7 +1214,7 @@ with sidebar:
         with st.expander("🔑 Mở khóa Phân tích chuyên sâu", expanded=False):
             deep_pwd = st.text_input("Mật khẩu truy cập:", type="password", key="deep_pwd_input")
             if st.button("Xác nhận", key="activate_deep", use_container_width=True):
-                if deep_pwd in _DEEP_PWD_OK or deep_pwd.strip() in _DEEP_PWD_OK:
+                if deep_pwd.strip() == PASSWORD_DEEP or deep_pwd.strip() in _DEEP_PWD_OK:
                     st.session_state.deep_unlocked = True
                     st.success("✅ Đã mở khóa! Nhấn nút bên dưới để vào.")
                     st.rerun()
@@ -3368,14 +3370,14 @@ elif st.session_state.trang_thai == "deep_analysis":
         '<div class="login-title" style="font-size:2rem;">🔒 PHÂN TÍCH CHUYÊN SÂU</div>'
         '<div class="login-subtitle">Vui lòng nhập mật khẩu để truy cập</div>'
         '</div>', unsafe_allow_html=True)
-        with st.form("deep_unlock_form"):
-            _deep_pwd = st.text_input("Mật khẩu Phân tích Chuyên sâu:", type="password", placeholder="Nhập mật khẩu...")
-            if st.form_submit_button("🔓 Mở khóa", use_container_width=True):
-                if _deep_pwd in _DEEP_PWD_OK or _deep_pwd.strip() in _DEEP_PWD_OK:
-                    st.session_state.deep_unlocked = True
-                    st.rerun()
-                else:
-                    st.error("❌ Mật khẩu không chính xác!")
+        _deep_pwd = st.text_input("Mật khẩu Phân tích Chuyên sâu:", type="password", placeholder="Nhập mật khẩu...", key="deep_page_pwd")
+        if st.button("🔓 Mở khóa", key="deep_unlock_btn", use_container_width=True):
+            _pw = _deep_pwd.strip()
+            if _pw == PASSWORD_DEEP or _pw in _DEEP_PWD_OK:
+                st.session_state.deep_unlocked = True
+                st.rerun()
+            else:
+                st.error("❌ Mật khẩu không chính xác!")
         st.stop()
 
     st.markdown("**🆕 VERSION 6.0** — 6 nhóm Tabs + 8 tính năng mới (thanh khoản, khối ngoại, AI, Bollinger, FX, VN30, lịch sử GD, thuế). Không thấy dòng này = Ctrl+Shift+R.")
