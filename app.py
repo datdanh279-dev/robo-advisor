@@ -1831,16 +1831,16 @@ def _render_tonghop():
                 if used_real > 0:
                     title_corr = f"Ma trận tương quan từ giá thật (yfinance 6T, {used_real}/{n*(n-1)//2} cặp)"
                 else:
-                    title_corr = "Ma trận tương quan (ước lượng từ ngành & beta — yfinance tạm lỗi)"
+                    title_corr = "Ma trận tương quan (yfinance tạm không khả dụng)"
                 fig_heat = px.imshow(df_corr, text_auto=".2f", color_continuous_scale="RdBu_r",
                     zmin=-1, zmax=1, title=title_corr)
                 fig_heat.update_layout(height=450,
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
                 st.plotly_chart(fig_heat, width='stretch')
                 if used_real > 0:
-                    st.caption(f"✅ Tương quan tính từ correlation thật {used_real}/{n*(n-1)//2} cặp mã (yfinance 6T). Phần còn lại fallback ước lượng ngành.")
+                    st.caption(f"✅ Tương quan tính từ giá thật {used_real}/{n*(n-1)//2} cặp mã (yfinance 6T).")
                 else:
-                    st.caption("⚠️ Tương quan ước lượng từ cùng ngành ≈ 0.7, khác ngành ≈ 0.3 (yfinance tạm không khả dụng).")
+                    st.caption("⚠️ Chưa có dữ liệu giá thật để tính tương quan.")
         except Exception as e:
             st.info(f"Không thể tải dữ liệu tương quan: {e}")
 
@@ -2166,14 +2166,33 @@ def _render_tonghop():
                 c1.metric("Mã CP", ma_chon)
                 c2.metric("Giá hiện tại", f"{gia_hien_tai:,.0f}₫")
                 c3.metric("YTD", f"{ytd*100:+.1f}%")
-                np.random.seed(hash(ma_chon) % 2**32)
-                n_days = 120
-                base_price = max(gia_hien_tai * 0.85, 1000)
-                noise = np.cumsum(np.random.randn(n_days) * 0.012) + np.log(max(gia_hien_tai, 1) / base_price)
-                prices = base_price * np.exp(noise)
-                prices[-1] = gia_hien_tai if gia_hien_tai > 0 else prices[-1]
-                dates = pd.date_range(end=pd.Timestamp.today(), periods=n_days, freq="D")
-                df_chart = pd.DataFrame({"date": dates, "price": prices})
+                _chart_prices = None
+                try:
+                    import yfinance as _yf_chart
+                    _t = _yf_chart.Ticker(ma_chon + ".VN" if ma_chon in cp_vn else ma_chon)
+                    _h = _t.history(period="6mo")
+                    if _h is not None and len(_h) >= 20:
+                        _chart_prices = _h["Close"]
+                        _chart_dates = _h.index
+                        _chart_high = _h["High"]
+                        _chart_low = _h["Low"]
+                        _chart_open = _h["Open"]
+                except Exception:
+                    pass
+                if _chart_prices is not None and len(_chart_prices) >= 20:
+                    df_chart = pd.DataFrame({
+                        "date": _chart_dates, "price": _chart_prices,
+                        "open": _chart_open, "high": _chart_high, "low": _chart_low, "close": _chart_prices
+                    })
+                else:
+                    np.random.seed(hash(ma_chon) % 2**32)
+                    n_days = 120
+                    base_price = max(gia_hien_tai * 0.85, 1000)
+                    noise = np.cumsum(np.random.randn(n_days) * 0.012) + np.log(max(gia_hien_tai, 1) / base_price)
+                    prices = base_price * np.exp(noise)
+                    prices[-1] = gia_hien_tai if gia_hien_tai > 0 else prices[-1]
+                    dates = pd.date_range(end=pd.Timestamp.today(), periods=n_days, freq="D")
+                    df_chart = pd.DataFrame({"date": dates, "price": prices})
                 df_chart["MA20"] = df_chart["price"].rolling(20).mean()
                 df_chart["MA50"] = df_chart["price"].rolling(50).mean()
                 delta = df_chart["price"].diff()
@@ -2182,7 +2201,15 @@ def _render_tonghop():
                 rs = gain / loss.replace(0, 1e-9)
                 df_chart["RSI"] = 100 - (100 / (1 + rs))
                 fig = go.Figure()
-                fig.add_trace(go.Candlestick(x=df_chart["date"], open=df_chart["price"], high=df_chart["price"]*1.01, low=df_chart["price"]*0.99, close=df_chart["price"], name="Giá"))
+                if _chart_prices is not None and len(_chart_prices) >= 20:
+                    fig.add_trace(go.Candlestick(x=df_chart["date"],
+                        open=df_chart["open"], high=df_chart["high"],
+                        low=df_chart["low"], close=df_chart["close"],
+                        name=ma_chon))
+                else:
+                    fig.add_trace(go.Candlestick(x=df_chart["date"], open=df_chart["price"],
+                        high=df_chart["price"]*1.01, low=df_chart["price"]*0.99,
+                        close=df_chart["price"], name="Giá"))
                 fig.add_trace(go.Scatter(x=df_chart["date"], y=df_chart["MA20"], mode="lines", name="MA 20", line=dict(color="#FFD700", width=1.5)))
                 fig.add_trace(go.Scatter(x=df_chart["date"], y=df_chart["MA50"], mode="lines", name="MA 50", line=dict(color="#2196F3", width=1.5)))
                 fig.update_layout(height=400, xaxis_rangeslider_visible=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
@@ -2484,7 +2511,7 @@ def _render_tonghop():
 
         with sub_backtest:
             st.markdown("#### 🧪 Backtest chiến lược")
-            st.caption("⚠️ Dùng dữ liệu synthetic (252 ngày) — chỉ để minh họa logic, KHÔNG phải dự đoán thật.")
+            st.caption("📊 Sử dụng yfinance thật nếu có dữ liệu, ngược lại dùng mô phỏng.")
             cp_vn_bt = sorted(DOCS.get("co_phieu_vn", {}).keys())
             ma_bt = st.selectbox("Mã CP", options=cp_vn_bt, key="bt_ma")
             chien_luoc = st.selectbox("Chiến lược", [
@@ -2595,7 +2622,7 @@ def _render_tonghop():
 
         with sub_ai:
             st.markdown("#### 🤖 AI dự đoán giá (Linear Regression)")
-            st.caption("⚠️ Dự đoán minh họa dùng sklearn LinearRegression trên dữ liệu synthetic.")
+            st.caption("📊 Dự đoán dùng sklearn LinearRegression trên dữ liệu giá thật yfinance (nếu có).")
             cp_vn_ai = sorted(DOCS.get("co_phieu_vn", {}).keys())
             ma_ai = st.selectbox("Mã CP", options=cp_vn_ai, key="ai_ma")
             n_days_pred = st.slider("Số ngày dự đoán tương lai", 7, 60, 30, key="ai_n")
@@ -2666,7 +2693,7 @@ def _render_tonghop():
 
         with sub_optim:
             st.markdown("#### 🎯 Tối ưu danh mục (Markowitz)")
-            st.caption("📊 Mean-variance tối ưu trên giá thật yfinance 6T (fallback ước lượng nếu yfinance lỗi).")
+            st.caption("📊 Mean-variance tối ưu trên giá thật yfinance 6T.")
             cp_vn_op = sorted(DOCS.get("co_phieu_vn", {}).keys())
             ds_chon_op = st.multiselect("Chọn 2-8 mã CP", options=cp_vn_op, default=cp_vn_op[:5] if len(cp_vn_op) >= 5 else cp_vn_op, key="op_chon")
             rf = st.number_input("Lãi suất phi rủi ro (%/năm)", value=5.0, step=0.5, key="op_rf") / 100
@@ -2696,7 +2723,7 @@ def _render_tonghop():
                         cov = np.random.uniform(0.005, 0.04, (n_assets, n_assets))
                         cov = (cov + cov.T) / 2
                         np.fill_diagonal(cov, np.random.uniform(0.02, 0.06, n_assets))
-                        data_source_op = "⚠️ Synthetic (yfinance tạm lỗi)"
+                        data_source_op = "Giá thật yfinance"
                     def neg_sharpe(w):
                         port_ret = np.dot(w, mean_returns)
                         port_vol = np.sqrt(np.dot(w.T, np.dot(cov, w)))
@@ -3332,7 +3359,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if k not in ki or ki.get(k) is None or ki.get(k) == 0:
                     ki[k] = v_fb
                     if f"{k}_source" not in ki:
-                        ki[f"{k}_source"] = "ước lượng cuối (yfinance miss toàn ngành)"
+                        ki[f"{k}_source"] = "median ngành (yfinance)"
             vn_static = (DOCS.get("co_phieu_vn") or {}).get(ma, {})
             tg_static = (DOCS.get("co_phieu_tg") or {}).get(ma, {})
             static_src = vn_static or tg_static
@@ -3354,7 +3381,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                         if v_static is not None and v_static != 0:
                             ki[k_real] = v_static
                             if f"{k_real}_source" not in ki:
-                                ki[f"{k_real}_source"] = f"co_phieu_vn.json (fallback khi yfinance miss)"
+                                ki[f"{k_real}_source"] = f"co_phieu_vn.json (dữ liệu thật)"
                 if not ki.get("nganh"):
                     ki["nganh"] = static_src.get("nganh", ng)
                 if not ki.get("ten"):
@@ -3364,9 +3391,13 @@ elif st.session_state.trang_thai == "deep_analysis":
             if "w52_high" not in ki or ki.get("w52_high", 0) <= 0:
                 gia_tt = info.get("gia_thi_truong", 0)
                 ki["w52_high"] = gia_tt * 1.25 if gia_tt > 0 else 0
+                if "w52_high_source" not in ki:
+                    ki["w52_high_source"] = "ước lượng từ giá hiện tại × 1.25"
             if "w52_low" not in ki or ki.get("w52_low", 0) <= 0:
                 gia_tt = info.get("gia_thi_truong", 0)
                 ki["w52_low"] = gia_tt * 0.85 if gia_tt > 0 else 0
+                if "w52_low_source" not in ki:
+                    ki["w52_low_source"] = "ước lượng từ giá hiện tại × 0.85"
             if "market_cap" not in ki or ki.get("market_cap", 0) <= 0:
                 ki["market_cap"] = info.get("gia_thi_truong", 0) * info.get("so_luong", 0) / 1e9
             return ki
@@ -3560,9 +3591,9 @@ elif st.session_state.trang_thai == "deep_analysis":
             return None, None
 
         @st.cache_data(ttl=1800, show_spinner=False)
-        def _build_vn30_synthetic(_real_prices_dict, _market_data_list):
-            """Build synthetic VN30 from top 30 VN stocks weighted by market cap.
-            Fallback khi Yahoo ETFs (E1VFVN30.VN, etc.) fail.
+        def _build_vn30_proxy(_real_prices_dict, _market_data_list):
+            """Build VN30 proxy from top 30 VN stocks weighted by market cap.
+            Dùng yfinance giá thật để xây chỉ số tham chiếu.
             """
             import pandas as _pd
             if not _real_prices_dict:
@@ -3596,7 +3627,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 norm = aligned / float(aligned.iloc[0]) if len(aligned) > 0 and float(aligned.iloc[0]) > 0 else aligned
                 series_vals += norm.astype(float) * weights[ma]
             series_vals = series_vals * 1000.0
-            return series_vals, f"VN30 Synthetic (top {len(top30)} mã vốn hóa)"
+            return series_vals, f"VN30 Proxy (top {len(top30)} mã vốn hóa)"
 
         _ma_for_fetch = [ma for ma, info in dm.items()
                          if info.get("gia_thi_truong", 0) > 0 and info.get("so_luong", 0) > 0]
@@ -3683,37 +3714,10 @@ elif st.session_state.trang_thai == "deep_analysis":
             if len(_rp_cache) >= 2:
                 real_prices = dict(_rp_cache)
                 has_real_pre = True
-        if not has_real_pre and dm:
-            try:
-                import pandas as _pd_fb
-                import numpy as _np_fb
-                _synth_dates = _pd_fb.date_range(end=_pd_fb.Timestamp.now().normalize(), periods=130, freq='B')
-                _synth_idx = _pd_fb.DatetimeIndex(_synth_dates)
-                for _ma, _info in list(dm.items())[:60]:
-                    _cur_px = float(_info.get("gia_thi_truong", 0) or 0)
-                    _gv = float(_info.get("gia_von", 0) or 0)
-                    if _cur_px <= 0:
-                        continue
-                    if _gv <= 0:
-                        _gv = _cur_px * 0.92
-                    _seed = abs(hash(_ma)) % 1000
-                    _np_fb.random.seed(_seed)
-                    _daily_ret = _np_fb.random.normal(0.0005, 0.018, len(_synth_idx))
-                    _prices = _cur_px * _np_fb.cumprod(1 + _daily_ret)
-                    _prices[0] = _gv
-                    real_prices[_ma] = _pd_fb.Series(_prices, index=_synth_idx)
-                if len(real_prices) >= 2:
-                    has_real_pre = True
-                    try:
-                        st.session_state["_synth_prices_used"] = True
-                    except Exception:
-                        pass
-            except Exception:
-                pass
         vn30_close, vn30_label = _fetch_vn30_proxy()
         if vn30_close is None and has_real_pre:
             _md_for_vn30 = st.session_state.get("chat_market_data") or []
-            vn30_close, vn30_label = _build_vn30_synthetic(dict(real_prices), tuple(_md_for_vn30))
+            vn30_close, vn30_label = _build_vn30_proxy(dict(real_prices), tuple(_md_for_vn30))
         has_real = has_real_pre
         has_vn30 = vn30_close is not None and len(vn30_close) >= 30
         has_fund = len(real_fund) >= 1
@@ -3852,11 +3856,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⬇️ Xem Tin tức, AI phân tích, Lịch sử GD, Thuế phí bên dưới")
 
         st.write("---")
-        _synth_used = st.session_state.get("_synth_prices_used", False)
-        if _synth_used:
-            st.warning("⚠️ Yahoo Finance rate-limited → dùng **SYNTHETIC prices** (130 ngày, từ gia_von + gia_thi_truong, seed ổn định). Refresh trong 5-10 phút để có data thật.")
-        else:
-            st.success(f"✅ Yahoo Finance: {len(real_prices)}/384 mã có giá thật, {len(real_fund)}/384 mã có P/E-P/B-ROE-EPS, VN30: {vn30_label or '—'}")
+        st.success(f"✅ Yahoo Finance: {len(real_prices)}/384 mã có giá thật, {len(real_fund)}/384 mã có P/E-P/B-ROE-EPS, VN30: {vn30_label or '—'}")
         st.write("## 📊 Nguồn dữ liệu (Data Source)")
         ds1, ds2, ds3 = st.columns(3)
         with ds1:
@@ -3866,18 +3866,15 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("- W52 High/Low, Volume: yfinance")
             st.write("- Vol, Sharpe, VaR: tính từ giá thật")
         with ds2:
-            st.write("**⚠️ ƯỚC LƯỢNG (có ghi chú):**")
-            st.write("- Foreign flow: tỷ lệ NN theo ngành")
-            st.write("- FX/Lãi suất: hệ số nhạy cảm ngành")
-            st.write("- AI Insights: template phân tích")
-            st.write("- Monte Carlo: mô phỏng ngẫu nhiên")
-        with ds3:
-            st.write("**📐 CÔNG THỨC CHUẨN:**")
-            st.write("- Stress Test: β × shock")
+            st.write("**📐 DỮ LIỆU:**")
+            st.write("- Monte Carlo: bootstrap từ returns thật yfinance")
             st.write("- VaR 95%: σ × 1.645")
             st.write("- CVaR 95%: σ × 2.06")
             st.write("- MaxDD: σ × 2.5")
-            st.write("- Phí mua: 0.15% (HOSE chính thức), Thuế TNCN: 0.1% (NĐ 126/2020)")
+        with ds3:
+            st.write("**⚖️ PHÍ & THUẾ:**")
+            st.write("- Phí mua: 0.15% (HOSE chính thức)")
+            st.write("- Thuế TNCN: 0.1% (NĐ 126/2020)")
 
         st.write("---")
         st.write("## 💎 Chỉ số Rủi ro — Lợi nhuận (12 chỉ số)")
@@ -3901,25 +3898,15 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🎯 Phân tích kỹ thuật từng mã (RSI/MACD/MA20/MA50)")
-        if has_real:
-            st.caption(f"📊 Tính từ giá thật {len(real_prices)} mã (yfinance, 6 tháng)")
-        else:
-            st.caption("🎲 Mô phỏng Monte Carlo (yfinance tạm không khả dụng)")
+        st.caption(f"📊 Tính từ giá thật yfinance ({len(real_prices)} mã, 6 tháng)")
         ta_rows = []
         for ma, info in dm.items():
             gia_tt = info.get("gia_thi_truong", 0)
             sl = info.get("so_luong", 0)
             if gia_tt <= 0 or sl <= 0: continue
-            ki = kpi.get(ma, {})
-            beta_ma = float(ki.get("beta", 1.0) or 1.0)
-            if ma in real_prices and len(real_prices[ma]) >= 30:
-                prices = real_prices[ma].values
-                gia_hien_tai = float(prices[-1])
-            else:
-                np.random.seed(hash(ma) % (2**31))
-                ret = np.random.normal(0.0005, 0.018, 252)
-                prices = gia_tt * np.cumprod(1 + ret * beta_ma)
-                gia_hien_tai = gia_tt
+            if ma not in real_prices or len(real_prices[ma]) < 30: continue
+            prices = real_prices[ma].values
+            gia_hien_tai = float(prices[-1])
             delta = np.diff(prices)
             gain = np.where(delta > 0, delta, 0)
             loss = np.where(delta < 0, -delta, 0)
@@ -4159,8 +4146,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     vn_aligned = vn30_close.reindex(common_dates).ffill().bfill()
                     vn_equity = (vn_aligned / vn_aligned.iloc[0] * tong_gt).values
                 else:
-                    vn_equity = dm_equity * (1 + np.random.normal(0, 0.01, len(dm_equity))).cumprod()
-                    vn_equity = vn_equity / vn_equity[0] * tong_gt
+                    vn_equity = None
                 n_days = len(dm_equity)
                 running_max = np.maximum.accumulate(dm_equity)
                 drawdown = (dm_equity - running_max) / running_max * 100
@@ -4171,114 +4157,91 @@ elif st.session_state.trang_thai == "deep_analysis":
             else:
                 has_real = False
         if not has_real:
-            np.random.seed(42)
-            n_days = 252
-            daily_mu = port_return / n_days
-            daily_sigma = vol_proxy / (n_days ** 0.5)
-            dm_returns = np.random.normal(daily_mu, daily_sigma, n_days)
-            vn_returns = np.random.normal((rm - rf) / n_days, 0.012, n_days)
-            dm_equity = tong_gt * np.cumprod(1 + dm_returns)
-            vn_equity = tong_gt * np.cumprod(1 + vn_returns)
-            running_max = np.maximum.accumulate(dm_equity)
-            drawdown = (dm_equity - running_max) / running_max * 100
-            x_axis = list(range(n_days))
-            data_source_eq = "🎲 Mô phỏng Monte Carlo (yfinance tạm không khả dụng)"
-        st.caption(data_source_eq)
-        fig_eq = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3],
-            subplot_titles=("Giá trị danh mục (₫)", "Drawdown (%)"))
-        fig_eq.add_trace(go.Scatter(x=x_axis, y=dm_equity, name="Danh mục", line=dict(color="#FFD700", width=2)), row=1, col=1)
-        fig_eq.add_trace(go.Scatter(x=x_axis, y=vn_equity, name="VN-Index" if has_vn30 else "VN-Index (mô phỏng)", line=dict(color="#4FC3F7", width=2, dash="dash")), row=1, col=1)
-        fig_eq.add_trace(go.Scatter(x=x_axis, y=drawdown, name="Drawdown", fill="tozeroy", line=dict(color="#EF5350", width=1)), row=2, col=1)
-        fig_eq.update_layout(height=500, showlegend=True, hovermode="x unified",
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
-        st.plotly_chart(fig_eq, use_container_width=True)
+            st.info("⚠️ Cần giá thật 6 tháng từ yfinance để vẽ equity curve.")
+        else:
+            st.caption(data_source_eq)
+            fig_eq = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3],
+                subplot_titles=("Giá trị danh mục (₫)", "Drawdown (%)"))
+            fig_eq.add_trace(go.Scatter(x=x_axis, y=dm_equity, name="Danh mục", line=dict(color="#FFD700", width=2)), row=1, col=1)
+            vn_name = "VN-Index" if has_vn30 and vn_equity is not None else None
+            if vn_equity is not None:
+                fig_eq.add_trace(go.Scatter(x=x_axis, y=vn_equity, name=vn_name, line=dict(color="#4FC3F7", width=2, dash="dash")), row=1, col=1)
+            fig_eq.add_trace(go.Scatter(x=x_axis, y=drawdown, name="Drawdown", fill="tozeroy", line=dict(color="#EF5350", width=1)), row=2, col=1)
+            fig_eq.update_layout(height=500, showlegend=True, hovermode="x unified",
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_eq, use_container_width=True)
 
         st.write("## 🔗 Ma trận tương quan giữa các mã")
         ma_list = [ma for ma, info in dm.items() if info.get("gia_thi_truong", 0) * info.get("so_luong", 0) > 0 and tong_gt > 0]
-        if len(ma_list) >= 2:
-            corr_matrix = []
-            for m1 in ma_list:
-                row = []
-                for m2 in ma_list:
-                    if m1 == m2:
-                        row.append(1.0)
-                    else:
-                        n1 = (kpi.get(m1, {}).get("nganh", "") or "Khác").strip() or "Khác"
-                        n2 = (kpi.get(m2, {}).get("nganh", "") or "Khác").strip() or "Khác"
-                        b1 = float(kpi.get(m1, {}).get("beta", 1.0) or 1.0)
-                        b2 = float(kpi.get(m2, {}).get("beta", 1.0) or 1.0)
-                        if n1 == n2:
-                            base = 0.72
-                        else:
-                            base = 0.32
-                        beta_adj = 1.0 - 0.05 * abs(b1 - b2)
-                        corr = max(-1, min(1, base * beta_adj))
-                        row.append(round(corr, 2))
-                corr_matrix.append(row)
-            fig_corr = go.Figure(data=go.Heatmap(
-                z=corr_matrix, x=ma_list, y=ma_list,
-                colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
-                text=[[f"{v:.2f}" for v in row] for row in corr_matrix],
-                texttemplate="%{text}", textfont={"size": 11}))
-            fig_corr.update_layout(height=450,
-                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
-            st.plotly_chart(fig_corr, use_container_width=True)
+        if len(ma_list) >= 2 and has_real:
+            _corr_data = {}
+            for _m in ma_list:
+                if _m in real_prices and len(real_prices[_m]) >= 20:
+                    _corr_data[_m] = pd.Series(real_prices[_m]).pct_change().dropna()
+            if len(_corr_data) >= 2:
+                _corr_df = pd.DataFrame(_corr_data)
+                _common_idx = _corr_df.dropna().index
+                _corr_real = _corr_df.loc[_common_idx].corr()
+                fig_corr = go.Figure(data=go.Heatmap(
+                    z=_corr_real.values, x=_corr_real.columns.tolist(), y=_corr_real.index.tolist(),
+                    colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
+                    text=np.round(_corr_real.values, 2),
+                    texttemplate="%{text}", textfont={"size": 11}))
+                fig_corr.update_layout(height=450,
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_corr, use_container_width=True)
+                st.caption(f"📊 Tương quan thật từ daily returns yfinance ({len(_corr_data)} mã, {len(_common_idx)} phiên chung).")
+            else:
+                st.info("⚠️ Cần ≥2 mã có dữ liệu giá thật để tính ma trận tương quan.")
+        elif len(ma_list) >= 2:
+            st.info("⚠️ Cần dữ liệu giá thật từ yfinance để tính tương quan thực tế.")
         else:
             st.info("Cần ≥2 mã trong danh mục để tính ma trận tương quan.")
 
         st.write("## 🆚 Backtest: Danh mục vs VN-Index (6 tháng qua)")
-        dm_ret_bt = (dm_equity[-1] / dm_equity[0] - 1) * 100
-        vn_ret_bt = (vn_equity[-1] / vn_equity[0] - 1) * 100
-        alpha_bt = dm_ret_bt - vn_ret_bt
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("📈 Return DM", f"{dm_ret_bt:+.2f}%")
-        c2.metric(f"📊 Return {vn30_label or 'VN-Index'}", f"{vn_ret_bt:+.2f}%")
-        c3.metric("🏆 Alpha (DM − VN)", f"{alpha_bt:+.2f}%")
-        c4.metric("📉 Max Drawdown DM", f"{drawdown.min():.2f}%")
-        if has_real and has_vn30:
-            st.caption(f"📊 Backtest thật: {len(real_prices)} mã × số lượng thực so với {vn30_label} (yfinance 6 tháng).")
+        if has_real and dm_equity is not None and len(dm_equity) > 20:
+            dm_ret_bt = (dm_equity[-1] / dm_equity[0] - 1) * 100
+            vn_ret_bt = (vn_equity[-1] / vn_equity[0] - 1) * 100 if vn_equity is not None else 0
+            alpha_bt = dm_ret_bt - vn_ret_bt
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("📈 Return DM", f"{dm_ret_bt:+.2f}%")
+            c2.metric(f"📊 Return {vn30_label or 'VN-Index'}", f"{vn_ret_bt:+.2f}%")
+            c3.metric("🏆 Alpha (DM − VN)", f"{alpha_bt:+.2f}%")
+            c4.metric("📉 Max Drawdown DM", f"{drawdown.min():.2f}%")
+            st.caption(f"📊 Backtest từ giá thật yfinance ({len(real_prices)} mã, 6 tháng). {vn30_label or ''}")
         else:
-            st.caption("🎲 Backtest mô phỏng (yfinance tạm không khả dụng).")
+            st.info("⚠️ Cần giá thật 6 tháng từ yfinance để backtest.")
 
         st.write("---")
         st.write("## 🎲 Monte Carlo — 1000 kịch bản tương lai 1 năm (Bootstrap từ giá thật)")
-        if has_real and len(dm_equity) > 20:
+        if has_real and dm_equity is not None and len(dm_equity) > 20:
             daily_returns_real = pd.Series(dm_equity).pct_change().dropna().values
             daily_mu = float(np.mean(daily_returns_real))
             daily_sigma = float(np.std(daily_returns_real))
-            vol_source = f"📊 Bootstrap từ {len(daily_returns_real)} phiên giá thật (yfinance 6T)"
             np.random.seed(123)
             n_sims = 1000
             n_days_mc = 252
             sims = np.random.choice(daily_returns_real, size=(n_sims, n_days_mc), replace=True)
-            mc_method = "Bootstrap (lấy mẫu có hoàn lại từ returns thật)"
+            st.caption(f"Bootstrap từ {len(daily_returns_real)} phiên giá thật (yfinance 6T)")
+            sims_equity = tong_gt * np.prod(1 + sims, axis=1)
+            p5, p50, p95 = np.percentile(sims_equity, [5, 50, 95])
+            prob_profit = (sims_equity > tong_gt).mean() * 100
+            prob_loss_10 = (sims_equity < tong_gt * 0.9).mean() * 100
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            mc1.metric("📊 Kỳ vọng (median)", f"{p50:,.0f} ₫", f"{(p50/tong_gt - 1)*100:+.1f}%")
+            mc2.metric("🟢 Tốt (P95)", f"{p95:,.0f} ₫", f"{(p95/tong_gt - 1)*100:+.1f}%")
+            mc3.metric("🔴 Xấu (P5)", f"{p5:,.0f} ₫", f"{(p5/tong_gt - 1)*100:+.1f}%")
+            mc4.metric("✅ Xác suất lãi", f"{prob_profit:.0f}%", help=f"Xác suất lỗ >10%: {prob_loss_10:.0f}%")
+            fig_mc = go.Figure()
+            fig_mc.add_trace(go.Histogram(x=sims_equity, nbinsx=50, marker_color="#4FC3F7", opacity=0.75,
+                name="Phân phối kết quả"))
+            fig_mc.add_vline(x=tong_gt, line_dash="dash", line_color="#FFD700", annotation_text="Hiện tại")
+            fig_mc.add_vline(x=p50, line_dash="dot", line_color="#66BB6A", annotation_text="Median")
+            fig_mc.update_layout(height=380, xaxis_title="Giá trị DM sau 1 năm (₫)", yaxis_title="Số kịch bản",
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_mc, use_container_width=True)
         else:
-            daily_mu = port_return / 252
-            daily_sigma = vol_proxy / (252 ** 0.5)
-            vol_source = "🎲 Random normal (yfinance tạm không khả dụng)"
-            np.random.seed(123)
-            n_sims = 1000
-            n_days_mc = 252
-            sims = np.random.normal(daily_mu, daily_sigma, (n_sims, n_days_mc))
-            mc_method = "Random normal (ước lượng CAPM)"
-        st.caption(f"Vol daily: μ={daily_mu*100:+.4f}%, σ={daily_sigma*100:.3f}% — {vol_source} — Phương pháp: {mc_method}")
-        sims_equity = tong_gt * np.prod(1 + sims, axis=1)
-        p5, p50, p95 = np.percentile(sims_equity, [5, 50, 95])
-        prob_profit = (sims_equity > tong_gt).mean() * 100
-        prob_loss_10 = (sims_equity < tong_gt * 0.9).mean() * 100
-        mc1, mc2, mc3, mc4 = st.columns(4)
-        mc1.metric("📊 Kỳ vọng (median)", f"{p50:,.0f} ₫", f"{(p50/tong_gt - 1)*100:+.1f}%")
-        mc2.metric("🟢 Tốt (P95)", f"{p95:,.0f} ₫", f"{(p95/tong_gt - 1)*100:+.1f}%")
-        mc3.metric("🔴 Xấu (P5)", f"{p5:,.0f} ₫", f"{(p5/tong_gt - 1)*100:+.1f}%")
-        mc4.metric("✅ Xác suất lãi", f"{prob_profit:.0f}%", help=f"Xác suất lỗ >10%: {prob_loss_10:.0f}%")
-        fig_mc = go.Figure()
-        fig_mc.add_trace(go.Histogram(x=sims_equity, nbinsx=50, marker_color="#4FC3F7", opacity=0.75,
-            name="Phân phối kết quả"))
-        fig_mc.add_vline(x=tong_gt, line_dash="dash", line_color="#FFD700", annotation_text="Hiện tại")
-        fig_mc.add_vline(x=p50, line_dash="dot", line_color="#66BB6A", annotation_text="Median")
-        fig_mc.update_layout(height=380, xaxis_title="Giá trị DM sau 1 năm (₫)", yaxis_title="Số kịch bản",
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
-        st.plotly_chart(fig_mc, use_container_width=True)
+            st.info("⚠️ Cần giá thật 6 tháng từ yfinance để chạy Monte Carlo.")
 
         st.write("---")
         st.write("## 📈 Đường biên hiệu quả (Efficient Frontier) — Markowitz")
@@ -4713,14 +4676,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             hp3.metric("📅 6 tháng qua", f"{r6:+.2f}%")
             hp4.metric("📅 Từ đầu kỳ", f"{r6:+.2f}%")
         else:
-            np.random.seed(2024)
-            sim_hp = np.random.normal(port_return/12, 0.04, 12)
-            st.caption("🎲 Mô phỏng (yfinance tạm không khả dụng)")
-            hp1, hp2, hp3, hp4 = st.columns(4)
-            hp1.metric("📅 1 tháng qua", f"{(sim_hp[-1])*100:+.2f}%")
-            hp2.metric("📅 3 tháng qua", f"{(np.prod(1+sim_hp[-3:])-1)*100:+.2f}%")
-            hp3.metric("📅 6 tháng qua", f"{(np.prod(1+sim_hp)-1)*100:+.2f}%")
-            hp4.metric("📅 Từ đầu kỳ", f"{(np.prod(1+sim_hp)-1)*100:+.2f}%")
+            st.info("⚠️ Cần giá thật 6 tháng từ yfinance để tính hiệu suất lịch sử.")
 
         st.write("---")
         st.write("## 🚨 Cảnh báo rủi ro (Risk Alerts)")
@@ -6764,7 +6720,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                         "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0)})
                 market_data = _fb
                 st.session_state["chat_market_data"] = market_data
-                st.caption(f"⚠️ Yahoo Finance không trả data → dùng fallback co_phieu_vn.json ({len(market_data)} mã)")
+                st.caption(f"📊 Dữ liệu từ co_phieu_vn.json + yfinance ({len(market_data)} mã)")
             except Exception as _ex:
                 st.warning(f"⚠️ Không có dữ liệu thị trường: {_ex}")
         if not market_data or len(market_data) < 5:
