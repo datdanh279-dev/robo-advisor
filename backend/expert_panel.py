@@ -231,10 +231,15 @@ async def _call_groq(session, prompt, question, api_key, model="llama-3.3-70b-ve
             if r.status == 200:
                 data = await r.json()
                 return data["choices"][0]["message"]["content"].strip()
-            logger.warning(f"Groq {model} status {r.status}")
+            text = await r.text()
+            logger.warning(f"Groq {model} status {r.status}: {text[:200]}")
+            return f"⚠️ Groq API error (status {r.status})"
+    except asyncio.TimeoutError:
+        logger.warning(f"Groq {model} timeout after {timeout}s")
+        return f"⚠️ Groq API timeout after {timeout}s"
     except Exception as e:
         logger.warning(f"Groq {model} error: {e}")
-    return None
+        return f"⚠️ Groq API error: {e}"
 
 
 async def _call_gemini(session, prompt, question, api_key, model="gemini-2.0-flash", timeout=45):
