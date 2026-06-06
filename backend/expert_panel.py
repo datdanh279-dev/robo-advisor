@@ -1,8 +1,10 @@
-import asyncio
 import json
 import logging
 import os
 import requests
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
@@ -281,14 +283,14 @@ def _call_openrouter(prompt, question, api_key, model, timeout=60):
     return None
 
 
-async def _call_expert(expert, question, api_keys, semaphore, context=""):
+def _call_expert(expert, question, api_keys, lock, context=""):
     prompt = expert["prompt"]
     if context:
         prompt = f"{prompt}\n\nDỮ LIỆU THỊ TRƯỜNG HIỆN TẠI:\n{context}"
     kwargs = {"prompt": prompt, "question": question}
 
-    async with semaphore:
-        await asyncio.sleep(0.3)  # Stagger 300ms giữa các request để tránh rate limit
+    with lock:
+        time.sleep(0.3)  # Stagger 300ms giữa các request để tránh rate limit
 
         if expert["backend"] == "openai":
             api_key = api_keys.get("openai")
@@ -296,7 +298,7 @@ async def _call_expert(expert, question, api_keys, semaphore, context=""):
                 return "❌ OPENAI_API_KEY chưa được cấu hình."
             kwargs["api_key"] = api_key
             kwargs["model"] = expert["model"]
-            result = await asyncio.to_thread(_call_openai, **kwargs)
+            result = _call_openai(**kwargs)
 
         elif expert["backend"] == "groq":
             api_key = api_keys.get("groq")
@@ -304,7 +306,7 @@ async def _call_expert(expert, question, api_keys, semaphore, context=""):
                 return "❌ GROQ_API_KEY chưa được cấu hình.\n\nLấy key miễn phí tại https://console.groq.com/keys (không cần thẻ tín dụng)."
             kwargs["api_key"] = api_key
             kwargs["model"] = expert["model"]
-            result = await asyncio.to_thread(_call_groq, **kwargs)
+            result = _call_groq(**kwargs)
 
         elif expert["backend"] == "gemini":
             api_key = api_keys.get("gemini")
@@ -312,7 +314,7 @@ async def _call_expert(expert, question, api_keys, semaphore, context=""):
                 return "❌ GEMINI_API_KEY chưa được cấu hình."
             kwargs["api_key"] = api_key
             kwargs["model"] = expert["model"]
-            result = await asyncio.to_thread(_call_gemini, **kwargs)
+            result = _call_gemini(**kwargs)
 
         elif expert["backend"] == "openrouter":
             api_key = api_keys.get("openrouter")
@@ -320,7 +322,7 @@ async def _call_expert(expert, question, api_keys, semaphore, context=""):
                 return "❌ OPENROUTER_API_KEY chưa được cấu hình.\n\nDùng OpenRouter (https://openrouter.ai) để truy cập Qwen, DeepSeek, Claude, và các model khác."
             kwargs["api_key"] = api_key
             kwargs["model"] = expert["model"]
-            result = await asyncio.to_thread(_call_openrouter, **kwargs)
+            result = _call_openrouter(**kwargs)
 
         else:
             result = None
@@ -419,9 +421,6 @@ def _get_key(name):
 
 
 def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None):
-    import nest_asyncio
-    nest_asyncio.apply()
-
     openai_key = _get_key("OPENAI_API_KEY")
     gemini_key = _get_key("GEMINI_API_KEY")
     openrouter_key = _get_key("OPENROUTER_API_KEY")
@@ -469,7 +468,7 @@ def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None):
             thi_truong_context = (thi_truong_context + "\n\n" if thi_truong_context else "") + "\n".join(esg_lines)
 
     try:
-        results = asyncio.run(_run_expert_panel_async(cau_hoi, api_keys, thi_truong_context))
+        results = _run_expert_panel(cau_hoi, api_keys, thi_truong_context)
         if not results or not isinstance(results, dict) or "experts" not in results:
             return _build_error_result(api_keys)
         return results
@@ -494,11 +493,11 @@ def _build_error_result(api_keys=None):
     }
 
 
-async def _run_expert_panel_async(question, api_keys, thi_truong_context=""):
+def _run_expert_panel(question, api_keys, thi_truong_context=""):
     loai = phan_loai_cau_hoi(question)
 
     # Giới hạn tối đa 3 request đồng thời để tránh rate limit
-    semaphore = asyncio.Semaphore(3)
+    lock = threading.Semaphore(3)
 
     if loai == "don_gian":
         can_chon = {"buffett", "munger"}
@@ -510,18 +509,20 @@ async def _run_expert_panel_async(question, api_keys, thi_truong_context=""):
         can_chon = {e["id"] for e in EXPERTS}
         logger.info("Chế độ TOÀN DIỆN: gọi cả 6 chuyên gia + Chủ tịch")
 
-    expert_tasks = []
-    expert_ids = []
-    for exp in EXPERTS:
-        if exp["id"] in can_chon:
-            expert_tasks.append(_call_expert(exp, question, api_keys, semaphore, thi_truong_context))
-            expert_ids.append(exp["id"])
+    expert_futures = {}
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        for exp in EXPERTS:
+            if exp["id"] in can_chon:
+                fut = executor.submit(_call_expert, exp, question, api_keys, lock, thi_truong_context)
+                expert_futures[exp["id"]] = fut
 
-    raw = {}
-    if expert_tasks:
-        results = await asyncio.gather(*expert_tasks)
-        for eid, result in zip(expert_ids, results):
-            raw[eid] = result
+        raw = {}
+        for eid, fut in expert_futures.items():
+            try:
+                raw[eid] = fut.result(timeout=180)
+            except Exception as exc:
+                logger.warning(f"Expert {eid} failed: {exc}")
+                raw[eid] = None
 
     # Build full list: called experts get their result, others get placeholder
     expert_results = []
@@ -535,7 +536,7 @@ async def _run_expert_panel_async(question, api_keys, thi_truong_context=""):
     chairman_key = api_keys.get("groq") or api_keys.get("openai")
     if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
         try:
-            chairman_result = await asyncio.to_thread(_call_chairman, question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
+            chairman_result = _call_chairman(question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
         except Exception as e:
             logger.warning(f"Chairman failed: {e}")
 
