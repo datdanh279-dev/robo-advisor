@@ -991,6 +991,167 @@ div[data-testid="stMetricLabel"] {
     letter-spacing: 1px;
     text-transform: uppercase;
 }
+
+/* ===== DEEP ANALYSIS — BEAUTIFUL STYLING ===== */
+.da-section {
+    background: linear-gradient(135deg, rgba(20,30,55,0.85), rgba(10,18,38,0.95));
+    border: 1px solid rgba(120,180,255,0.12);
+    border-left: 4px solid var(--gold);
+    border-radius: 16px;
+    padding: 1.4rem 1.6rem;
+    margin: 1.2rem 0 1rem 0;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+}
+
+/* Section headers H2 inside deep analysis */
+.stApp h2 {
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: var(--gold) !important;
+    padding: 0.5rem 0 0.5rem 1rem !important;
+    margin: 1.5rem 0 1rem 0 !important;
+    border-left: 4px solid var(--gold);
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, rgba(255,215,0,0.06), transparent);
+    border-radius: 0 8px 8px 0;
+}
+.stApp h3 {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    color: var(--cream) !important;
+    margin: 1.2rem 0 0.8rem 0 !important;
+    letter-spacing: 0.3px;
+}
+
+/* Metric containers: grid of 4 columns */
+div[data-testid="column"] {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,215,0,0.06);
+    border-radius: 12px;
+    padding: 0.8rem 0.6rem;
+    margin: 0.2rem;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+}
+div[data-testid="column"]:hover {
+    background: rgba(255,215,0,0.05);
+    border-color: rgba(255,215,0,0.15);
+    transform: translateY(-1px);
+}
+
+/* StMetric inside columns */
+div[data-testid="column"] div[data-testid="stMetric"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.2rem !important;
+}
+div[data-testid="column"] div[data-testid="stMetricValue"] {
+    font-size: 1.3rem !important;
+    font-weight: 700 !important;
+}
+div[data-testid="column"] div[data-testid="stMetricLabel"] {
+    font-size: 0.7rem !important;
+    letter-spacing: 0.5px;
+}
+
+/* StDataFrame tables */
+div[data-testid="stDataFrame"] {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(255,215,0,0.08) !important;
+    margin: 0.8rem 0;
+}
+div[data-testid="stDataFrame"] th {
+    background: rgba(255,215,0,0.08) !important;
+    color: var(--gold) !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.5px;
+    padding: 0.6rem 0.8rem !important;
+}
+div[data-testid="stDataFrame"] td {
+    padding: 0.5rem 0.8rem !important;
+    font-size: 0.8rem !important;
+}
+
+/* Plotly charts */
+.js-plotly-plot {
+    border-radius: 12px;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+/* Tabs styling inside deep analysis */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0 !important;
+    background: rgba(255,215,0,0.03) !important;
+    padding: 4px !important;
+    border-radius: 12px !important;
+}
+.stTabs [data-baseweb="tab"] {
+    border-radius: 10px !important;
+    padding: 0.4rem 1rem !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+}
+.stTabs [aria-selected="true"] {
+    background: rgba(255,215,0,0.12) !important;
+    color: var(--gold) !important;
+    font-weight: 600 !important;
+}
+
+/* Section dividers */
+hr.gold-divider, .stApp hr {
+    margin: 1.8rem 0 !important;
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent, rgba(255,215,0,0.25), transparent) !important;
+}
+
+/* Info/Warning/Success boxes */
+div[data-testid="stInfo"], div[data-testid="stWarning"], div[data-testid="stSuccess"] {
+    border-radius: 12px !important;
+    padding: 1rem 1.2rem !important;
+    margin: 0.8rem 0 !important;
+    font-size: 0.85rem !important;
+    line-height: 1.6 !important;
+}
+div[data-testid="stInfo"] {
+    background: rgba(33,150,243,0.06) !important;
+    border: 1px solid rgba(33,150,243,0.15) !important;
+    border-left: 4px solid #2196F3 !important;
+}
+div[data-testid="stWarning"] {
+    background: rgba(255,152,0,0.06) !important;
+    border: 1px solid rgba(255,152,0,0.15) !important;
+    border-left: 4px solid #FF9800 !important;
+}
+
+/* StExpander */
+div[data-testid="stExpander"] {
+    border: 1px solid rgba(255,215,0,0.08) !important;
+    border-radius: 12px !important;
+    margin: 0.5rem 0 !important;
+    overflow: hidden;
+}
+div[data-testid="stExpander"] details {
+    background: rgba(255,255,255,0.02) !important;
+}
+div[data-testid="stExpander"] summary {
+    padding: 0.8rem 1rem !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+}
+
+/* Section captions */
+.stCaption {
+    color: var(--text-muted) !important;
+    font-size: 0.8rem !important;
+    font-style: italic;
+    margin-top: 0.3rem;
+}
+
 </style>
 """,
         unsafe_allow_html=True,
