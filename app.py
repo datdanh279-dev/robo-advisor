@@ -6541,19 +6541,25 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("---")
         st.write("## 💧 Liquidity Stress Test — Test thanh khoản (Position / ADTV)")
         market_data = st.session_state.get("chat_market_data") or []
-        if has_real and market_data and len(market_data) >= 5:
+        if dm and len(dm) >= 2:
             try:
                 liq_rows = []
+                _liq_has_real = "real_prices" in dir() and isinstance(real_prices, dict) and len(real_prices) >= 2
                 for ma, d in dm.items():
                     px = float(d.get("gia_thi_truong", 0))
                     sl = float(d.get("so_luong", 0))
                     vh = float(d.get("von_hoa", 0))
-                    if px <= 0 or sl <= 0 or ma not in real_prices or len(real_prices[ma]) < 20:
+                    if px <= 0 or sl <= 0:
                         continue
-                    rets = real_prices[ma].pct_change().dropna()
-                    vol_proxy = float(rets.tail(20).abs().mean()) * 1000
-                    adtv = max(vh * 0.005, vol_proxy * px, 100_000_000)
                     pos_value = px * sl
+                    if _liq_has_real and ma in real_prices and real_prices[ma] is not None and len(real_prices[ma]) >= 20:
+                        rets = real_prices[ma].pct_change().dropna()
+                        vol_proxy = float(rets.tail(20).abs().mean()) * 1000
+                        adtv = max(vh * 0.005, vol_proxy * px, 100_000_000)
+                    else:
+                        adtv = vh * 0.005
+                    if adtv <= 0:
+                        continue
                     days_to_liquidate = max(1, pos_value / adtv)
                     pct_of_adtv = pos_value / adtv
                     stress = "🟢 OK" if pct_of_adtv < 1 else ("🟡 Cẩn thận" if pct_of_adtv < 5 else ("🟠 Khó" if pct_of_adtv < 15 else "🔴 Rất khó"))
@@ -6562,7 +6568,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                         "Ngày bán hết": round(days_to_liquidate, 1), "Trạng thái": stress})
                 if liq_rows:
                     df_liq = pd.DataFrame(liq_rows).sort_values("% ADTV", ascending=False)
-                    st.write(f"**Test thanh khoản cho {len(df_liq)} mã. ADTV ước lượng = max(vốn hóa × 0.5%, vol×px, 100M₫). %ADTV > 5% = khó thoát hàng.**")
+                    src = "+ vol thật yfinance" if _liq_has_real else "ước lượng từ vốn hóa"
+                    st.write(f"**Test thanh khoản cho {len(df_liq)} mã. ADTV = {src}. %ADTV > 5% = khó thoát hàng.**")
                     st.dataframe(df_liq.head(20), use_container_width=True, hide_index=True)
                     n_warn = int((df_liq["% ADTV"] >= 5).sum())
                     n_bad = int((df_liq["% ADTV"] >= 15).sum())
@@ -6570,11 +6577,13 @@ elif st.session_state.trang_thai == "deep_analysis":
                     lq1.metric("🟢 Thoát hàng <1 ngày", f"{int((df_liq['% ADTV'] < 1).sum())}/{len(df_liq)}")
                     lq2.metric("🟡 Cảnh báo >5% ADTV", f"{n_warn}")
                     lq3.metric("🔴 Khó bán >15% ADTV", f"{n_bad}")
-                    st.caption("📐 **%ADTV = (Giá × Số lượng) / ADTV**. Nếu > 5% → khó thoát hàng trong 1 ngày mà không đẩy giá. Nếu > 15% → cần chia nhỏ lệnh bán nhiều ngày. Stress test giả định kịch bản bán tháo.")
+                    st.caption("📐 **%ADTV = (Giá × Số lượng) / ADTV**. Nếu > 5% → khó thoát hàng trong 1 ngày. Nếu > 15% → cần bán nhiều ngày.")
+                else:
+                    st.info("⚠️ Không có mã nào đủ dữ liệu (giá > 0, số lượng > 0) để test thanh khoản.")
             except Exception as _le:
                 st.caption(f"⚠️ Liquidity test lỗi: {str(_le)[:80]}")
         else:
-            st.info("⚠️ Cần DM + giá thật 6T + market_data để test thanh khoản.")
+            st.info("⚠️ Cần danh mục có ít nhất 2 mã để test thanh khoản.")
 
         st.write("---")
         st.write("## 🌍 Macro Sensitivity Matrix — Độ nhạy DM với biến vĩ mô")
