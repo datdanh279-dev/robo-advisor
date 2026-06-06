@@ -1,8 +1,8 @@
 import asyncio
-import aiohttp
 import json
 import logging
 import os
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ CHAIRMAN_SYSTEM_PROMPT = (
 )
 
 
-async def _call_openai(session, prompt, question, api_key, model="gpt-4o", timeout=45):
+def _call_openai(prompt, question, api_key, model="gpt-4o", timeout=45):
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
@@ -201,20 +201,20 @@ async def _call_openai(session, prompt, question, api_key, model="gpt-4o", timeo
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
     try:
-        async with session.post(
+        r = requests.post(
             "https://api.openai.com/v1/chat/completions",
-            json=payload, headers=headers,
-        ) as r:
-            if r.status == 200:
-                data = await r.json()
-                return data["choices"][0]["message"]["content"].strip()
-            logger.warning(f"OpenAI {model} status {r.status}")
+            json=payload, headers=headers, timeout=timeout,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            return data["choices"][0]["message"]["content"].strip()
+        logger.warning(f"OpenAI {model} status {r.status_code}")
     except Exception as e:
         logger.warning(f"OpenAI {model} error: {e}")
     return None
 
 
-async def _call_groq(session, prompt, question, api_key, model="llama-3.3-70b-versatile", timeout=90):
+def _call_groq(prompt, question, api_key, model="llama-3.3-70b-versatile", timeout=90):
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
@@ -222,17 +222,16 @@ async def _call_groq(session, prompt, question, api_key, model="llama-3.3-70b-ve
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
     try:
-        async with session.post(
+        r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
-            json=payload, headers=headers,
-        ) as r:
-            if r.status == 200:
-                data = await r.json()
-                return data["choices"][0]["message"]["content"].strip()
-            text = await r.text()
-            logger.warning(f"Groq {model} status {r.status}: {text[:200]}")
-            return f"⚠️ Groq API error (status {r.status})"
-    except asyncio.TimeoutError:
+            json=payload, headers=headers, timeout=timeout,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            return data["choices"][0]["message"]["content"].strip()
+        logger.warning(f"Groq {model} status {r.status_code}")
+        return f"⚠️ Groq API error (status {r.status_code})"
+    except requests.Timeout:
         logger.warning(f"Groq {model} timeout after {timeout}s")
         return f"⚠️ Groq API timeout after {timeout}s"
     except Exception as e:
@@ -240,23 +239,23 @@ async def _call_groq(session, prompt, question, api_key, model="llama-3.3-70b-ve
         return f"⚠️ Groq API error: {e}"
 
 
-async def _call_gemini(session, prompt, question, api_key, model="gemini-2.0-flash", timeout=45):
+def _call_gemini(prompt, question, api_key, model="gemini-2.0-flash", timeout=45):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     payload = {"contents": [{"parts": [{"text": f"{prompt}\n\nCâu hỏi: {question}"}]}]}
     try:
-        async with session.post(url, json=payload) as r:
-            if r.status == 200:
-                data = await r.json()
-                candidates = data.get("candidates", [])
-                if candidates:
-                    return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
-            logger.warning(f"Gemini status {r.status}")
+        r = requests.post(url, json=payload, timeout=timeout)
+        if r.status_code == 200:
+            data = r.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+        logger.warning(f"Gemini status {r.status_code}")
     except Exception as e:
         logger.warning(f"Gemini error: {e}")
     return None
 
 
-async def _call_openrouter(session, prompt, question, api_key, model, timeout=60):
+def _call_openrouter(prompt, question, api_key, model, timeout=60):
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
@@ -269,20 +268,20 @@ async def _call_openrouter(session, prompt, question, api_key, model, timeout=60
     }
     payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
     try:
-        async with session.post(
+        r = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
-            json=payload, headers=headers,
-        ) as r:
-            if r.status == 200:
-                data = await r.json()
-                return data["choices"][0]["message"]["content"].strip()
-            logger.warning(f"OpenRouter {model} status {r.status}")
+            json=payload, headers=headers, timeout=timeout,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            return data["choices"][0]["message"]["content"].strip()
+        logger.warning(f"OpenRouter {model} status {r.status_code}")
     except Exception as e:
         logger.warning(f"OpenRouter {model} error: {e}")
     return None
 
 
-async def _call_expert(session, expert, question, api_keys, semaphore, context=""):
+async def _call_expert(expert, question, api_keys, semaphore, context=""):
     prompt = expert["prompt"]
     if context:
         prompt = f"{prompt}\n\nDỮ LIỆU THỊ TRƯỜNG HIỆN TẠI:\n{context}"
@@ -297,7 +296,7 @@ async def _call_expert(session, expert, question, api_keys, semaphore, context="
                 return "❌ OPENAI_API_KEY chưa được cấu hình."
             kwargs["api_key"] = api_key
             kwargs["model"] = expert["model"]
-            result = await _call_openai(session, **kwargs)
+            result = await asyncio.to_thread(_call_openai, **kwargs)
 
         elif expert["backend"] == "groq":
             api_key = api_keys.get("groq")
@@ -305,7 +304,7 @@ async def _call_expert(session, expert, question, api_keys, semaphore, context="
                 return "❌ GROQ_API_KEY chưa được cấu hình.\n\nLấy key miễn phí tại https://console.groq.com/keys (không cần thẻ tín dụng)."
             kwargs["api_key"] = api_key
             kwargs["model"] = expert["model"]
-            result = await _call_groq(session, **kwargs)
+            result = await asyncio.to_thread(_call_groq, **kwargs)
 
         elif expert["backend"] == "gemini":
             api_key = api_keys.get("gemini")
@@ -313,7 +312,7 @@ async def _call_expert(session, expert, question, api_keys, semaphore, context="
                 return "❌ GEMINI_API_KEY chưa được cấu hình."
             kwargs["api_key"] = api_key
             kwargs["model"] = expert["model"]
-            result = await _call_gemini(session, **kwargs)
+            result = await asyncio.to_thread(_call_gemini, **kwargs)
 
         elif expert["backend"] == "openrouter":
             api_key = api_keys.get("openrouter")
@@ -321,7 +320,7 @@ async def _call_expert(session, expert, question, api_keys, semaphore, context="
                 return "❌ OPENROUTER_API_KEY chưa được cấu hình.\n\nDùng OpenRouter (https://openrouter.ai) để truy cập Qwen, DeepSeek, Claude, và các model khác."
             kwargs["api_key"] = api_key
             kwargs["model"] = expert["model"]
-            result = await _call_openrouter(session, **kwargs)
+            result = await asyncio.to_thread(_call_openrouter, **kwargs)
 
         else:
             result = None
@@ -329,7 +328,7 @@ async def _call_expert(session, expert, question, api_keys, semaphore, context="
         return result or f"⚠️ {expert['name']} không thể trả lời ngay lúc này."
 
 
-async def _call_chairman(session, question, expert_results, api_key, api_keys):
+def _call_chairman(question, expert_results, api_key, api_keys):
     global _CHAIRMAN_ATTEMPTED
     _CHAIRMAN_ATTEMPTED = False
 
@@ -348,14 +347,14 @@ async def _call_chairman(session, question, expert_results, api_key, api_keys):
         groq_headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
         groq_payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
         try:
-            async with session.post(
+            r = requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
-                json=groq_payload, headers=groq_headers,
-            ) as r:
-                if r.status == 200:
-                    data = await r.json()
-                    return data["choices"][0]["message"]["content"].strip()
-                logger.warning(f"Chairman Groq status {r.status}")
+                json=groq_payload, headers=groq_headers, timeout=60,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                return data["choices"][0]["message"]["content"].strip()
+            logger.warning(f"Chairman Groq status {r.status_code}")
         except Exception as e:
             logger.warning(f"Chairman Groq error: {e}")
         _CHAIRMAN_ATTEMPTED = True
@@ -366,14 +365,14 @@ async def _call_chairman(session, question, expert_results, api_key, api_keys):
         headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
         payload = {"model": "gpt-4o", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
         try:
-            async with session.post(
+            r = requests.post(
                 "https://api.openai.com/v1/chat/completions",
-                json=payload, headers=headers,
-            ) as r:
-                if r.status == 200:
-                    data = await r.json()
-                    return data["choices"][0]["message"]["content"].strip()
-                logger.warning(f"Chairman OpenAI status {r.status}")
+                json=payload, headers=headers, timeout=60,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                return data["choices"][0]["message"]["content"].strip()
+            logger.warning(f"Chairman OpenAI status {r.status_code}")
         except Exception as e:
             logger.warning(f"Chairman OpenAI error: {e}")
         _CHAIRMAN_ATTEMPTED = True
@@ -394,14 +393,14 @@ async def _call_chairman(session, question, expert_results, api_key, api_keys):
             "max_tokens": 1500,
         }
         try:
-            async with session.post(
+            r = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
-                json=or_payload, headers=or_headers,
-            ) as r:
-                if r.status == 200:
-                    data = await r.json()
-                    return data["choices"][0]["message"]["content"].strip()
-                logger.warning(f"Chairman OpenRouter status {r.status}")
+                json=or_payload, headers=or_headers, timeout=60,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                return data["choices"][0]["message"]["content"].strip()
+            logger.warning(f"Chairman OpenRouter status {r.status_code}")
         except Exception as e:
             logger.warning(f"Chairman OpenRouter error: {e}")
 
@@ -511,35 +510,34 @@ async def _run_expert_panel_async(question, api_keys, thi_truong_context=""):
         can_chon = {e["id"] for e in EXPERTS}
         logger.info("Chế độ TOÀN DIỆN: gọi cả 6 chuyên gia + Chủ tịch")
 
-    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=None)) as session:
-        expert_tasks = []
-        expert_ids = []
-        for exp in EXPERTS:
-            if exp["id"] in can_chon:
-                expert_tasks.append(_call_expert(session, exp, question, api_keys, semaphore, thi_truong_context))
-                expert_ids.append(exp["id"])
+    expert_tasks = []
+    expert_ids = []
+    for exp in EXPERTS:
+        if exp["id"] in can_chon:
+            expert_tasks.append(_call_expert(exp, question, api_keys, semaphore, thi_truong_context))
+            expert_ids.append(exp["id"])
 
-        raw = {}
-        if expert_tasks:
-            results = await asyncio.gather(*expert_tasks)
-            for eid, result in zip(expert_ids, results):
-                raw[eid] = result
+    raw = {}
+    if expert_tasks:
+        results = await asyncio.gather(*expert_tasks)
+        for eid, result in zip(expert_ids, results):
+            raw[eid] = result
 
-        # Build full list: called experts get their result, others get placeholder
-        expert_results = []
-        for exp in EXPERTS:
-            if exp["id"] in raw:
-                expert_results.append(raw[exp["id"]])
-            else:
-                expert_results.append(f"⏭️ {exp['name']} — chuyên gia không cần thiết cho câu hỏi này.")
+    # Build full list: called experts get their result, others get placeholder
+    expert_results = []
+    for exp in EXPERTS:
+        if exp["id"] in raw:
+            expert_results.append(raw[exp["id"]])
+        else:
+            expert_results.append(f"⏭️ {exp['name']} — chuyên gia không cần thiết cho câu hỏi này.")
 
-        chairman_result = None
-        chairman_key = api_keys.get("groq") or api_keys.get("openai")
-        if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
-            try:
-                chairman_result = await _call_chairman(session, question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
-            except Exception as e:
-                logger.warning(f"Chairman failed: {e}")
+    chairman_result = None
+    chairman_key = api_keys.get("groq") or api_keys.get("openai")
+    if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
+        try:
+            chairman_result = await asyncio.to_thread(_call_chairman, question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
+        except Exception as e:
+            logger.warning(f"Chairman failed: {e}")
 
     return {
         "experts": [{"id": e["id"], "name": e["name"], "title": e["title"], "color": e["color"], "response": r} for e, r in zip(EXPERTS, expert_results)],
