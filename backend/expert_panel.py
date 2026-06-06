@@ -223,28 +223,34 @@ def _call_openai(prompt, question, api_key, model="gpt-4o", timeout=45):
 def _call_groq(prompt, question, api_key, model="llama-3.3-70b-versatile", timeout=90):
     import http.client
     import ssl
+    import time as _time
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
     ]
     payload = json.dumps({"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}).encode()
-    try:
-        ctx = ssl.create_default_context()
-        conn = http.client.HTTPSConnection("api.groq.com", timeout=timeout, context=ctx)
-        conn.request("POST", "/openai/v1/chat/completions",
-                      body=payload,
-                      headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
-        r = conn.getresponse()
-        body = r.read()
-        if r.status == 200:
-            data = json.loads(body)
-            return data["choices"][0]["message"]["content"].strip()
-        logger.warning(f"Groq {model} status {r.status}")
-        return f"⚠️ Groq API error (status {r.status})"
-    except Exception as e:
-        tb = traceback.format_exc()
-        logger.warning(f"Groq {model} error: {e}\n{tb}")
-        return f"⚠️ Groq API error: {e}"
+    for attempt in range(3):
+        try:
+            ctx = ssl.create_default_context()
+            conn = http.client.HTTPSConnection("api.groq.com", timeout=timeout, context=ctx)
+            conn.request("POST", "/openai/v1/chat/completions",
+                          body=payload,
+                          headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+            r = conn.getresponse()
+            body = r.read()
+            if r.status == 200:
+                data = json.loads(body)
+                return data["choices"][0]["message"]["content"].strip()
+            elif r.status == 429 and attempt < 2:
+                _time.sleep(3 * (attempt + 1))  # retry: 3s, 6s
+                continue
+            logger.warning(f"Groq {model} status {r.status}")
+            return f"⚠️ Groq API error (status {r.status})" if r.status != 429 else "⚠️ Groq đang quá tải, vui lòng thử lại sau."
+        except Exception as e:
+            tb = traceback.format_exc()
+            logger.warning(f"Groq {model} error: {e}\n{tb}")
+            return f"⚠️ Groq API error: {e}"
+    return "⚠️ Groq API error (status 429 - đã thử lại 3 lần)"
 
 
 def _call_gemini(prompt, question, api_key, model="gemini-2.0-flash", timeout=45):
@@ -358,23 +364,28 @@ def _call_chairman(question, expert_results, api_key, api_keys):
     messages = [{"role": "user", "content": prompt}]
     payload_body = json.dumps({"messages": messages, "temperature": 0.5, "max_tokens": 1500})
 
-    # Try Groq first (free, Llama 3.3 70B)
+    # Try Groq first (free, Llama 3.3 70B) with retry
     groq_key = api_keys.get("groq")
     if groq_key:
-        try:
-            ctx = ssl.create_default_context()
-            conn = http.client.HTTPSConnection("api.groq.com", timeout=60, context=ctx)
-            conn.request("POST", "/openai/v1/chat/completions",
-                          body=json.dumps({"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
-                          headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
-            r = conn.getresponse()
-            body = r.read()
-            if r.status == 200:
-                data = json.loads(body)
-                return data["choices"][0]["message"]["content"].strip()
-            logger.warning(f"Chairman Groq status {r.status}")
-        except Exception as e:
-            logger.warning(f"Chairman Groq error: {e}")
+        for attempt in range(3):
+            try:
+                ctx = ssl.create_default_context()
+                conn = http.client.HTTPSConnection("api.groq.com", timeout=60, context=ctx)
+                conn.request("POST", "/openai/v1/chat/completions",
+                              body=json.dumps({"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
+                              headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
+                r = conn.getresponse()
+                body = r.read()
+                if r.status == 200:
+                    data = json.loads(body)
+                    return data["choices"][0]["message"]["content"].strip()
+                elif r.status == 429 and attempt < 2:
+                    time.sleep(4 * (attempt + 1))  # retry: 4s, 8s
+                    continue
+                logger.warning(f"Chairman Groq status {r.status}")
+            except Exception as e:
+                logger.warning(f"Chairman Groq error: {e}")
+            break
         _CHAIRMAN_ATTEMPTED = True
 
     # Try OpenAI (best for chairman role)
@@ -517,12 +528,12 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
         can_chon = {e["id"] for e in EXPERTS}
         logger.info("Chế độ TOÀN DIỆN: gọi cả 6 chuyên gia + Chủ tịch")
 
-    # Gọi TUẦN TỰ — mỗi lần 1 chuyên gia để tránh race condition trong http.client
+    # Gọi TUẦN TỰ — mỗi lần 1 chuyên gia, cách nhau 1s để tránh rate limit
     raw = {}
     for exp in EXPERTS:
         if exp["id"] not in can_chon:
             continue
-        time.sleep(0.3)  # Stagger 300ms giữa các request
+        time.sleep(1)  # Stagger 1s giữa các request
         try:
             raw[exp["id"]] = _call_expert(exp, question, api_keys, thi_truong_context)
         except Exception as exc:
@@ -540,7 +551,7 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
     chairman_result = None
     chairman_key = api_keys.get("groq") or api_keys.get("openai")
     if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
-        time.sleep(2)  # Chờ 2s để rate limit hồi phục trước khi gọi Chủ tịch
+        time.sleep(3)  # Chờ 3s để rate limit hồi phục trước khi gọi Chủ tịch
         try:
             chairman_result = _call_chairman(question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
         except Exception as e:
