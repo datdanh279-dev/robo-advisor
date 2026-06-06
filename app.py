@@ -662,6 +662,13 @@ console.log = function() {
     if (_blocked.some(b => msg.includes(b))) return;
     _origLog.apply(console, arguments);
 };
+window.addEventListener('error', function(e) {
+    if (e && e.message && e.message.indexOf('removeChild') > -1) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+});
 </script>
 <style>
 :root {
@@ -8886,9 +8893,9 @@ elif st.session_state.trang_thai == "dashboard":
 elif st.session_state.trang_thai == "chat":
     st.markdown('<div class="main-header" style="font-size:1.8rem;font-weight:700;color:#FFD700;margin:0.5rem 0;">💬 Chat với Robo-Advisor</div>', unsafe_allow_html=True)
 
-    tab_chat, tab_expert = st.tabs(["💬 Chat", "👑 Hội đồng Chuyên gia"])
+    tab_chat_v2, tab_expert_v2 = st.tabs(["💬 Chat", "👑 Hội đồng Chuyên gia"])
 
-    with tab_chat:
+    with tab_chat_v2:
         st.markdown("Hỏi tôi về đầu tư, cổ phiếu, vàng, bất động sản, hay bất kỳ chủ đề tài chính nào! 🤖💡")
         st.markdown("💡 *Tôi hiểu được: phân tích DM của bạn, top mã tăng/giảm hôm nay, vol đột biến, gợi ý phân bổ vốn theo hồ sơ rủi ro...*")
         st.markdown("---")
@@ -8988,109 +8995,110 @@ elif st.session_state.trang_thai == "chat":
                 st.session_state.chat_history = []
                 st.rerun()
 
-    with tab_expert:
-        try:
-            st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
-            st.markdown(
-                "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại** do AI đóng vai. "
-                "Chủ tịch Hội đồng sẽ tổng hợp và chọn ra phương án tốt nhất."
-            )
-            st.markdown("---")
-            _expert_chips_html = '<div style="margin:6px 0 14px 0;line-height:2.2;">'
-            for exp in [
-                {"name": "Warren Buffett", "title": "Nhà đầu tư giá trị", "color": "#4CAF50"},
-                {"name": "George Soros", "title": "Nhà đầu cơ vĩ đại", "color": "#2196F3"},
-                {"name": "Peter Lynch", "title": "Chuyên gia tăng trưởng", "color": "#FF9800"},
-                {"name": "Ray Dalio", "title": "Chiến lược vĩ mô", "color": "#9C27B0"},
-                {"name": "Benjamin Graham", "title": "Cha đẻ đầu tư giá trị", "color": "#607D8B"},
-                {"name": "Charlie Munger", "title": "Triết gia đầu tư", "color": "#795548"},
-            ]:
-                _expert_chips_html += (
-                    f'<span style="display:inline-block;background:rgba(255,255,255,0.04);'
-                    f'border:1px solid rgba(255,215,0,0.1);border-radius:20px;padding:4px 14px;margin:3px 4px;'
-                    f'font-size:0.8rem;white-space:nowrap;">'
-                    f'<b style="color:{exp["color"]};">{exp["name"]}</b>'
-                    f'<span style="color:#8892B0;margin-left:6px;">— {exp["title"]}</span></span>'
+    if tab_expert_v2 is not None:
+        with tab_expert_v2:
+            try:
+                st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
+                st.markdown(
+                    "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại** do AI đóng vai. "
+                    "Chủ tịch Hội đồng sẽ tổng hợp và chọn ra phương án tốt nhất."
                 )
-            _expert_chips_html += '</div>'
-            st.markdown(_expert_chips_html, unsafe_allow_html=True)
-            st.markdown("---")
+                st.markdown("---")
+                _expert_chips_html = '<div style="margin:6px 0 14px 0;line-height:2.2;">'
+                for exp in [
+                    {"name": "Warren Buffett", "title": "Nhà đầu tư giá trị", "color": "#4CAF50"},
+                    {"name": "George Soros", "title": "Nhà đầu cơ vĩ đại", "color": "#2196F3"},
+                    {"name": "Peter Lynch", "title": "Chuyên gia tăng trưởng", "color": "#FF9800"},
+                    {"name": "Ray Dalio", "title": "Chiến lược vĩ mô", "color": "#9C27B0"},
+                    {"name": "Benjamin Graham", "title": "Cha đẻ đầu tư giá trị", "color": "#607D8B"},
+                    {"name": "Charlie Munger", "title": "Triết gia đầu tư", "color": "#795548"},
+                ]:
+                    _expert_chips_html += (
+                        f'<span style="display:inline-block;background:rgba(255,255,255,0.04);'
+                        f'border:1px solid rgba(255,215,0,0.1);border-radius:20px;padding:4px 14px;margin:3px 4px;'
+                        f'font-size:0.8rem;white-space:nowrap;">'
+                        f'<b style="color:{exp["color"]};">{exp["name"]}</b>'
+                        f'<span style="color:#8892B0;margin-left:6px;">— {exp["title"]}</span></span>'
+                    )
+                _expert_chips_html += '</div>'
+                st.markdown(_expert_chips_html, unsafe_allow_html=True)
+                st.markdown("---")
 
-            if "expert_results" not in st.session_state:
-                st.session_state.expert_results = None
-
-            with st.form(key="expert_form", clear_on_submit=True):
-                cau_hoi = st.text_input(
-                    "Câu hỏi của bạn:",
-                    placeholder="VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
-                    key="expert_question",
-                    label_visibility="collapsed",
-                )
-                submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
-                if submitted and cau_hoi:
-                    _status = st.status("🧠 Đang kết nối 6 chuyên gia AI...", expanded=True)
-                    try:
-                        _status.update(label="🧠 Đang gửi câu hỏi cho 6 chuyên gia (có thể mất 30-90 giây)...")
-                        results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
-                        _status.update(label="✅ Hoàn tất!", state="complete")
-                        if results and isinstance(results, dict) and results.get("experts"):
-                            st.session_state.expert_results = results
-                            st.session_state.expert_status = "ok"
-                            st.session_state.expert_mode = results.get("mode", "cao_cap")
-                        else:
-                            st.session_state.expert_results = results
-                            st.session_state.expert_status = "empty"
-                    except Exception as _expert_err:
-                        _status.update(label="❌ Lỗi", state="error")
-                        st.session_state.expert_status = "error"
-                        st.session_state.expert_error = str(_expert_err)
-                    try:
-                        _status.empty()
-                    except Exception:
-                        pass
-
-            if st.session_state.get("expert_status") == "ok":
-                _mode = st.session_state.get("expert_mode", "cao_cap")
-                _mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
-                st.write(f"✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}")
-            elif st.session_state.get("expert_status") == "empty":
-                st.write("⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.")
-            elif st.session_state.get("expert_status") == "error":
-                _err = st.session_state.get("expert_error", "Lỗi không xác định")
-                st.write(f"❌ Lỗi khi gọi Hội đồng Chuyên gia: {_err}")
-                st.write("Vui lòng thử lại hoặc dùng tab Chat bên cạnh.")
-
-            if st.session_state.expert_results:
-                results = st.session_state.expert_results
-                if not isinstance(results, dict) or "experts" not in results:
-                    st.warning("⚠️ Kết quả không hợp lệ. Vui lòng thử lại.")
+                if "expert_results" not in st.session_state:
                     st.session_state.expert_results = None
-                else:
-                    st.markdown("---")
-                    st.markdown("### 🗳️ Ý kiến Chuyên gia")
 
-                    cols = st.columns(3)
-                    for i, expert in enumerate(results["experts"]):
-                        with cols[i % 3]:
-                            resp = expert.get("response") or "⚠️ Không có phản hồi."
-                            with st.expander(
-                                f"**{expert.get('name', 'Chuyên gia')}** — {expert.get('title', '')}",
-                                expanded=(i < 3),
-                            ):
-                                st.write(resp)
+                with st.form(key="expert_form", clear_on_submit=True):
+                    cau_hoi = st.text_input(
+                        "Câu hỏi của bạn:",
+                        placeholder="VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
+                        key="expert_question",
+                        label_visibility="collapsed",
+                    )
+                    submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
+                    if submitted and cau_hoi:
+                        _status = st.status("🧠 Đang kết nối 6 chuyên gia AI...", expanded=True)
+                        try:
+                            _status.update(label="🧠 Đang gửi câu hỏi cho 6 chuyên gia (có thể mất 30-90 giây)...")
+                            results = hoi_dong_chuyen_gia(cau_hoi, groq_key_override=_GROQ_KEY, docs=DOCS)
+                            _status.update(label="✅ Hoàn tất!", state="complete")
+                            if results and isinstance(results, dict) and results.get("experts"):
+                                st.session_state.expert_results = results
+                                st.session_state.expert_status = "ok"
+                                st.session_state.expert_mode = results.get("mode", "cao_cap")
+                            else:
+                                st.session_state.expert_results = results
+                                st.session_state.expert_status = "empty"
+                        except Exception as _expert_err:
+                            _status.update(label="❌ Lỗi", state="error")
+                            st.session_state.expert_status = "error"
+                            st.session_state.expert_error = str(_expert_err)
+                        try:
+                            _status.empty()
+                        except Exception:
+                            pass
 
-                    chairman = results.get("chairman")
-                    if chairman:
-                        st.write("---")
-                        st.write("#### 👑 Kết luận của Chủ tịch Hội đồng")
-                        st.write(chairman)
+                if st.session_state.get("expert_status") == "ok":
+                    _mode = st.session_state.get("expert_mode", "cao_cap")
+                    _mode_labels = {"don_gian": "⚡ Tiết kiệm (2 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (4 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
+                    st.write(f"✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}")
+                elif st.session_state.get("expert_status") == "empty":
+                    st.write("⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.")
+                elif st.session_state.get("expert_status") == "error":
+                    _err = st.session_state.get("expert_error", "Lỗi không xác định")
+                    st.write(f"❌ Lỗi khi gọi Hội đồng Chuyên gia: {_err}")
+                    st.write("Vui lòng thử lại hoặc dùng tab Chat bên cạnh.")
 
-                if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
-                    st.session_state.expert_results = None
-                    st.rerun()
-        except Exception as _tab_err:
-            st.error(f"❌ Lỗi tab Chuyên gia: {_tab_err}")
-            st.info("Vui lòng thử lại hoặc dùng tab Chat.")
+                if st.session_state.expert_results:
+                    results = st.session_state.expert_results
+                    if not isinstance(results, dict) or "experts" not in results:
+                        st.warning("⚠️ Kết quả không hợp lệ. Vui lòng thử lại.")
+                        st.session_state.expert_results = None
+                    else:
+                        st.markdown("---")
+                        st.markdown("### 🗳️ Ý kiến Chuyên gia")
+
+                        cols = st.columns(3)
+                        for i, expert in enumerate(results["experts"]):
+                            with cols[i % 3]:
+                                resp = expert.get("response") or "⚠️ Không có phản hồi."
+                                with st.expander(
+                                    f"**{expert.get('name', 'Chuyên gia')}** — {expert.get('title', '')}",
+                                    expanded=(i < 3),
+                                ):
+                                    st.write(resp)
+
+                        chairman = results.get("chairman")
+                        if chairman:
+                            st.write("---")
+                            st.write("#### 👑 Kết luận của Chủ tịch Hội đồng")
+                            st.write(chairman)
+
+                    if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
+                        st.session_state.expert_results = None
+                        st.rerun()
+            except Exception as _tab_err:
+                st.error(f"❌ Lỗi tab Chuyên gia: {_tab_err}")
+                st.info("Vui lòng thử lại hoặc dùng tab Chat.")
 
 
 
