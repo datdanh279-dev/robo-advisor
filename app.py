@@ -259,9 +259,9 @@ header[data-testid="stHeader"] { visibility: hidden; height: 0; }
     text-shadow: 0 0 60px rgba(255,215,0,0.15);
 }
 .login-subtitle {
-    color: #8E8E9A; font-size: 0.85rem; margin-bottom: 2rem;
-    letter-spacing: 4px; text-transform: uppercase;
-    font-weight: 300;
+    color: #9AABB8; font-size: 0.9rem; margin-bottom: 2rem;
+    letter-spacing: 3px; text-transform: uppercase;
+    font-weight: 400;
 }
 .login-box {
     background: rgba(8,14,26,0.7);
@@ -312,7 +312,7 @@ header[data-testid="stHeader"] { visibility: hidden; height: 0; }
     box-shadow: 0 0 30px rgba(255,215,0,0.08) !important;
 }
 .login-box .stTextInput input::placeholder {
-    color: #8E8E9A !important;
+    color: #9AABB8 !important;
 }
 .login-box .stButton > button {
     background: linear-gradient(135deg, #FFD700, #C9A84C, #B8860B) !important;
@@ -355,7 +355,7 @@ def hien_thi_login():
         '<div class="login-title">🤖 Robo-Advisor</div>'
         '<div class="login-subtitle">Đầu tư thông minh · Quản lý tài sản cá nhân</div>'
         f'<div style="margin:0 auto 1.5rem;max-width:320px;background:rgba(255,215,0,0.05);border-radius:20px;padding:0.8rem 1rem;border:1px solid rgba(255,215,0,0.1);">'
-        f'<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#8E8E9A;margin-bottom:6px;">'
+        f'<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:#9AABB8;margin-bottom:6px;">'
         f'<span>🎯 Beta {registered_count}/{max_slots}</span>'
         f'<span>{remaining} chỗ trống</span></div>'
         f'<div style="height:4px;background:rgba(255,215,0,0.1);border-radius:4px;overflow:hidden;">'
@@ -583,7 +583,7 @@ with st.sidebar:
         st.markdown(
             '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.12),rgba(201,168,76,0.04));'
             'border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:10px 14px;margin:4px 0 8px 0;">'
-            '<div style="color:#8E8E9A;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;">Tài khoản</div>'
+            '<div style="color:#9AABB8;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;">Tài khoản</div>'
             '<div style="color:#FFD700;font-size:1.05rem;font-weight:600;">👑 Đặc quyền Founder</div>'
             '<div style="color:#C9A84C;font-size:0.75rem;margin-top:2px;">Toàn quyền PRO — miễn phí trọn đời</div>'
             '</div>',
@@ -598,7 +598,7 @@ with st.sidebar:
         st.markdown(
             '<div style="background:rgba(142,142,154,0.08);border:1px solid rgba(142,142,154,0.2);'
             'border-radius:10px;padding:8px 14px;margin:4px 0 8px 0;">'
-            '<span style="color:#8E8E9A;font-size:0.75rem;">Tài khoản: </span>'
+            '<span style="color:#9AABB8;font-size:0.75rem;">Tài khoản: </span>'
             '<b style="color:#ECE8E1;">GÓI TIÊU CHUẨN</b></div>',
             unsafe_allow_html=True,
         )
@@ -671,10 +671,22 @@ console.log = function() {
     --gold-light: #FFE55C;
     --gold-dark: #B8860B;
     --cream: #ECE8E1;
-    --text-muted: #8E8E9A;
+    --text-muted: #9AABB8;
     --prosperity: #00C9A7;
     --bg-dark: #02050E;
     --bg-card: rgba(10,17,31,0.85);
+}
+
+* {
+    font-family: 'Inter', 'Nunito', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+html, body, .stApp, [data-testid="stAppViewContainer"] {
+    font-size: 16px;
+    line-height: 1.7;
+}
+p, li, div, span, label, .stMarkdown, .stText {
+    font-size: 15px;
+    line-height: 1.7;
 }
 
 .main-header {
@@ -688,10 +700,10 @@ console.log = function() {
     letter-spacing: 0.5px;
 }
 .sub-header {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: var(--text-muted);
-    font-weight: 300;
-    letter-spacing: 3px;
+    font-weight: 400;
+    letter-spacing: 2px;
     text-transform: uppercase;
 }
 .vip-badge {
@@ -702,7 +714,7 @@ console.log = function() {
     border: 1px solid rgba(255,215,0,0.2);
     border-radius: 20px;
     padding: 4px 14px;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--gold);
     text-transform: uppercase;
@@ -890,7 +902,7 @@ div[data-testid="stSidebar"] {
     box-shadow: 0 3px 14px rgba(0,0,0,0.2);
 }
 .da-metric .da-label {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 1.5px;
@@ -966,7 +978,7 @@ div[data-testid="stMetricValue"] {
 }
 div[data-testid="stMetricLabel"] {
     color: var(--text-muted) !important;
-    font-size: 0.75rem !important;
+    font-size: 0.8rem !important;
     letter-spacing: 1px;
     text-transform: uppercase;
 }
@@ -1051,7 +1063,7 @@ with sidebar:
         st.markdown(
             f'<div style="background:linear-gradient(135deg,rgba(255,215,0,0.08),rgba(201,168,76,0.03));'
             f'border:1px solid rgba(255,215,0,0.2);border-radius:12px;padding:0.6rem 1rem;text-align:center;">'
-            f'<span style="font-size:0.6rem;color:#8E8E9A;text-transform:uppercase;letter-spacing:1px;">Thành viên</span><br>'
+            f'<span style="font-size:0.6rem;color:#9AABB8;text-transform:uppercase;letter-spacing:1px;">Thành viên</span><br>'
             f'<span style="font-size:1.1rem;">👑 <b style="color:#FFD700;">Founding Member</b></span><br>'
             f'<span style="font-size:0.7rem;color:#C9A84C;">#{slot}/100</span>'
             f'</div>',
@@ -1062,7 +1074,7 @@ with sidebar:
         st.markdown(
             f'<div style="background:rgba(255,215,0,0.03);border:1px solid rgba(255,215,0,0.08);'
             f'border-radius:12px;padding:0.4rem 1rem;text-align:center;">'
-            f'<span style="font-size:0.7rem;color:#8E8E9A;">Beta <b style="color:#FFD700;">{reg_count}/{max_slots}</b></span>'
+            f'<span style="font-size:0.7rem;color:#9AABB8;">Beta <b style="color:#FFD700;">{reg_count}/{max_slots}</b></span>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1094,7 +1106,7 @@ with sidebar:
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:#8E8E9A;">'
+        '<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:#9AABB8;">'
         '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#FFC107;box-shadow:0 0 4px #FFC107;"></span>'
         'Dữ liệu thị trường: <b style="color:#FFC107;">Delayed 15-20 phút</b> (miễn phí) — '
         'Nâng cấp Realtime với Premium'
@@ -1128,10 +1140,10 @@ with sidebar:
         "không phải khuyến nghị đầu tư. Mọi quyết định đầu tư thuộc về trách nhiệm của người dùng."
     )
     st.markdown(
-        '<div style="font-size:0.7rem;color:#8E8E9A;margin-top:4px;">'
-        '📜 <a href="#terms" style="color:#8E8E9A;">Điều khoản</a> · '
-        '🔒 <a href="#privacy" style="color:#8E8E9A;">Bảo mật</a> · '
-        '⚖️ <a href="#disclaimer" style="color:#8E8E9A;">Miễn trừ</a></div>',
+        '<div style="font-size:0.7rem;color:#9AABB8;margin-top:4px;">'
+        '📜 <a href="#terms" style="color:#9AABB8;">Điều khoản</a> · '
+        '🔒 <a href="#privacy" style="color:#9AABB8;">Bảo mật</a> · '
+        '⚖️ <a href="#disclaimer" style="color:#9AABB8;">Miễn trừ</a></div>',
         unsafe_allow_html=True,
     )
 
@@ -1142,7 +1154,7 @@ with sidebar:
 _themes = {
     "sepia": {
         "bg_main": "#F5EFE0", "bg_card": "rgba(255,250,238,0.92)", "bg_card2": "rgba(245,235,215,0.85)",
-        "bg_input": "#FFFCF0", "text_main": "#3E2723", "text_muted": "#7A6855", "cream": "#3E2723",
+        "bg_input": "#FFFCF0", "text_main": "#3E2723", "text_muted": "#8B7A66", "cream": "#3E2723",
         "gold": "#B45309", "gold_light": "#D97706", "gold_dark": "#92400E",
         "prosperity": "#15803D", "border": "rgba(180,83,9,0.15)", "border_strong": "rgba(180,83,9,0.3)",
         "shadow": "rgba(120,80,30,0.12)", "text_shadow": "none",
@@ -1168,7 +1180,7 @@ _themes = {
     },
     "dark": {
         "bg_main": "#0F172A", "bg_card": "rgba(30,41,59,0.85)", "bg_card2": "rgba(15,23,42,0.95)",
-        "bg_input": "#1E293B", "text_main": "#E2E8F0", "text_muted": "#94A3B8", "cream": "#E2E8F0",
+        "bg_input": "#1E293B", "text_main": "#F1F5F9", "text_muted": "#A5B8CC", "cream": "#E2E8F0",
         "gold": "#FBBF24", "gold_light": "#FCD34D", "gold_dark": "#D97706",
         "prosperity": "#34D399", "border": "rgba(148,163,184,0.15)", "border_strong": "rgba(148,163,184,0.3)",
         "shadow": "rgba(0,0,0,0.4)", "text_shadow": "none",
@@ -2369,7 +2381,7 @@ def _render_tonghop():
                             f'padding:8px 12px;margin:6px 0;border-radius:4px;">'
                             f'<a href="{tin["link"]}" target="_blank" style="color:#FFD700;text-decoration:none;font-weight:600;">'
                             f'📰 {tin["tieu_de"][:120]}</a><br>'
-                            f'<small style="color:#8E8E9A;">🕐 {tin["ngay"][:25] if tin["ngay"] else ""}</small>'
+                            f'<small style="color:#9AABB8;">🕐 {tin["ngay"][:25] if tin["ngay"] else ""}</small>'
                             f'</div>',
                             unsafe_allow_html=True,
                         )
@@ -2406,7 +2418,7 @@ def _render_tonghop():
                     f'padding:8px 12px;margin:6px 0;border-radius:4px;">'
                     f'<b style="color:{c};">[{s["loai"]}]</b> '
                     f'<b>{s["ma"]}</b> — {s["noi_dung"]}<br>'
-                    f'<small style="color:#8E8E9A;">📅 {s["ngay"]}</small>'
+                    f'<small style="color:#9AABB8;">📅 {s["ngay"]}</small>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -2839,8 +2851,8 @@ if st.session_state.is_pro:
     )
 else:
     st.markdown(
-        '<div style="background:#ECE8E10a;border:1px solid #8E8E9A33;border-radius:10px;'
-        'padding:8px 16px;margin-bottom:12px;font-size:0.85rem;color:#8E8E9A;">'
+        '<div style="background:#ECE8E10a;border:1px solid #9AABB833;border-radius:10px;'
+        'padding:8px 16px;margin-bottom:12px;font-size:0.85rem;color:#9AABB8;">'
         'Đang dùng <b style="color:#ECE8E1;">GÓI TIÊU CHUẨN</b> — mở khóa <b style="color:#FFD700;">GÓI PRO</b> tại Sidebar để dùng tính năng VIP.'
         '</div>',
         unsafe_allow_html=True,
