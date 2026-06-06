@@ -3028,6 +3028,97 @@ elif st.session_state.trang_thai == "portfolio":
         st.info("Chưa có dữ liệu danh mục. Hãy cập nhật dữ liệu trước.")
 
 elif st.session_state.trang_thai == "deep_analysis":
+    # ============================================
+    # HELPER FUNCTIONS — Tính toán 1 lần, dùng nhiều nơi
+    # Phase 24-25-26: gộp sections trùng + số ước lượng
+    # ============================================
+    def _compute_drawdown(eq_series):
+        if eq_series is None or len(eq_series) < 2:
+            return None
+        try:
+            eq = pd.Series(eq_series) if not isinstance(eq_series, pd.Series) else eq_series
+            running_max = eq.cummax()
+            dd = (eq - running_max) / running_max
+            max_dd = float(dd.min())
+            max_dd_pct = max_dd * 100
+            current_dd = float(dd.iloc[-1]) * 100
+            dd_duration = 0
+            try:
+                peak_idx = running_max.idxmax()
+                after_peak = dd.loc[peak_idx:]
+                recovered = after_peak[after_peak >= 0]
+                dd_duration = int((recovered.index[0] - peak_idx).days) if len(recovered) > 0 else int((eq.index[-1] - peak_idx).days)
+            except Exception:
+                pass
+            return {"drawdown": dd, "max_dd_pct": max_dd_pct, "current_dd_pct": current_dd,
+                "dd_duration_days": dd_duration, "max_dd_idx": dd.idxmin()}
+        except Exception:
+            return None
+
+    def _compute_all_ratios(eq_series, bench_series=None, risk_free=0.05):
+        if eq_series is None or len(eq_series) < 20:
+            return None
+        try:
+            eq = pd.Series(eq_series) if not isinstance(eq_series, pd.Series) else eq_series
+            rets = eq.pct_change().dropna()
+            if len(rets) < 10:
+                return None
+            vol_daily = float(rets.std())
+            vol_ann = vol_daily * (252**0.5)
+            ret_ann = float((1 + rets).prod() ** (252 / len(rets)) - 1)
+            rf_daily = risk_free / 252
+            sharpe = (rets.mean() - rf_daily) / vol_daily * (252**0.5) if vol_daily > 0 else 0
+            downside_rets = rets[rets < 0]
+            downside_dev = float(downside_rets.std()) * (252**0.5) if len(downside_rets) > 0 else vol_ann
+            sortino = (ret_ann - risk_free) / downside_dev if downside_dev > 0 else 0
+            dd_info = _compute_drawdown(eq)
+            max_dd_pct = abs(dd_info["max_dd_pct"]) if dd_info else 0
+            ret_ann_val = ret_ann
+            calmar = ret_ann_val / (max_dd_pct / 100) if max_dd_pct > 0 else 0
+            roMaD = ret_ann_val / (max_dd_pct / 100) if max_dd_pct > 0 else 0
+            ulcer_idx = float(np.sqrt((dd_info["drawdown"] ** 2).mean())) * 100 if dd_info and dd_info.get("drawdown") is not None else 0
+            martin = ret_ann_val / ulcer_idx if ulcer_idx > 0 else 0
+            var_95 = -float(np.percentile(rets, 5)) * 100
+            var_99 = -float(np.percentile(rets, 1)) * 100
+            cvar_95_rets = rets[rets <= np.percentile(rets, 5)]
+            cvar_95 = -float(cvar_95_rets.mean()) * 100 if len(cvar_95_rets) > 0 else var_95
+            cumsum = (1 + rets).cumprod()
+            running_max_c = cumsum.cummax()
+            drawdown_c = (cumsum - running_max_c) / running_max_c
+            avg_dd = float(drawdown_c[drawdown_c < 0].mean()) * 100 if (drawdown_c < 0).any() else 0
+            sterling = ret_ann_val / (abs(avg_dd) / 100) if avg_dd < 0 else 0
+            burke = ret_ann_val / (np.sqrt((drawdown_c[drawdown_c < 0] ** 2).sum()) * 100) if (drawdown_c < 0).any() else 0
+            gain = rets[rets > 0].sum()
+            pain = abs(rets[rets < 0].sum())
+            omega = gain / pain if pain > 0 else 0
+            gain_pain = (rets.sum()) / pain if pain > 0 else 0
+            ir = te = 0
+            if bench_series is not None and len(bench_series) >= 20:
+                try:
+                    bench = pd.Series(bench_series) if not isinstance(bench_series, pd.Series) else bench_series
+                    bench_rets = bench.pct_change().dropna()
+                    common_idx = rets.index.intersection(bench_rets.index)
+                    if len(common_idx) >= 15:
+                        r_p = rets.loc[common_idx]
+                        r_b = bench_rets.loc[common_idx]
+                        if len(r_p) > 5:
+                            diff = r_p - r_b
+                            te = float(diff.std()) * (252**0.5) * 100
+                            avg_diff = float(diff.mean()) * 252
+                            ir = avg_diff / (te / 100) if te > 0 else 0
+                except Exception:
+                    pass
+            return {"vol_ann_pct": vol_ann * 100, "ret_ann_pct": ret_ann * 100,
+                "sharpe": sharpe, "sortino": sortino, "calmar": calmar,
+                "roMaD": roMaD, "martin": martin, "sterling": sterling, "burke": burke,
+                "omega": omega, "gain_pain": gain_pain, "ir": ir, "te_pct": te,
+                "var_95_pct": var_95, "var_99_pct": var_99, "cvar_95_pct": cvar_95,
+                "max_dd_pct": max_dd_pct, "downside_dev_pct": downside_dev * 100,
+                "ulcer_idx": ulcer_idx, "ret_total_pct": float((1 + rets).prod() - 1) * 100,
+                "n_periods": len(rets), "dd_info": dd_info}
+        except Exception:
+            return None
+
     st.markdown("**🆕 VERSION 6.0** — 6 nhóm Tabs + 8 tính năng mới (thanh khoản, khối ngoại, AI, Bollinger, FX, VN30, lịch sử GD, thuế). Không thấy dòng này = Ctrl+Shift+R.")
     st.write("# 📊 PHÂN TÍCH CHUYÊN SÂU DANH MỤC")
     st.write("---")
@@ -3613,10 +3704,23 @@ elif st.session_state.trang_thai == "deep_analysis":
         else:
             risk_grade = ("D", "Yeu — tap trung qua muc")
 
-        var_95 = vol_proxy * 1.645
-        cvar_95 = vol_proxy * 2.06
-        max_dd_uoc = vol_proxy * 2.5
-        expected_1y = port_return + 0.5 * vol_proxy
+        if has_real and dm_equity is not None and len(dm_equity) > 20:
+            _all_ratios_cache = _compute_all_ratios(dm_equity, bench_series=vn30_close if has_vn30 else None)
+            if _all_ratios_cache:
+                var_95 = _all_ratios_cache["var_95_pct"] / 100
+                cvar_95 = _all_ratios_cache["cvar_95_pct"] / 100
+                max_dd_uoc = abs(_all_ratios_cache["max_dd_pct"]) / 100
+                expected_1y = port_return + 0.5 * vol_proxy
+            else:
+                var_95 = vol_proxy * 1.645
+                cvar_95 = vol_proxy * 2.06
+                max_dd_uoc = vol_proxy * 2.5
+                expected_1y = port_return + 0.5 * vol_proxy
+        else:
+            var_95 = vol_proxy * 1.645
+            cvar_95 = vol_proxy * 2.06
+            max_dd_uoc = vol_proxy * 2.5
+            expected_1y = port_return + 0.5 * vol_proxy
 
         st.write("## 📑 6 NHÓM PHÂN TÍCH (TABS)")
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -4202,35 +4306,35 @@ elif st.session_state.trang_thai == "deep_analysis":
                     st.write("✅ _Toàn DM đang lãi — không có mã lỗ_")
 
         st.write("---")
-        st.write("## 🛡️ Chỉ số rủi ro nâng cao (Sortino/Calmar/Tracking Error)")
-        if has_real and 'dm_value_ts' in dir() and len(dm_equity) > 20:
-            daily_ret_real = pd.Series(dm_equity).pct_change().dropna().values
-            downside = daily_ret_real[daily_ret_real < 0]
-            downside_dev = float(np.std(downside)) if len(downside) > 0 else vol_proxy / (252**0.5)
-            sortino = (port_return - rf) / (downside_dev * (252**0.5)) if downside_dev > 0 else 0
-            calmar = port_return / (abs(drawdown.min()/100) + 0.001) if drawdown.min() < 0 else 0
-            if has_vn30 and len(vn_equity) == len(dm_equity):
-                te = float(np.std(daily_ret_real - pd.Series(vn_equity).pct_change().dropna().values) * (252**0.5))
+        st.write("## 🛡️ Chỉ số rủi ro nâng cao (Sortino / Calmar / TE / Skewness / Kurtosis)")
+        if has_real and dm_equity is not None and len(dm_equity) > 20:
+            _rr2 = _compute_all_ratios(dm_equity, bench_series=vn30_close if has_vn30 else None)
+            if _rr2:
+                daily_ret_rr2 = pd.Series(dm_equity).pct_change().dropna()
+                skew_rr2 = float(daily_ret_rr2.skew())
+                kurt_rr2 = float(daily_ret_rr2.kurtosis())
             else:
-                te = vol_proxy * 0.5
-            skew = float(pd.Series(daily_ret_real).skew())
-            kurt = float(pd.Series(daily_ret_real).kurtosis())
+                skew_rr2 = kurt_rr2 = 0
         else:
-            np.random.seed(99)
-            daily_sim = np.random.normal(port_return/252, vol_proxy/(252**0.5), 252)
-            downside = daily_sim[daily_sim < 0]
-            downside_dev = float(np.std(downside)) if len(downside) > 0 else vol_proxy/(252**0.5)
-            sortino = (port_return - rf) / (downside_dev*(252**0.5))
-            calmar = port_return / (vol_proxy*2.5 + 0.001)
-            te = vol_proxy * 0.5
-            skew = 0.0
-            kurt = 3.0
-        sr1, sr2, sr3, sr4, sr5 = st.columns(5)
-        sr1.metric("📐 Sortino", f"{sortino:.2f}", help=">1: tốt | >2: rất tốt (chỉ tính downside)")
-        sr2.metric("📐 Calmar", f"{calmar:.2f}", help="Return / |Max DD|")
-        sr3.metric("📐 Tracking Err", f"{te*100:.1f}%", help="Sai lệch so với benchmark")
-        sr4.metric("📐 Skewness", f"{skew:+.2f}", help=">0: lệch phải (lợi nhuận)")
-        sr5.metric("📐 Kurtosis", f"{kurt:.2f}", help=">3: đuôi dày (rủi ro đuôi cao)")
+            skew_rr2 = 0.0
+            kurt_rr2 = 0.0
+            _rr2 = None
+        if _rr2:
+            sr1, sr2, sr3, sr4, sr5 = st.columns(5)
+            sr1.metric("📐 Sortino", f"{_rr2['sortino']:.2f}", help=">1: tốt | >2: rất tốt (chỉ tính downside)")
+            sr2.metric("📐 Calmar", f"{_rr2['calmar']:.2f}", help="Return / |Max DD| (từ Max DD THẬT, không heuristic)")
+            sr3.metric("📐 Tracking Err", f"{_rr2['te_pct']:.1f}%", help="Std(DM_ret - VN30_ret) × sqrt(252) — từ data thật")
+            sr4.metric("📐 Skewness", f"{skew_rr2:+.2f}", help=">0: lệch phải (lợi nhuận), <0: lệch trái (rủi ro)")
+            sr5.metric("📐 Kurtosis", f"{kurt_rr2:.2f}", help=">3: đuôi dày (rủi ro đuôi cao)")
+            st.caption(f"📊 Sortino/Calmar/TE tính từ helper `_compute_all_ratios()`. Calmar dùng Max DD THẬT từ equity curve (không dùng `vol_proxy*2.5`). TE tính từ DM_ret − VN30_ret (không dùng `vol_proxy*0.5`).")
+        else:
+            sr1, sr2, sr3, sr4, sr5 = st.columns(5)
+            sr1.metric("📐 Sortino", "—")
+            sr2.metric("📐 Calmar", "—")
+            sr3.metric("📐 Tracking Err", "—")
+            sr4.metric("📐 Skewness", f"{skew_rr2:+.2f}")
+            sr5.metric("📐 Kurtosis", f"{kurt_rr2:.2f}")
+            st.caption("ℹ️ Sortino/Calmar/TE cần `dm_equity` + VN30. Skewness/Kurtosis hiển thị từ returns thật.")
 
         st.write("---")
         st.write("## 🎯 Phân tích tập trung (Concentration)")
@@ -5525,6 +5629,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("---")
         st.write("## 💎 Risk-Return Bubble Chart — Hiệu suất vs Rủi ro từng mã (229 VN + 155 TG)")
         rr_data = []
+        market_data = st.session_state.get("chat_market_data") or []
         try:
             if market_data and len(market_data) >= 5:
                 for d in market_data:
@@ -5680,25 +5785,7 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🏆 Return / MaxDD Ratio (RoMaD) — Hiệu quả trên Sụt giảm")
-        if has_real and dm_equity is not None and len(dm_equity) > 30:
-            eq_s8 = pd.Series(dm_equity)
-            total_ret = (float(eq_s8.iloc[-1]) / float(eq_s8.iloc[0]) - 1) * 100
-            running_max8 = eq_s8.cummax()
-            max_dd_v = float(((eq_s8 - running_max8) / running_max8).min() * 100)
-            romad = total_ret / abs(max_dd_v) if max_dd_v != 0 else 0
-            annual_ret = total_ret * (252 / len(eq_s8))
-            calmar = annual_ret / abs(max_dd_v) if max_dd_v != 0 else 0
-            rd1, rd2, rd3, rd4 = st.columns(4)
-            rd1.metric("📈 Return 6M", f"{total_ret:+.1f}%")
-            rd2.metric("📉 Max DD", f"{max_dd_v:.1f}%")
-            rd3.metric("⚖️ RoMaD", f"{romad:.2f}", help="Return / |MaxDD|. >1 = tốt, >2 = xuất sắc")
-            rd4.metric("📊 Calmar", f"{calmar:.2f}", help="Annualized Return / |MaxDD|. >1 = tốt")
-            grade_romad = "✅ Xuất sắc" if romad > 2 else ("✅ Tốt" if romad > 1 else ("🟡 Trung bình" if romad > 0.5 else "🔴 Yếu"))
-            st.write(f"**Đánh giá RoMaD:** {grade_romad} — Return gấp {romad:.1f}x mức sụt giảm tối đa")
-            st.caption(f"📊 Tính từ {len(eq_s8)} phiên giá thật yfinance 6T. RoMaD > 2 = lợi nhuận gấp 2 lần rủi ro sụt giảm = DM chất lượng cao.")
-        else:
-            st.info("⚠️ Cần giá thật 6T để tính RoMaD.")
-
+        st.info("ℹ️ Section này đã được gộp vào **🏆 Return / Drawdown Ratios** ở dưới (1 bảng 5 ratios: Calmar/RoMaD/Sterling/Burke/Martin).")
         st.write("---")
         st.write("## 🔥 Win/Loss Streaks — Chuỗi thắng/thua dài nhất")
         if has_real and dm_equity is not None and len(dm_equity) > 10:
@@ -5952,45 +6039,53 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần giá thật 6T để tính horizon VaR.")
 
         st.write("---")
-        st.write("## 🎯 Sterling & Burke Ratio — Return trên Drawdown")
-        if has_real and dm_equity is not None and len(dm_equity) > 60:
-            eq_s_st = pd.Series(dm_equity)
-            running_max_st = eq_s_st.cummax()
-            dd_pct_st = ((eq_s_st - running_max_st) / running_max_st * 100)
-            dd_neg = dd_pct_st[dd_pct_st < 0]
-            avg_dd_st = abs(float(dd_neg.mean())) if len(dd_neg) > 0 else 0.01
-            sum_dd2 = float((dd_neg ** 2).sum()) if len(dd_neg) > 0 else 0.01
-            burke = abs(dd_neg.count()) ** 0.5 if len(dd_neg) > 0 else 0
-            annual_ret_st = float((eq_s_st.iloc[-1] / eq_s_st.iloc[0] - 1) * 252 / len(eq_s_st) * 100)
-            sterling = annual_ret_st / avg_dd_st if avg_dd_st > 0 else 0
-            burke_ratio = annual_ret_st / (sum_dd2 ** 0.5) if sum_dd2 > 0 else 0
-            st1, st2, st3 = st.columns(3)
-            st1.metric("🎯 Sterling Ratio", f"{sterling:.2f}", help="Annual Return / |Avg DD|. >1 = tốt")
-            st2.metric("🎯 Burke Ratio", f"{burke_ratio:.2f}", help="Annual Return / sqrt(Σ DD²). >1 = tốt")
-            st3.metric("📉 Avg DD", f"{avg_dd_st:.2f}%", help="Trung bình mức sụt giảm")
-            grade_st = "✅ Xuất sắc" if sterling > 2 else ("✅ Tốt" if sterling > 1 else ("🟡 TB" if sterling > 0.5 else "🔴 Yếu"))
-            st.write(f"**Đánh giá:** {grade_st}")
-            st.caption(f"📊 Tính từ {len(eq_s_st)} phiên giá thật yfinance 6T. Sterling & Burke đo hiệu quả trên DD, khác Sharpe ở chỗ dùng DD thay vol.")
+        st.write("## 🏆 Return / Drawdown Ratios — Tổng hợp Calmar / RoMaD / Sterling / Burke / Martin")
+        if has_real and dm_equity is not None and len(dm_equity) > 20:
+            ratios = _compute_all_ratios(dm_equity, bench_series=vn30_close if has_vn30 else None)
+            if ratios:
+                eq_s_uni = pd.Series(dm_equity)
+                total_ret_uni = (float(eq_s_uni.iloc[-1]) / float(eq_s_uni.iloc[0]) - 1) * 100
+                annual_ret_uni = total_ret_uni * (252 / len(eq_s_uni))
+                rru1, rru2, rru3, rru4, rru5 = st.columns(5)
+                rru1.metric("⚖️ Calmar", f"{ratios['calmar']:.2f}",
+                    help="Annual Return / |MaxDD|. >1 tốt, >2 xuất sắc")
+                rru2.metric("⚖️ RoMaD", f"{ratios['roMaD']:.2f}",
+                    help="Total Return / |MaxDD|. >1 tốt, >2 xuất sắc")
+                rru3.metric("⚖️ Sterling", f"{ratios['sterling']:.2f}",
+                    help="Annual Return / |Avg DD|. >1 tốt")
+                rru4.metric("⚖️ Burke", f"{ratios['burke']:.2f}",
+                    help="Annual Return / sqrt(Σ DD²). >1 tốt")
+                rru5.metric("⚖️ Martin", f"{ratios['martin']:.2f}",
+                    help="Annual Return / Ulcer Index. >1 tốt, >2 xuất sắc")
+                rru_data = [
+                    ("Calmar", ratios["calmar"]), ("RoMaD", ratios["roMaD"]),
+                    ("Sterling", ratios["sterling"]), ("Burke", ratios["burke"]),
+                    ("Martin", ratios["martin"]), ("Sharpe", ratios["sharpe"]),
+                    ("Sortino", ratios["sortino"]), ("Omega", ratios["omega"]),
+                ]
+                rru_data.sort(key=lambda x: x[1], reverse=True)
+                fig_rr = go.Figure()
+                names = [n for n, _ in rru_data]
+                vals = [v for _, v in rru_data]
+                colors_rr = ["#4ADE80" if v > 1 else "#FBBF24" if v > 0 else "#F87171" for v in vals]
+                fig_rr.add_trace(go.Bar(x=names, y=vals, marker_color=colors_rr,
+                    text=[f"{v:.2f}" for v in vals], textposition="outside"))
+                fig_rr.add_hline(y=1, line_dash="dash", line_color="green", annotation_text="Tốt (>1)")
+                fig_rr.add_hline(y=2, line_dash="dash", line_color="gold", annotation_text="Xuất sắc (>2)")
+                fig_rr.update_layout(title="So sánh 8 risk-adjusted ratios (sắp xếp giảm dần)",
+                    yaxis_title="Ratio", height=380,
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                st.plotly_chart(fig_rr, use_container_width=True)
+                best = rru_data[0]
+                worst = rru_data[-1]
+                rru6, rru7 = st.columns(2)
+                rru6.metric("🏆 Ratio tốt nhất", f"{best[0]}", f"{best[1]:.2f}")
+                rru7.metric("⚠️ Ratio yếu nhất", f"{worst[0]}", f"{worst[1]:.2f}")
+                st.caption(f"📊 **Calmar/RoMaD** = Return / MaxDD. **Sterling** = Return / |Avg DD|. **Burke** = Return / sqrt(Σ DD²). **Martin** = Return / Ulcer Index. Tất cả tính từ **{len(eq_s_uni)} phiên giá thật yfinance 6T** qua helper `_compute_all_ratios()`. Max DD, Avg DD, Ulcer Index đều tính từ equity curve THẬT (không heuristic `vol_proxy*2.5`).")
+            else:
+                st.info("⚠️ Helper ratios trả về None — cần ≥20 phiên returns.")
         else:
-            st.info("⚠️ Cần giá thật 6T để tính Sterling/Burke.")
-
-        st.write("---")
-        st.write("## 🔬 Martin Ratio (Ulcer Performance Index)")
-        if has_real and dm_equity is not None and len(dm_equity) > 30:
-            eq_s_mr = pd.Series(dm_equity)
-            running_max_mr = eq_s_mr.cummax()
-            dd_pct_mr = ((eq_s_mr - running_max_mr) / running_max_mr * 100)
-            ulcer_mr = float(np.sqrt((dd_pct_mr ** 2).mean()))
-            annual_ret_mr = float((eq_s_mr.iloc[-1] / eq_s_mr.iloc[0] - 1) * 252 / len(eq_s_mr) * 100)
-            martin = annual_ret_mr / ulcer_mr if ulcer_mr > 0 else 0
-            mr1, mr2, mr3, mr4 = st.columns(4)
-            mr1.metric("🔬 Martin Ratio", f"{martin:.2f}", help="Annual Return / Ulcer Index. >1 = tốt, >2 = xuất sắc")
-            mr2.metric("🩹 Ulcer Index", f"{ulcer_mr:.2f}")
-            mr3.metric("📊 Annual Return", f"{annual_ret_mr:+.1f}%")
-            mr4.metric("🎯 Xếp loại", "✅ Xuất sắc" if martin > 2 else ("✅ Tốt" if martin > 1 else ("🟡 TB" if martin > 0.5 else "🔴 Yếu")))
-            st.caption(f"📊 Martin Ratio (Ulcer Performance Index) đo return trên Ulcer Index (giống Pain Index). Tốt hơn Sharpe vì phạt DD thực tế. Tính từ {len(eq_s_mr)} phiên giá thật.")
-        else:
-            st.info("⚠️ Cần giá thật 6T để tính Martin Ratio.")
+            st.info("⚠️ Cần giá thật 6T (≥20 phiên) để tính Return/Drawdown Ratios.")
 
         st.write("---")
         st.write("## 📊 Active Share — DM khác VN30 bao nhiêu?")
