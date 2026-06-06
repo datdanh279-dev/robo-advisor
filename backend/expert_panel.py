@@ -431,6 +431,50 @@ def _call_chairman(question, expert_results, api_key, api_keys):
     return "⚠️ Chủ tịch chưa thể tổng hợp do API tạm thời quá tải. Vui lòng thử lại sau hoặc dùng tab Chat."
 
 
+def _local_chairman_synthesis(question, expert_results, expert_names):
+    """Tổng hợp local từ các câu trả lời chuyên gia — không cần API"""
+    conclusions = []
+    details = []
+    for name, resp in zip(expert_names, expert_results):
+        if not resp or resp.startswith("⚠️") or resp.startswith("⏭️"):
+            continue
+        lower = resp.lower()
+        if any(w in lower for w in ["có mua", "mua với", "nên mua", "mua"]):
+            conclusions.append(f"✅ **{name}**: MUA")
+        elif any(w in lower for w in ["không mua", "không nên mua", "bán", "thoát"]):
+            conclusions.append(f"❌ **{name}**: KHÔNG MUA")
+        elif any(w in lower for w in ["chờ", "chờ giá tốt hơn", "giữ"]):
+            conclusions.append(f"⏳ **{name}**: CHỜ/GIỮ")
+        else:
+            conclusions.append(f"📊 **{name}**: Phân tích (xem chi tiết bên trên)")
+        # Trích 2-3 câu đầu
+        sentences = [s.strip() for s in resp.replace("\n", " ").split(".") if len(s.strip()) > 20]
+        excerpt = ". ".join(sentences[:2])[:300] + ("..." if len(sentences[:2]) > 300 else "")
+        if excerpt:
+            details.append(f"**{name}**: {excerpt}")
+
+    if not conclusions:
+        return "⚠️ Chưa có đủ ý kiến chuyên gia để tổng hợp."
+
+    # Đếm phiếu
+    mua = sum(1 for c in conclusions if "MUA" in c and "KHÔNG" not in c)
+    khong = sum(1 for c in conclusions if "KHÔNG MUA" in c)
+    cho = sum(1 for c in conclusions if "CHỜ/GIỮ" in c)
+
+    if mua > khong and mua >= cho:
+        verdict = "📈 **Đa số chuyên gia khuyến nghị MUA.**"
+    elif khong > mua and khong >= cho:
+        verdict = "📉 **Đa số chuyên gia khuyến nghị KHÔNG MUA.**"
+    elif cho >= mua and cho >= khong:
+        verdict = "⏸️ **Đa số chuyên gia khuyến nghị CHỜ/GIỮ.**"
+    else:
+        verdict = "📊 **Các chuyên gia có ý kiến trái chiều.**"
+
+    part1 = "\n".join(conclusions)
+    part2 = "\n\n".join(details[:4])  # Tối đa 4 excerpt
+    return f"{verdict}\n\n**Kết quả bỏ phiếu:**\n{part1}\n\n**Trích dẫn:**\n{part2}"
+
+
 def _get_key(name):
     val = os.environ.get(name, "")
     if not val:
@@ -551,11 +595,13 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
     chairman_result = None
     chairman_key = api_keys.get("groq") or api_keys.get("openai")
     if chairman_key and loai == "cao_cap" and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
-        time.sleep(10)  # Đợi 10s để rate limit hồi phục
         try:
             chairman_result = _call_chairman(question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
         except Exception as e:
             logger.warning(f"Chairman failed: {e}")
+        # Nếu API failed, dùng tổng hợp local
+        if not chairman_result or chairman_result.startswith("⚠️"):
+            chairman_result = _local_chairman_synthesis(question, expert_results, [e["name"] for e in EXPERTS])
 
     return {
         "experts": [{"id": e["id"], "name": e["name"], "title": e["title"], "color": e["color"], "response": r} for e, r in zip(EXPERTS, expert_results)],
