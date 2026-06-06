@@ -8654,63 +8654,71 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🌐 Tương quan Đa thị trường — VN vs Thế giới")
-        if real_prices and len(real_prices) >= 5:
-            with st.spinner("📡 Tải chỉ số quốc tế (S&P 500, Nikkei, Shanghai, VN-Index)..."):
-                import yfinance as _yf_global
-                _global_tickers = {
-                    "VN-Index": "^VNINDEX",
-                    "S&P 500": "^GSPC",
-                    "Nikkei 225": "^N225",
-                    "Shanghai": "000001.SS",
-                }
-                _global_data = {}
-                for _name, _ticker in _global_tickers.items():
-                    try:
-                        _t = _yf_global.Ticker(_ticker)
-                        _h = _t.history(period="6mo")
-                        if _h is not None and len(_h) >= 20:
-                            _global_data[_name] = _h["Close"]
-                    except Exception:
-                        pass
-                if len(_global_data) >= 2:
-                    _global_df = pd.DataFrame(_global_data).pct_change().dropna()
-                    _corr_global = _global_df.corr()
-                    fig_global = go.Figure(data=go.Heatmap(
-                        z=_corr_global.values,
-                        x=_corr_global.columns.tolist(),
-                        y=_corr_global.index.tolist(),
-                        colorscale="RdBu", zmid=0,
-                        text=np.round(_corr_global.values, 3),
-                        texttemplate="%{text}",
-                        hovertemplate="%{x} vs %{y}: %{z:.3f}<extra></extra>"
+        _global_tickers = {
+            "VN-Index": ("^VNINDEX", ""),
+            "S&P 500": ("^GSPC", ""),
+            "Nikkei 225": ("^N225", ""),
+            "Shanghai": ("000001.SS", ""),
+        }
+        _global_prices = {}
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import requests as _rq_gbl, pandas as _pd_gbl
+        def _fetch_gbl(sym, suffix):
+            try:
+                r = _rq_gbl.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
+                    params={"range": "6mo", "interval": "1d"},
+                    timeout=12, headers={"User-Agent": "Mozilla/5.0"})
+                if r.status_code == 200:
+                    d = r.json()
+                    quote = d.get("chart", {}).get("result", [{}])[0]
+                    ts = quote.get("timestamp", [])
+                    cs = quote.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                    pairs = [(t, c) for t, c in zip(ts, cs) if c]
+                    if len(pairs) >= 20:
+                        return sym, _pd_gbl.Series([c for _, c in pairs], index=_pd_gbl.to_datetime([t for t, _ in pairs], unit="s"))
+            except: pass
+            return sym, None
+        with ThreadPoolExecutor(max_workers=4) as _ex_gbl:
+            _futs_gbl = {_ex_gbl.submit(_fetch_gbl, t, s): n for n, (t, s) in _global_tickers.items()}
+            for _f_gbl in as_completed(_futs_gbl):
+                _t_gbl, _s_gbl = _f_gbl.result()
+                _n_gbl = _futs_gbl[_f_gbl]
+                if _s_gbl is not None:
+                    _global_prices[_n_gbl] = _s_gbl
+        if len(_global_prices) >= 2:
+            _global_df = _pd_gbl.DataFrame(_global_prices).pct_change().dropna()
+            if len(_global_df) >= 5:
+                _corr_global = _global_df.corr()
+                fig_global = go.Figure(data=go.Heatmap(
+                    z=_corr_global.values, x=_corr_global.columns.tolist(), y=_corr_global.index.tolist(),
+                    colorscale="RdBu", zmid=0,
+                    text=np.round(_corr_global.values, 3),
+                    texttemplate="%{text}",
+                    hovertemplate="%{x} vs %{y}: %{z:.3f}<extra></extra>"
+                ))
+                fig_global.update_layout(height=450,
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#ECE8E1"),
+                    title="Correlation Matrix — VN vs Quốc tế (6 tháng)")
+                st.plotly_chart(fig_global, use_container_width=True)
+                fig_global_ts = go.Figure()
+                for _col in _global_df.columns:
+                    fig_global_ts.add_trace(go.Scatter(
+                        x=_global_df.index, y=(1 + _global_df[_col]).cumprod(),
+                        mode="lines", name=_col,
+                        hovertemplate="%{x|%d/%m}<br>%{y:.4f}<extra></extra>"
                     ))
-                    fig_global.update_layout(height=450,
-                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                        font=dict(color="#ECE8E1"),
-                        title="Correlation Matrix — Thị trường Việt Nam vs Quốc tế (6 tháng qua)")
-                    st.plotly_chart(fig_global, use_container_width=True)
-                    _global_df["Date"] = _global_df.index
-                    _df_global_long = _global_df.melt(id_vars="Date", var_name="Chỉ số", value_name="Return")
-                    fig_global_ts = go.Figure()
-                    for _col in _global_df.columns:
-                        if _col == "Date":
-                            continue
-                        fig_global_ts.add_trace(go.Scatter(
-                            x=_global_df.index, y=(1 + _global_df[_col]).cumprod(),
-                            mode="lines", name=_col,
-                            hovertemplate="%{x|%d/%m}<br>%{y:.4f}<extra></extra>"
-                        ))
-                    fig_global_ts.update_layout(height=380,
-                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                        font=dict(color="#ECE8E1"),
-                        title="Hiệu suất tích lũy — So sánh VN với các thị trường lớn",
-                        yaxis_title="Tăng trưởng (x lần)")
-                    st.plotly_chart(fig_global_ts, use_container_width=True)
-                    st.caption("🌐 Tương quan và hiệu suất giữa VN-Index và 3 thị trường lớn (Mỹ, Nhật, Trung Quốc). Dữ liệu 6 tháng từ yfinance.")
-                else:
-                    st.info("⚠️ Không đủ dữ liệu chỉ số quốc tế. Thử lại sau vài phút.")
+                fig_global_ts.update_layout(height=380,
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#ECE8E1"),
+                    title="Hiệu suất tích lũy — VN vs Thế giới",
+                    yaxis_title="Tăng trưởng (x lần)")
+                st.plotly_chart(fig_global_ts, use_container_width=True)
+                st.caption("🌐 Tương quan + hiệu suất giữa VN-Index, S&P 500, Nikkei 225, Shanghai. Dữ liệu 6 tháng từ yfinance.")
+            else:
+                st.info("⚠️ Không đủ phiên chung để tính tương quan.")
         else:
-            st.info("⚠️ Cần dữ liệu giá thật để phân tích tương quan đa thị trường.")
+            st.info("⚠️ Yahoo Finance không trả dữ liệu chỉ số quốc tế. Refresh sau 5-10 phút.")
 
         st.write("---")
         st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
