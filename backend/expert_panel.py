@@ -372,7 +372,7 @@ def _call_chairman(question, expert_results, api_key, api_keys):
                 ctx = ssl.create_default_context()
                 conn = http.client.HTTPSConnection("api.groq.com", timeout=60, context=ctx)
                 conn.request("POST", "/openai/v1/chat/completions",
-                              body=json.dumps({"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
+                              body=json.dumps({"model": "mixtral-8x7b-32768", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
                               headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
                 r = conn.getresponse()
                 body = r.read()
