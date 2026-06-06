@@ -613,19 +613,6 @@ with st.sidebar:
             '<b style="color:#ECE8E1;">GÓI TIÊU CHUẨN</b></div>',
             unsafe_allow_html=True,
         )
-        with st.expander("🔑 Kích hoạt Gói PRO"):
-            input_password = st.text_input(
-                "Nhập mật khẩu cấp phép:",
-                type="password",
-                key="pro_pwd_input",
-            )
-            if st.button("Xác nhận kích hoạt", key="activate_pro", use_container_width=True):
-                if input_password in _PWD_OK or input_password.strip() == PASSWORD_PRO.strip():
-                    st.session_state.is_pro = True
-                    st.success("✅ Kích hoạt Gói PRO thành công!")
-                    st.rerun()
-                else:
-                    st.error("❌ Mật khẩu không chính xác!")
     st.markdown("---")
 
 
