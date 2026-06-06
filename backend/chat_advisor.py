@@ -3,23 +3,8 @@ import re
 from .data_loader import DOCS
 
 MO_DAU = (
-    "\"Đầu tư không phải là trò chơi IQ cao. Khi bạn có chỉ số thông minh bình thường, "
-    "tất cả những gì bạn cần là khả năng kiểm soát cảm xúc.\"\n"
-    "— \U0001f3b5 **Warren Buffett, huyền thoại đầu tư 94 tuổi**\n\n"
-    "\U0001f4bc **80 NĂM KINH NGHIỆM — GÓC NHÌN CHUYÊN GIA**\n"
-    "Tôi đã chứng kiến **7 chu kỳ tăng-giảm** của thị trường chứng khoán thế giới: "
-    "từ khủng hoảng 1987, bong bóng dot-com 2000, khủng hoảng tài chính 2008, "
-    "COVID-19 2020, đến chu kỳ hiện tại. Tôi đã sống qua **3 cuộc suy thoái** "
-    "và chứng kiến **5 lần VN-Index mất 30%+**.\n\n"
     "\"Thị trường chứng khoán là công cụ chuyển tiền từ người thiếu kiên nhẫn "
     "sang người kiên nhẫn.\"\n\n"
-    "\U0001f4a1 **TRIẾT LÝ ĐẦU TƯ CỦA TÔI**\n"
-    "1. **Giá trị thực** — Mua doanh nghiệp, không mua cổ phiếu\n"
-    "2. **Biên an toàn** — Mua dưới giá trị nội tại ít nhất 30%\n"
-    "3. **Kiên nhẫn** — Thời gian là bạn, không phải kẻ thù\n"
-    "4. **Đa dạng hóa** — Phân bổ tài sản quyết định 90% thành công\n\n"
-    "\u2695\ufe0f Tôi đã tư vấn cho hơn **10.000 nhà đầu tư Việt Nam** và giúp họ xây dựng "
-    "danh mục vượt qua mọi thăng trầm của thị trường. Hãy hỏi tôi bất cứ điều gì!\n\n"
 )
 
 HOI_DAP = {
