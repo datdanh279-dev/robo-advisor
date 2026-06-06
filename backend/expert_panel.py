@@ -511,7 +511,7 @@ async def _run_expert_panel_async(question, api_keys, thi_truong_context=""):
         can_chon = {e["id"] for e in EXPERTS}
         logger.info("Chế độ TOÀN DIỆN: gọi cả 6 chuyên gia + Chủ tịch")
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=None)) as session:
         expert_tasks = []
         expert_ids = []
         for exp in EXPERTS:
