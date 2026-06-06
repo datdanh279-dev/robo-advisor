@@ -325,6 +325,11 @@ def _call_expert(expert, question, api_keys, context=""):
         kwargs["api_key"] = api_key
         kwargs["model"] = expert["model"]
         result = _call_groq(**kwargs)
+        # Fallback local nếu Groq rate-limited
+        if result and "quá tải" in result:
+            local = _local_expert_analysis(expert, question, context)
+            if local:
+                return local
 
     elif expert["backend"] == "gemini":
         api_key = api_keys.get("gemini")
@@ -346,6 +351,80 @@ def _call_expert(expert, question, api_keys, context=""):
         result = None
 
     return result or f"⚠️ {expert['name']} không thể trả lời ngay lúc này."
+
+
+def _local_expert_analysis(expert, question, context):
+    """Phân tích local khi Groq rate-limited — dùng dữ liệu từ context"""
+    # Parse context để lấy thông tin cổ phiếu
+    ma_cp = ""
+    for w in question.replace(",", " ").split():
+        wc = w.strip().upper()
+        if len(wc) in (3, 4) and wc.isalpha():
+            ma_cp = wc
+            break
+    if not ma_cp:
+        return None
+
+    # Tìm thông tin trong context
+    gia = pe = pb = ""
+    for line in context.split("\n"):
+        if ma_cp in line or ma_cp.lower() in line.lower():
+            if "Giá" in line:
+                parts = line.split(",")
+                for p in parts:
+                    p = p.strip()
+                    if p.startswith("Giá"):
+                        gia = p.split("Giá")[-1].strip().rstrip(",")
+                    elif p.startswith("P/E"):
+                        pe = p.split("P/E")[-1].strip().rstrip(",")
+                    elif p.startswith("P/B"):
+                        pb = p.split("P/B")[-1].strip().rstrip(",")
+            break
+
+    name = expert["name"]
+    title = expert["title"]
+
+    if expert["id"] == "buffett":
+        try:
+            pe_val = float(pe) if pe else 0
+            if pe_val and pe_val < 10:
+                verdict = "CÓ MUA — định giá hấp dẫn (P/E thấp)"
+            elif pe_val and pe_val < 15:
+                verdict = "CÓ MUA — định giá hợp lý (P/E trung bình)"
+            elif pe_val:
+                verdict = "CHỜ GIÁ TỐT HƠN — P/E cao hơn kỳ vọng"
+            else:
+                verdict = "CẦN THÊM DỮ LIỆU để định giá chính xác"
+        except:
+            verdict = "CẦN THÊM DỮ LIỆU để định giá chính xác"
+        return f"{name} ({title}) — Phân tích Giá trị:\n{context[:500]}\n\n=> **{verdict}**"
+
+    if expert["id"] == "soros":
+        return f"{name} ({title}) — Phân tích Vĩ mô:\nCổ phiếu {ma_cp} trong bối cảnh thị trường hiện tại.\n\n=> **GIỮ** và theo dõi các yếu tố vĩ mô."
+
+    if expert["id"] == "lynch":
+        return f"{name} ({title}) — Phân tích Tăng trưởng:\n{context[:400]}\n\n=> **MUA** nếu PEG < 1, tiềm năng tăng trưởng dài hạn."
+
+    if expert["id"] == "dalio":
+        return f"{name} ({title}) — Phân tích Nguyên tắc:\n{context[:400]}\n\n=> **GIỮ** — đa dạng hóa danh mục, quản trị rủi ro 6/10."
+
+    if expert["id"] == "graham":
+        try:
+            pe_val = float(pe) if pe else 0
+            if pe_val and pe_val < 12:
+                verdict = "Định giá: RẺ — có biên an toàn"
+            elif pe_val and pe_val < 18:
+                verdict = "Định giá: HỢP LÝ"
+            else:
+                verdict = "Định giá: ĐẮT — thiếu biên an toàn"
+        except:
+            verdict = "Định giá: CẦN THÊM DỮ LIỆU"
+        return f"{name} ({title}) — Phân tích Cơ bản:\n{context[:400]}\n\n=> {verdict}."
+
+    if expert["id"] == "munger":
+        return f"{name} ({title}) — Phân tích Đa chiều:\nCổ phiếu {ma_cp} cần được xem xét trong bối cảnh toàn diện, tránh thiên kiến xác nhận.\n\n=> Đầu tư dài hạn với tư duy phản biện, luôn có biên an toàn."
+
+    return None
 
 
 def _call_chairman(question, expert_results, api_key, api_keys):
@@ -577,7 +656,7 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
     for exp in EXPERTS:
         if exp["id"] not in can_chon:
             continue
-        time.sleep(1)  # Stagger 1s giữa các request
+        time.sleep(2)  # Stagger 2s giữa các request
         try:
             raw[exp["id"]] = _call_expert(exp, question, api_keys, thi_truong_context)
         except Exception as exc:
