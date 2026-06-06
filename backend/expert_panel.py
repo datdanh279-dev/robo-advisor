@@ -201,11 +201,14 @@ async def _call_openai(session, prompt, question, api_key, model="gpt-4o", timeo
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
     try:
-        async with session.post(
-            "https://api.openai.com/v1/chat/completions",
-            json=payload, headers=headers,
-            timeout=aiohttp.ClientTimeout(total=timeout)
-        ) as r:
+        r = await asyncio.wait_for(
+            session.post(
+                "https://api.openai.com/v1/chat/completions",
+                json=payload, headers=headers,
+            ),
+            timeout=timeout
+        )
+        async with r:
             if r.status == 200:
                 data = await r.json()
                 return data["choices"][0]["message"]["content"].strip()
@@ -223,11 +226,14 @@ async def _call_groq(session, prompt, question, api_key, model="llama-3.3-70b-ve
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
     try:
-        async with session.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json=payload, headers=headers,
-            timeout=aiohttp.ClientTimeout(total=timeout)
-        ) as r:
+        r = await asyncio.wait_for(
+            session.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json=payload, headers=headers,
+            ),
+            timeout=timeout
+        )
+        async with r:
             if r.status == 200:
                 data = await r.json()
                 return data["choices"][0]["message"]["content"].strip()
@@ -246,7 +252,11 @@ async def _call_gemini(session, prompt, question, api_key, model="gemini-2.0-fla
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     payload = {"contents": [{"parts": [{"text": f"{prompt}\n\nCâu hỏi: {question}"}]}]}
     try:
-        async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=timeout)) as r:
+        r = await asyncio.wait_for(
+            session.post(url, json=payload),
+            timeout=timeout
+        )
+        async with r:
             if r.status == 200:
                 data = await r.json()
                 candidates = data.get("candidates", [])
@@ -271,11 +281,14 @@ async def _call_openrouter(session, prompt, question, api_key, model, timeout=60
     }
     payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
     try:
-        async with session.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            json=payload, headers=headers,
-            timeout=aiohttp.ClientTimeout(total=timeout)
-        ) as r:
+        r = await asyncio.wait_for(
+            session.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                json=payload, headers=headers,
+            ),
+            timeout=timeout
+        )
+        async with r:
             if r.status == 200:
                 data = await r.json()
                 return data["choices"][0]["message"]["content"].strip()
@@ -351,11 +364,14 @@ async def _call_chairman(session, question, expert_results, api_key, api_keys):
         groq_headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
         groq_payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
         try:
-            async with session.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json=groq_payload, headers=groq_headers,
-                timeout=aiohttp.ClientTimeout(total=60)
-            ) as r:
+            r = await asyncio.wait_for(
+                session.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json=groq_payload, headers=groq_headers,
+                ),
+                timeout=60
+            )
+            async with r:
                 if r.status == 200:
                     data = await r.json()
                     return data["choices"][0]["message"]["content"].strip()
@@ -370,11 +386,14 @@ async def _call_chairman(session, question, expert_results, api_key, api_keys):
         headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
         payload = {"model": "gpt-4o", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
         try:
-            async with session.post(
-                "https://api.openai.com/v1/chat/completions",
-                json=payload, headers=headers,
-                timeout=aiohttp.ClientTimeout(total=60)
-            ) as r:
+            r = await asyncio.wait_for(
+                session.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    json=payload, headers=headers,
+                ),
+                timeout=60
+            )
+            async with r:
                 if r.status == 200:
                     data = await r.json()
                     return data["choices"][0]["message"]["content"].strip()
@@ -399,11 +418,14 @@ async def _call_chairman(session, question, expert_results, api_key, api_keys):
             "max_tokens": 1500,
         }
         try:
-            async with session.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                json=or_payload, headers=or_headers,
-                timeout=aiohttp.ClientTimeout(total=60)
-            ) as r:
+            r = await asyncio.wait_for(
+                session.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    json=or_payload, headers=or_headers,
+                ),
+                timeout=60
+            )
+            async with r:
                 if r.status == 200:
                     data = await r.json()
                     return data["choices"][0]["message"]["content"].strip()
