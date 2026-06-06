@@ -8989,16 +8989,6 @@ elif st.session_state.trang_thai == "chat":
                 st.rerun()
 
     with tab_expert:
-        if not st.session_state.is_pro:
-            st.markdown("## 🔒 Tính năng PRO")
-            st.warning("**Hội đồng 6 Chuyên gia** chỉ dành cho gói PRO. Vui lòng kích hoạt PRO trong Sidebar để sử dụng.")
-            st.info("👉 Mở Sidebar → 🔑 Kích hoạt Gói PRO → nhập mật khẩu → Enter")
-            st.markdown("---")
-            st.markdown("#### Tính năng sẽ mở khóa:")
-            st.markdown("- 🎯 Hỏi ý kiến **Warren Buffett, George Soros, Peter Lynch, Ray Dalio, Benjamin Graham, Charlie Munger**")
-            st.markdown("- 👑 **Chủ tịch Hội đồng** tổng hợp và đưa ra kết luận cuối cùng")
-            st.markdown("- 🧠 AI phân loại câu hỏi: Tiết kiệm / Tiêu chuẩn / Toàn diện")
-            st.stop()
         st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
         st.markdown(
             "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại** do AI đóng vai. "
