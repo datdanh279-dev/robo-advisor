@@ -3,10 +3,8 @@ import json
 import logging
 import os
 import ssl
-import threading
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -300,51 +298,48 @@ def _call_openrouter(prompt, question, api_key, model, timeout=60):
     return None
 
 
-def _call_expert(expert, question, api_keys, lock, context=""):
+def _call_expert(expert, question, api_keys, context=""):
     prompt = expert["prompt"]
     if context:
         prompt = f"{prompt}\n\nDỮ LIỆU THỊ TRƯỜNG HIỆN TẠI:\n{context}"
     kwargs = {"prompt": prompt, "question": question}
 
-    with lock:
-        time.sleep(0.3)  # Stagger 300ms giữa các request để tránh rate limit
+    if expert["backend"] == "openai":
+        api_key = api_keys.get("openai")
+        if not api_key:
+            return "❌ OPENAI_API_KEY chưa được cấu hình."
+        kwargs["api_key"] = api_key
+        kwargs["model"] = expert["model"]
+        result = _call_openai(**kwargs)
 
-        if expert["backend"] == "openai":
-            api_key = api_keys.get("openai")
-            if not api_key:
-                return "❌ OPENAI_API_KEY chưa được cấu hình."
-            kwargs["api_key"] = api_key
-            kwargs["model"] = expert["model"]
-            result = _call_openai(**kwargs)
+    elif expert["backend"] == "groq":
+        api_key = api_keys.get("groq")
+        if not api_key:
+            return "❌ GROQ_API_KEY chưa được cấu hình.\n\nLấy key miễn phí tại https://console.groq.com/keys (không cần thẻ tín dụng)."
+        kwargs["api_key"] = api_key
+        kwargs["model"] = expert["model"]
+        result = _call_groq(**kwargs)
 
-        elif expert["backend"] == "groq":
-            api_key = api_keys.get("groq")
-            if not api_key:
-                return "❌ GROQ_API_KEY chưa được cấu hình.\n\nLấy key miễn phí tại https://console.groq.com/keys (không cần thẻ tín dụng)."
-            kwargs["api_key"] = api_key
-            kwargs["model"] = expert["model"]
-            result = _call_groq(**kwargs)
+    elif expert["backend"] == "gemini":
+        api_key = api_keys.get("gemini")
+        if not api_key:
+            return "❌ GEMINI_API_KEY chưa được cấu hình."
+        kwargs["api_key"] = api_key
+        kwargs["model"] = expert["model"]
+        result = _call_gemini(**kwargs)
 
-        elif expert["backend"] == "gemini":
-            api_key = api_keys.get("gemini")
-            if not api_key:
-                return "❌ GEMINI_API_KEY chưa được cấu hình."
-            kwargs["api_key"] = api_key
-            kwargs["model"] = expert["model"]
-            result = _call_gemini(**kwargs)
+    elif expert["backend"] == "openrouter":
+        api_key = api_keys.get("openrouter")
+        if not api_key:
+            return "❌ OPENROUTER_API_KEY chưa được cấu hình.\n\nDùng OpenRouter (https://openrouter.ai) để truy cập Qwen, DeepSeek, Claude, và các model khác."
+        kwargs["api_key"] = api_key
+        kwargs["model"] = expert["model"]
+        result = _call_openrouter(**kwargs)
 
-        elif expert["backend"] == "openrouter":
-            api_key = api_keys.get("openrouter")
-            if not api_key:
-                return "❌ OPENROUTER_API_KEY chưa được cấu hình.\n\nDùng OpenRouter (https://openrouter.ai) để truy cập Qwen, DeepSeek, Claude, và các model khác."
-            kwargs["api_key"] = api_key
-            kwargs["model"] = expert["model"]
-            result = _call_openrouter(**kwargs)
+    else:
+        result = None
 
-        else:
-            result = None
-
-        return result or f"⚠️ {expert['name']} không thể trả lời ngay lúc này."
+    return result or f"⚠️ {expert['name']} không thể trả lời ngay lúc này."
 
 
 def _call_chairman(question, expert_results, api_key, api_keys):
@@ -512,9 +507,6 @@ def _build_error_result(api_keys=None):
 def _run_expert_panel(question, api_keys, thi_truong_context=""):
     loai = phan_loai_cau_hoi(question)
 
-    # Giới hạn tối đa 3 request đồng thời để tránh rate limit
-    lock = threading.Semaphore(3)
-
     if loai == "don_gian":
         can_chon = {"buffett", "munger"}
         logger.info("Chế độ TIẾT KIỆM: chỉ gọi 2 chuyên gia")
@@ -525,20 +517,17 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
         can_chon = {e["id"] for e in EXPERTS}
         logger.info("Chế độ TOÀN DIỆN: gọi cả 6 chuyên gia + Chủ tịch")
 
-    expert_futures = {}
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        for exp in EXPERTS:
-            if exp["id"] in can_chon:
-                fut = executor.submit(_call_expert, exp, question, api_keys, lock, thi_truong_context)
-                expert_futures[exp["id"]] = fut
-
-        raw = {}
-        for eid, fut in expert_futures.items():
-            try:
-                raw[eid] = fut.result(timeout=180)
-            except Exception as exc:
-                logger.warning(f"Expert {eid} failed: {exc}")
-                raw[eid] = None
+    # Gọi TUẦN TỰ — mỗi lần 1 chuyên gia để tránh race condition trong http.client
+    raw = {}
+    for exp in EXPERTS:
+        if exp["id"] not in can_chon:
+            continue
+        time.sleep(0.3)  # Stagger 300ms giữa các request
+        try:
+            raw[exp["id"]] = _call_expert(exp, question, api_keys, thi_truong_context)
+        except Exception as exc:
+            logger.warning(f"Expert {exp['id']} failed: {exc}")
+            raw[exp["id"]] = None
 
     # Build full list: called experts get their result, others get placeholder
     expert_results = []
@@ -560,5 +549,5 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
         "experts": [{"id": e["id"], "name": e["name"], "title": e["title"], "color": e["color"], "response": r} for e, r in zip(EXPERTS, expert_results)],
         "chairman": chairman_result,
         "mode": loai,
-        "_version": "2026-06-06-sync-only",
+        "_version": "2026-06-06-seq",
     }
