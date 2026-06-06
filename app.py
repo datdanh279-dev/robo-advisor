@@ -5845,75 +5845,82 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.info("⚠️ Cần giá thật 6T để vẽ correlation network.")
 
         st.write("---")
-        st.write("## 💎 Risk-Return Bubble Chart — Hiệu suất vs Rủi ro từng mã (229 VN + 155 TG)")
-        rr_data = []
-        market_data = st.session_state.get("chat_market_data") or []
-        try:
-            if market_data and len(market_data) >= 5:
-                for d in market_data:
-                    ma = d.get("ma", "")
-                    vung = d.get("vung", "VN")
-                    gia = float(d.get("gia", 0) or 0)
-                    ret3 = float(d.get("ret_3m", 0) or 0)
-                    vh = float(d.get("von_hoa", 0) or 0)
-                    volr = float(d.get("vol_ratio", 0) or 0)
-                    if gia <= 0 or vh <= 0:
-                        continue
-                    vh_ty = vh / 1e9 if vung == "VN" else vh / 1e9
-                    vol_proxy = max(15.0, min(80.0, 25.0 + (volr - 1.0) * 8.0))
-                    rr_data.append({
-                        "Mã": ma, "Vùng": vung, "Return 6M %": round(ret3 * 2, 1),
-                        "Vol %": round(vol_proxy, 1), "Vốn hóa (tỷ)": round(vh_ty, 0),
-                        "Ngành": d.get("nganh", "Khác") or "Khác",
-                        "Vol ratio": round(volr, 2), "Giá": round(gia, 0)})
-        except Exception:
-            rr_data = []
-        if has_real and len(real_prices) >= 2 and not rr_data:
-            for ma, info in dm.items():
-                if ma in real_prices and len(real_prices[ma]) >= 30:
+        st.write("## 💎 Risk-Return Bubble Chart — Hiệu suất vs Rủi ro từng mã")
+        ma_list_rr = [ma for ma, info in dm.items() if info.get("gia_thi_truong", 0) * info.get("so_luong", 0) > 0 and tong_gt > 0]
+        if len(ma_list_rr) >= 2:
+            _vn_keys = set((DOCS.get("co_phieu_vn") or {}).keys())
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import requests as _rq_rr, pandas as _pd_rr
+            _rr_prices = {}
+            def _fetch_rr(sym, suffix):
+                try:
+                    r = _rq_rr.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
+                        params={"range": "6mo", "interval": "1d"},
+                        timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code == 200:
+                        d = r.json()
+                        quote = d.get("chart", {}).get("result", [{}])[0]
+                        ts = quote.get("timestamp", [])
+                        cs = quote.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                        pairs = [(t, c) for t, c in zip(ts, cs) if c]
+                        if len(pairs) >= 20:
+                            idx = _pd_rr.to_datetime([p[0] for p in pairs], unit="s")
+                            return sym, _pd_rr.Series([p[1] for p in pairs], index=idx)
+                except: pass
+                return sym, None
+            with ThreadPoolExecutor(max_workers=12) as ex_rr:
+                _futs_rr = {ex_rr.submit(_fetch_rr, m, ".VN" if m in _vn_keys else ""): m for m in ma_list_rr}
+                for _f_rr in as_completed(_futs_rr):
+                    _s_rr, _p_rr = _f_rr.result()
+                    if _p_rr is not None:
+                        _rr_prices[_s_rr] = _p_rr
+            if len(_rr_prices) >= 2:
+                _rr_points = []
+                for _ma_rr, _s_rr in _rr_prices.items():
                     try:
-                        ki = kpi.get(ma, {})
-                        r6m = (float(real_prices[ma].iloc[-1]) / float(real_prices[ma].iloc[0]) - 1) * 100
-                        v6m = float(real_prices[ma].pct_change().dropna().std() * (252**0.5) * 100)
-                        roe = float(ki.get("roe", 0) or 0) * 100
-                        pe = float(ki.get("pe", 0) or 0)
-                        mc = float(ki.get("market_cap", 0) or 0) / 1e3
-                        rr_data.append({"Mã": ma, "Vùng": "VN", "Return 6M %": round(r6m, 1), "Vol %": round(v6m, 1),
-                            "Vốn hóa (tỷ)": round(mc, 1),
-                            "Ngành": ki.get("nganh", "Khác") or "Khác", "Vol ratio": 0, "Giá": float(real_prices[ma].iloc[-1])})
-                    except Exception:
-                        continue
-        if rr_data and len(rr_data) >= 2:
-            try:
-                df_rr = pd.DataFrame(rr_data)
-                df_rr = df_rr.dropna(subset=["Return 6M %", "Vol %", "Vốn hóa (tỷ)"])
-                df_rr = df_rr[df_rr["Vốn hóa (tỷ)"] > 0]
-                df_rr = df_rr[np.isfinite(df_rr["Return 6M %"]) & np.isfinite(df_rr["Vol %"])]
-                if len(df_rr) >= 2:
-                    df_rr["size_bubble"] = df_rr["Vốn hóa (tỷ)"].clip(lower=1.0)
-                    df_disp = df_rr.nlargest(50, "size_bubble").copy()
-                    color_arg = "Ngành" if df_disp["Ngành"].nunique() > 1 else None
-                    rr_kwargs = dict(
-                        x="Vol %", y="Return 6M %", size="size_bubble",
-                        hover_name="Mã", hover_data={"Vùng": True, "Ngành": True, "Giá": True, "Vol ratio": True, "size_bubble": False},
-                        labels={"Vol %": "Volatility (% năm)", "Return 6M %": "Return 6M (%)", "size_bubble": "Vốn hóa"},
-                        size_max=30)
-                    if color_arg:
-                        rr_kwargs["color"] = color_arg
-                    fig_rr = px.scatter(df_disp, **rr_kwargs)
-                    fig_rr.update_traces(textposition='top center', textfont=dict(size=8, color='#ECE8E1'))
-                    fig_rr.update_layout(height=520,
-                        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                        font=dict(color="#ECE8E1"),
-                        title=f"Risk-Return Bubble — {len(df_rr)} mã ({df_rr['Vùng'].value_counts().to_dict()})")
-                    st.plotly_chart(fig_rr, use_container_width=True)
-                    st.caption(f"📊 Trục X = Vol (% năm, ước lượng từ vol_ratio), trục Y = Return 6M (x2 từ 3M). Bong bóng trên-trái = lợi nhuận cao, rủi ro thấp (lý tưởng). Size = vốn hóa thị trường. Top 50 vốn hóa lớn nhất hiển thị nhãn.")
+                        _ret = (float(_s_rr.iloc[-1]) / float(_s_rr.iloc[0]) - 1) * 100
+                        _vol = float(_s_rr.pct_change().dropna().std() * (252 ** 0.5) * 100)
+                        _ki = kpi.get(_ma_rr, {}) or {}
+                        _mc = float(_ki.get("market_cap", 0) or 0) / 1e3
+                        _ng = str(_ki.get("nganh", "") or "")
+                        _rr_points.append({"ma": _ma_rr, "ret": _ret, "vol": _vol, "mc": max(_mc, 0.1), "nganh": _ng if _ng else "Khác", "vung": "VN" if _ma_rr in _vn_keys else "TG"})
+                    except: pass
+                if len(_rr_points) >= 2:
+                    _df_rr = _pd_rr.DataFrame(_rr_points)
+                    _df_rr = _df_rr.dropna(subset=["ret", "vol", "mc"])
+                    _df_rr = _df_rr[np.isfinite(_df_rr["ret"]) & np.isfinite(_df_rr["vol"])]
+                    _df_rr = _df_rr[_df_rr["mc"] > 0]
+                    if len(_df_rr) >= 2:
+                        _df_rr = _df_rr.sort_values("mc", ascending=False)
+                        _df_top = _df_rr.head(50)
+                        _color_needed = _df_top["nganh"].nunique() > 1
+                        import plotly.graph_objects as _go_rr
+                        _fig_rr = _go_rr.Figure()
+                        for _cat_rr in _df_rr["nganh"].unique():
+                            _sub = _df_rr[_df_rr["nganh"] == _cat_rr]
+                            _sz = _sub["mc"].clip(lower=1).values
+                            _fig_rr.add_trace(_go_rr.Scatter(
+                                x=_sub["vol"], y=_sub["ret"], mode="markers+text" if _cat_rr in _df_top["nganh"].values else "markers",
+                                marker=dict(size=_sz / _sz.max() * 40, sizemode="diameter",
+                                    line=dict(width=1, color="rgba(255,255,255,0.3)"), opacity=0.8),
+                                text=_sub["ma"].where(_sub["ma"].isin(_df_top["ma"])),
+                                textposition="top center", textfont=dict(size=8, color="#ECE8E1"),
+                                name=_cat_rr, hovertemplate="<b>%{customdata[0]}</b><br>Vol %: %{x:.1f}<br>Return %: %{y:.1f}<br>VH: %{customdata[1]:.0f}T<br>",
+                                customdata=np.column_stack([_sub["ma"], _sub["mc"]])))
+                        _fig_rr.update_layout(height=520, xaxis_title="Vol % (năm)", yaxis_title="Return 6M %",
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            font=dict(color="#ECE8E1"),
+                            title_text=f"Risk-Return Bubble — {len(_df_rr)} mã ({len(_df_rr[_df_rr['vung']=='VN'])} VN + {len(_df_rr[_df_rr['vung']=='TG'])} TG)")
+                        st.plotly_chart(_fig_rr, use_container_width=True)
+                        st.caption(f"📊 Trục X = Vol % năm từ daily returns yfinance 6T. Trục Y = Return 6M %. Bong bóng trên-trái = lợi nhuận cao, rủi ro thấp. Size = vốn hóa thị trường.")
+                    else:
+                        st.info("⚠️ Không đủ dữ liệu hợp lệ sau lọc NaN.")
                 else:
-                    st.info("⚠️ Không đủ dữ liệu hợp lệ sau khi lọc NaN/0.")
-            except Exception as e:
-                st.warning(f"⚠️ Không thể vẽ bubble chart: {str(e)[:100]}")
+                    st.info("⚠️ Không đủ mã có dữ liệu từ yfinance.")
+            else:
+                st.info("⚠️ Yahoo Finance không trả dữ liệu. Refresh sau 5-10 phút.")
         else:
-            st.info("⚠️ Cần giá thật hoặc market scan để vẽ bubble.")
+            st.info("Cần ≥2 mã trong danh mục để vẽ bubble.")
 
         st.write("---")
         st.write("## 💵 Tổng return vs Price return (có cổ tức)")
