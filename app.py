@@ -662,8 +662,15 @@ console.log = function() {
     if (_blocked.some(b => msg.includes(b))) return;
     _origLog.apply(console, arguments);
 };
+(function() {
+    const _rc = Node.prototype.removeChild;
+    Node.prototype.removeChild = function(c) {
+        try { return _rc.call(this, c); }
+        catch(e) { if (e.name==='NotFoundError') return c; throw e; }
+    };
+})();
 window.addEventListener('error', function(e) {
-    if (e && e.message && e.message.indexOf('removeChild') > -1) {
+    if (e && e.message && (e.message.indexOf('removeChild') > -1 || e.message.indexOf('NotFoundError') > -1)) {
         e.preventDefault();
         e.stopPropagation();
         return false;
