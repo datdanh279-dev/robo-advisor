@@ -4171,30 +4171,64 @@ elif st.session_state.trang_thai == "deep_analysis":
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
             st.plotly_chart(fig_eq, use_container_width=True)
 
-        st.write("## 🔗 Ma trận tương quan giữa các mã")
+        st.write("## 🔗 Ma trận tương quan giữa các mã — Từ daily returns yfinance")
         ma_list = [ma for ma, info in dm.items() if info.get("gia_thi_truong", 0) * info.get("so_luong", 0) > 0 and tong_gt > 0]
-        if len(ma_list) >= 2 and has_real:
-            _corr_data = {}
-            for _m in ma_list:
-                if _m in real_prices and len(real_prices[_m]) >= 20:
-                    _corr_data[_m] = pd.Series(real_prices[_m]).pct_change().dropna()
-            if len(_corr_data) >= 2:
-                _corr_df = pd.DataFrame(_corr_data)
-                _common_idx = _corr_df.dropna().index
-                _corr_real = _corr_df.loc[_common_idx].corr()
-                fig_corr = go.Figure(data=go.Heatmap(
-                    z=_corr_real.values, x=_corr_real.columns.tolist(), y=_corr_real.index.tolist(),
-                    colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
-                    text=np.round(_corr_real.values, 2),
-                    texttemplate="%{text}", textfont={"size": 11}))
-                fig_corr.update_layout(height=450,
-                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
-                st.plotly_chart(fig_corr, use_container_width=True)
-                st.caption(f"📊 Tương quan thật từ daily returns yfinance ({len(_corr_data)} mã, {len(_common_idx)} phiên chung).")
+        _corr_data = {}
+        _missing_dm = []
+        for _m in ma_list:
+            if _m in real_prices and len(real_prices[_m]) >= 20:
+                _corr_data[_m] = pd.Series(real_prices[_m]).pct_change().dropna()
             else:
-                st.info("⚠️ Cần ≥2 mã có dữ liệu giá thật để tính ma trận tương quan.")
+                _missing_dm.append(_m)
+        if _missing_dm and len(_missing_dm) <= 8 and len(_missing_dm) != len(ma_list):
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import requests as _rq_corr, pandas as _pd_corr
+            def _fetch_one(ma):
+                try:
+                    _vn_keys = set((DOCS.get("co_phieu_vn") or {}).keys())
+                    _suf = ".VN" if ma in _vn_keys else ""
+                    r = _rq_corr.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma}{_suf}",
+                        params={"range": "6mo", "interval": "1d"},
+                        timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code == 200:
+                        d = r.json()
+                        result = d.get("chart", {}).get("result", [{}])[0]
+                        ts = result.get("timestamp", [])
+                        cs = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                        pairs = [(t, c) for t, c in zip(ts, cs) if c]
+                        if len(pairs) >= 20:
+                            idx = _pd_corr.to_datetime([p[0] for p in pairs], unit="s")
+                            s = _pd_corr.Series([p[1] for p in pairs], index=idx)
+                            return ma, s
+                except Exception:
+                    pass
+                return ma, None
+            with ThreadPoolExecutor(max_workers=8) as ex_corr:
+                _futs_c = {ex_corr.submit(_fetch_one, m): m for m in _missing_dm}
+                for _f_c in as_completed(_futs_c):
+                    _m_c, _s_c = _f_c.result()
+                    if _s_c is not None:
+                        real_prices[_m_c] = _s_c
+                        _corr_data[_m_c] = pd.Series(_s_c).pct_change().dropna()
+        if len(_corr_data) >= 2:
+            _corr_df = pd.DataFrame(_corr_data)
+            _common_idx = _corr_df.dropna().index
+            _corr_real = _corr_df.loc[_common_idx].corr()
+            fig_corr = go.Figure(data=go.Heatmap(
+                z=_corr_real.values, x=_corr_real.columns.tolist(), y=_corr_real.index.tolist(),
+                colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
+                text=np.round(_corr_real.values, 2),
+                texttemplate="%{text}", textfont={"size": 11}))
+            fig_corr.update_layout(height=450,
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_corr, use_container_width=True)
+            _still_missing = [m for m in ma_list if m not in _corr_data]
+            _msg = f"📊 Tương quan từ daily returns yfinance ({len(_corr_data)}/{len(ma_list)} mã, {len(_common_idx)} phiên chung)."
+            if _still_missing:
+                _msg += f" Thiếu {len(_still_missing)} mã: {', '.join(_still_missing[:5])}{'...' if len(_still_missing)>5 else ''}"
+            st.caption(_msg)
         elif len(ma_list) >= 2:
-            st.info("⚠️ Cần dữ liệu giá thật từ yfinance để tính tương quan thực tế.")
+            st.info("⚠️ Yahoo Finance tạm không trả dữ liệu cho các mã trong danh mục. Vui lòng refresh trang sau 5-10 phút.")
         else:
             st.info("Cần ≥2 mã trong danh mục để tính ma trận tương quan.")
 
