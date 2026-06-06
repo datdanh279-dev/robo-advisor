@@ -8017,7 +8017,9 @@ elif st.session_state.trang_thai == "deep_analysis":
                         corr_xc = df_xc.corr()
                         if isinstance(corr_xc, pd.Series):
                             corr_xc = corr_xc.to_frame()
-                        if corr_xc.shape[0] >= 2 and corr_xc.shape[1] >= 2:
+                        if isinstance(corr_xc, (int, float, np.floating)):
+                            corr_xc = pd.DataFrame([[corr_xc]])
+                        if hasattr(corr_xc, 'shape') and corr_xc.shape[0] >= 2 and corr_xc.shape[1] >= 2:
                             fig_xc = px.imshow(corr_xc, text_auto=".2f", color_continuous_scale="RdBu_r",
                                 zmin=-1, zmax=1, aspect="auto",
                                 title=f"Correlation Matrix Top {len(corr_xc)} mã (3T)")
@@ -8026,14 +8028,15 @@ elif st.session_state.trang_thai == "deep_analysis":
                                 font=dict(color="#ECE8E1"))
                             st.plotly_chart(fig_xc, use_container_width=True)
                             try:
-                                avg_corr = float(corr_xc.values[np.triu_indices_from(corr_xc.values, k=1)].mean())
+                                vals = corr_xc.values
+                                avg_corr = float(vals[np.triu_indices_from(vals, k=1)].mean())
                                 st.metric("📊 Correlation TB (cặp đôi)", f"{avg_corr:.3f}",
                                     help="TB corr giữa các cặp mã. Càng gần 0 = đa dạng hóa tốt")
                             except Exception:
                                 pass
                             st.caption(f"📊 Corr>0.7 = cùng nhóm (đỏ đậm), <0.3 = độc lập. Tính từ {len(corr_xc)} mã top 50 vốn hóa daily returns 3T yfinance.")
                         else:
-                            st.info(f"⚠️ Cần ≥2 mã có dữ liệu để tính correlation. Mới có {corr_xc.shape[0]} mã.")
+                            st.info(f"⚠️ Cần ≥2 mã có dữ liệu để tính correlation. Mới có {corr_xc.shape[0] if hasattr(corr_xc, 'shape') else 1} mã.")
                     else:
                         st.info(f"⚠️ Cần ≥10 phiên × ≥2 mã để tính correlation. Mới có {len(df_xc)} phiên × {df_xc.shape[1]} mã.")
                 else:
@@ -8185,31 +8188,46 @@ elif st.session_state.trang_thai == "deep_analysis":
         st.write("---")
         st.write("## 📊 DISTRIBUTION ANALYSIS — Phân phối P/E, ROE, Vol 50 mã")
         if market_data and len(market_data) >= 5:
-            with st.spinner("📡 Tải P/E, ROE, beta cho 50 mã..."):
-                dist_data = []
-                for d in market_data:
-                    ma = d["ma"]
-                    try:
-                        import yfinance as _yf_dist
-                        info = _yf_dist.Ticker(ma + ".VN").info
-                        pe = info.get("trailingPE")
-                        roe = info.get("returnOnEquity")
-                        beta = info.get("beta")
-                        if pe and 0 < pe < 200:
-                            dist_data.append({"ma": ma, "pe": float(pe),
-                                "roe": float(roe) * 100 if roe and -0.5 < roe < 0.5 else None,
-                                "beta": float(beta) if beta and 0 < beta < 3 else None})
-                    except Exception:
-                        continue
+            dist_data = []
+            with st.spinner("📡 Tải P/E, ROE, Beta song song cho 50 mã..."):
+                import yfinance as _yf_dist
+                dist_targets = [(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data[:50]]
+                with ThreadPoolExecutor(max_workers=15) as _ex_dist:
+                    def _fetch_dist(t):
+                        _info = _yf_dist.Ticker(t[0] + t[1]).info if t[1] else _yf_dist.Ticker(t[0]).info
+                        return _info
+                    _futs_dist = {_ex_dist.submit(_fetch_dist, t): t for t in dist_targets}
+                    for _f in as_completed(_futs_dist):
+                        try:
+                            _inf = _f.result()
+                            _ma = _futs_dist[_f][0]
+                            pe = _inf.get("trailingPE") or _inf.get("forwardPE")
+                            roe = _inf.get("returnOnEquity")
+                            beta = _inf.get("beta")
+                            if pe and 0 < float(pe) < 200:
+                                dist_data.append({"ma": _ma, "pe": float(pe),
+                                    "roe": float(roe) * 100 if roe and -0.5 < roe < 0.5 else None,
+                                    "beta": float(beta) if beta and 0 < float(beta) < 3 else None})
+                        except Exception:
+                            continue
+            if not dist_data:
+                for d in market_data[:50]:
+                    pe = d.get("pe") or d.get("trailingPE")
+                    roe = d.get("roe")
+                    beta = d.get("beta")
+                    if pe and 0 < float(pe) < 200:
+                        dist_data.append({"ma": d["ma"], "pe": float(pe),
+                            "roe": float(roe) * 100 if roe and -0.5 < roe < 0.5 else None,
+                            "beta": float(beta) if beta and 0 < float(beta) < 3 else None})
             if dist_data:
                 df_dist = pd.DataFrame(dist_data)
                 fig_dist = make_subplots(rows=1, cols=3, subplot_titles=("Phân phối P/E", "Phân phối ROE %", "Phân phối Beta"))
                 fig_dist.add_trace(go.Histogram(x=df_dist["pe"].dropna(), nbinsx=20,
                     marker_color='#2196F3', name='P/E', showlegend=False), row=1, col=1)
-                if "roe" in df_dist.columns:
+                if "roe" in df_dist.columns and df_dist["roe"].notna().any():
                     fig_dist.add_trace(go.Histogram(x=df_dist["roe"].dropna(), nbinsx=20,
                         marker_color='#4CAF50', name='ROE', showlegend=False), row=1, col=2)
-                if "beta" in df_dist.columns:
+                if "beta" in df_dist.columns and df_dist["beta"].notna().any():
                     fig_dist.add_trace(go.Histogram(x=df_dist["beta"].dropna(), nbinsx=20,
                         marker_color='#FF9800', name='Beta', showlegend=False), row=1, col=3)
                 fig_dist.update_layout(height=350, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
@@ -8221,31 +8239,45 @@ elif st.session_state.trang_thai == "deep_analysis":
                 d4.metric("📊 ROE Mean", f"{df_dist['roe'].dropna().mean():.1f}%" if df_dist['roe'].notna().any() else "N/A")
                 d5.metric("📊 Beta Median", f"{df_dist['beta'].dropna().median():.2f}" if df_dist['beta'].notna().any() else "N/A")
                 d6.metric("📊 Beta Mean", f"{df_dist['beta'].dropna().mean():.2f}" if df_dist['beta'].notna().any() else "N/A")
-                st.caption(f"📊 Histogram phân phối P/E, ROE, Beta cho {len(df_dist)} mã VN từ yfinance.info. P/E median 12-15 = thị trường hợp lý. ROE median 12-15% = chất lượng tốt.")
+                st.caption(f"📊 Histogram phân phối P/E, ROE, Beta cho {len(df_dist)} mã từ yfinance. P/E median 12-15 = thị trường hợp lý. ROE median 12-15% = chất lượng tốt.")
         else:
             st.info("⚠️ Cần dữ liệu thị trường.")
 
         st.write("---")
         st.write("## 🌐 CROSS-SECTOR COMPARISON — So sánh đa ngành (Boxplot)")
         if market_data and len(market_data) >= 5:
-            with st.spinner("📡 Tải P/E, ROE, beta theo ngành..."):
-                cs_data = []
-                for d in market_data:
-                    ma = d["ma"]
-                    try:
-                        import yfinance as _yf_cs
-                        info = _yf_cs.Ticker(ma + ".VN").info
-                        pe = info.get("trailingPE")
-                        roe = info.get("returnOnEquity")
-                        beta = info.get("beta")
-                        if pe and 0 < pe < 200:
-                            cs_data.append({"nganh": d.get("nganh", "Khác"),
-                                "pe": float(pe),
-                                "roe": float(roe) * 100 if roe and -0.5 < roe < 0.5 else None,
-                                "beta": float(beta) if beta and 0 < beta < 3 else None,
-                                "ret_3m": d.get("ret_3m", 0)})
-                    except Exception:
-                        continue
+            cs_data = []
+            with st.spinner("📡 Tải P/E, ROE, Beta song song theo ngành..."):
+                import yfinance as _yf_cs
+                cs_targets = [(d["ma"], ".VN" if d.get("vung") == "VN" else "", d.get("nganh", "Khác"), d.get("ret_3m", 0)) for d in market_data[:100]]
+                with ThreadPoolExecutor(max_workers=15) as _ex_cs:
+                    def _fetch_cs(t):
+                        _info = _yf_cs.Ticker(t[0] + t[1]).info if t[1] else _yf_cs.Ticker(t[0]).info
+                        return _info, t[2], t[3]
+                    _futs_cs = {_ex_cs.submit(_fetch_cs, t): t for t in cs_targets}
+                    for _f in as_completed(_futs_cs):
+                        try:
+                            _inf, _ng, _r3 = _f.result()
+                            pe = _inf.get("trailingPE") or _inf.get("forwardPE")
+                            roe = _inf.get("returnOnEquity")
+                            beta = _inf.get("beta")
+                            if pe and 0 < float(pe) < 200:
+                                cs_data.append({"nganh": _ng, "pe": float(pe),
+                                    "roe": float(roe) * 100 if roe and -0.5 < roe < 0.5 else None,
+                                    "beta": float(beta) if beta and 0 < float(beta) < 3 else None,
+                                    "ret_3m": _r3})
+                        except Exception:
+                            continue
+            if not cs_data:
+                for d in market_data[:100]:
+                    pe = d.get("pe") or d.get("trailingPE")
+                    roe = d.get("roe")
+                    beta = d.get("beta")
+                    if pe and 0 < float(pe) < 200:
+                        cs_data.append({"nganh": d.get("nganh", "Khác"), "pe": float(pe),
+                            "roe": float(roe) * 100 if roe and -0.5 < roe < 0.5 else None,
+                            "beta": float(beta) if beta and 0 < float(beta) < 3 else None,
+                            "ret_3m": d.get("ret_3m", 0)})
             if cs_data:
                 df_cs = pd.DataFrame(cs_data)
                 fig_cs = make_subplots(rows=1, cols=3, subplot_titles=("P/E theo ngành", "ROE % theo ngành", "Return 3M theo ngành"))
