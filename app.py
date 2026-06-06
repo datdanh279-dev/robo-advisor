@@ -670,7 +670,7 @@ console.log = function() {
     };
 })();
 window.addEventListener('error', function(e) {
-    if (e && e.message && (e.message.indexOf('removeChild') > -1 || e.message.indexOf('NotFoundError') > -1)) {
+    if (e && e.message && e.message.indexOf('removeChild') > -1) {
         e.preventDefault();
         e.stopPropagation();
         return false;
@@ -9053,23 +9053,14 @@ elif st.session_state.trang_thai == "chat":
                     unsafe_allow_html=True,
                 )
 
-        col2, col3 = st.columns([6, 1])
-        with col2:
-            with st.form(key="chat_form", clear_on_submit=True):
-                cau_hoi = st.text_input(
-                    "Câu hỏi của bạn:",
-                    placeholder="VD: Nên đầu tư cổ phiếu gì?",
-                    key="chat_input",
-                    label_visibility="collapsed",
-                )
-                submitted = st.form_submit_button("Gửi", use_container_width=True)
-                if submitted and cau_hoi:
-                    st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
-                    st.session_state.chat_pending = cau_hoi
-        with col3:
-            if st.session_state.chat_history and st.button("🗑️ Xóa", key="clear_chat", use_container_width=True, help="Xóa lịch sử chat"):
-                st.session_state.chat_history = []
-                st.session_state.chat_pending = None
+        cau_hoi = st.chat_input("VD: Nên đầu tư cổ phiếu gì?", key="chat_input")
+        if cau_hoi:
+            st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
+            st.session_state.chat_pending = cau_hoi
+
+        if st.session_state.chat_history and st.button("🗑️ Xóa", key="clear_chat", use_container_width=True, help="Xóa lịch sử chat"):
+            st.session_state.chat_history = []
+            st.session_state.chat_pending = None
 
     # Inline chat processing: no st.status, no st.rerun
     if st.session_state.get("chat_pending"):
@@ -9088,9 +9079,6 @@ elif st.session_state.trang_thai == "chat":
             save_chat(username, "bot", _tra_loi)
         except Exception:
             pass
-
-    if "expert_pending" not in st.session_state:
-        st.session_state.expert_pending = None
 
     if tab_expert_v2 is not None:
         with tab_expert_v2:
@@ -9123,35 +9111,36 @@ elif st.session_state.trang_thai == "chat":
 
                 if "expert_results" not in st.session_state:
                     st.session_state.expert_results = None
+                if "expert_pending" not in st.session_state:
+                    st.session_state.expert_pending = None
 
-                with st.form(key="expert_form", clear_on_submit=True):
-                    cau_hoi = st.text_input(
-                        "Câu hỏi của bạn:",
-                        placeholder="VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
-                        key="expert_question",
-                        label_visibility="collapsed",
-                    )
-                    submitted = st.form_submit_button("🚀 Hỏi 6 Chuyên Gia", use_container_width=True)
-                    if submitted and cau_hoi:
-                        st.session_state.expert_pending = cau_hoi
+                cau_hoi = st.chat_input(
+                    "VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
+                    key="expert_chat_input",
+                )
+                if cau_hoi:
+                    st.session_state.expert_pending = cau_hoi
+                    st.session_state.expert_results = None
+                    st.session_state.expert_status = None
 
-                # Inline expert processing: no st.status, no st.rerun
                 if st.session_state.get("expert_pending"):
                     _q = st.session_state.expert_pending
                     st.session_state.expert_pending = None
-                    st.markdown("🔄 Đang kết nối 6 chuyên gia (30-90 giây)...")
-                    try:
-                        results = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS)
-                        if results and isinstance(results, dict) and results.get("experts"):
-                            st.session_state.expert_results = results
-                            st.session_state.expert_status = "ok"
-                            st.session_state.expert_mode = results.get("mode", "cao_cap")
-                        else:
-                            st.session_state.expert_results = results
-                            st.session_state.expert_status = "empty"
-                    except Exception as _expert_err:
-                        st.session_state.expert_status = "error"
-                        st.session_state.expert_error = str(_expert_err)
+                    with st.chat_message("user"):
+                        st.write(_q)
+                    with st.spinner("🔄 Đang kết nối 6 chuyên gia (30-90 giây)..."):
+                        try:
+                            results = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS)
+                            if results and isinstance(results, dict) and results.get("experts"):
+                                st.session_state.expert_results = results
+                                st.session_state.expert_status = "ok"
+                                st.session_state.expert_mode = results.get("mode", "cao_cap")
+                            else:
+                                st.session_state.expert_results = results
+                                st.session_state.expert_status = "empty"
+                        except Exception as _expert_err:
+                            st.session_state.expert_status = "error"
+                            st.session_state.expert_error = str(_expert_err)
 
                 if st.session_state.get("expert_status") == "ok":
                     _mode = st.session_state.get("expert_mode", "cao_cap")
