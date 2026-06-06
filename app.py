@@ -9126,21 +9126,20 @@ elif st.session_state.trang_thai == "chat":
                 if st.session_state.get("expert_pending"):
                     _q = st.session_state.expert_pending
                     st.session_state.expert_pending = None
-                    with st.chat_message("user"):
-                        st.write(_q)
-                    with st.spinner("🔄 Đang kết nối 6 chuyên gia (30-90 giây)..."):
-                        try:
-                            results = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS)
-                            if results and isinstance(results, dict) and results.get("experts"):
-                                st.session_state.expert_results = results
-                                st.session_state.expert_status = "ok"
-                                st.session_state.expert_mode = results.get("mode", "cao_cap")
-                            else:
-                                st.session_state.expert_results = results
-                                st.session_state.expert_status = "empty"
-                        except Exception as _expert_err:
-                            st.session_state.expert_status = "error"
-                            st.session_state.expert_error = str(_expert_err)
+                    st.markdown(f"**Bạn:** {_q}")
+                    st.markdown("⏳ Đang kết nối 6 chuyên gia (30-90 giây)...")
+                    try:
+                        results = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS)
+                        if results and isinstance(results, dict) and results.get("experts"):
+                            st.session_state.expert_results = results
+                            st.session_state.expert_status = "ok"
+                            st.session_state.expert_mode = results.get("mode", "cao_cap")
+                        else:
+                            st.session_state.expert_results = results
+                            st.session_state.expert_status = "empty"
+                    except Exception as _expert_err:
+                        st.session_state.expert_status = "error"
+                        st.session_state.expert_error = str(_expert_err)
 
                 if st.session_state.get("expert_status") == "ok":
                     _mode = st.session_state.get("expert_mode", "cao_cap")
