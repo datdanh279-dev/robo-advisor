@@ -6482,6 +6482,7 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 💧 Liquidity Stress Test — Test thanh khoản (Position / ADTV)")
+        market_data = st.session_state.get("chat_market_data") or []
         if has_real and market_data and len(market_data) >= 5:
             try:
                 liq_rows = []
