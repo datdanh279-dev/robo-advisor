@@ -8562,39 +8562,45 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🔥 Heatmap Tỷ suất Cổ tức theo Ngành — Sector Dividend Yield Map")
-        if market_data and len(market_data) >= 5:
-            _sector_dy = {}
-            for d in market_data:
-                ng = d.get("nganh", "Khác")
-                dy_val = d.get("dividend_yield") or d.get("co_tuc_pct", 0)
-                if dy_val and isinstance(dy_val, (int, float)) and 0 < float(dy_val) < 0.5:
-                    _sector_dy.setdefault(ng, []).append(float(dy_val) * 100)
-            if _sector_dy:
-                _sec_dy_df = pd.DataFrame([
-                    {"Ngành": ng, "Cổ tức TB %": round(np.mean(vals), 2),
-                     "Cổ tức Cao nhất %": round(max(vals), 2),
-                     "Số mã": len(vals)}
-                    for ng, vals in sorted(_sector_dy.items(), key=lambda x: np.mean(x[1]), reverse=True)
-                ])
-                fig_dy = go.Figure(data=go.Heatmap(
-                    z=[_sec_dy_df["Cổ tức TB %"].values],
-                    x=_sec_dy_df["Ngành"].values,
-                    y=["Cổ tức TB %"],
-                    colorscale="YlOrRd",
-                    text=[f"{v:.2f}%" for v in _sec_dy_df["Cổ tức TB %"].values],
-                    texttemplate="%{text}",
-                    hovertemplate="Ngành: %{x}<br>Cổ tức TB: %{z:.2f}%<extra></extra>"
-                ))
-                fig_dy.update_layout(height=200, margin=dict(l=20, r=20, t=10, b=60),
-                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                    font=dict(color="#ECE8E1"))
-                st.plotly_chart(fig_dy, use_container_width=True)
-                st.dataframe(_sec_dy_df, use_container_width=True, hide_index=True)
-                st.caption("🔥 Ngành có cổ tức trung bình cao nhất. Dữ liệu từ yfinance + co_phieu_vn.json.")
-            else:
-                st.info("⚠️ Chưa có dữ liệu cổ tức.")
+        _co_phieu_vn = DOCS.get("co_phieu_vn") or {}
+        _cp_vn_items = _co_phieu_vn.items() if isinstance(_co_phieu_vn, dict) else []
+        _sector_dy = {}
+        for _ma_vn, _info_vn in _cp_vn_items:
+            _ng = _info_vn.get("nganh", "Khác") or "Khác"
+            _ct = _info_vn.get("co_tuc_pct", 0)
+            if _ct and isinstance(_ct, (int, float)) and 0 < float(_ct) < 50:
+                _sector_dy.setdefault(_ng, []).append(float(_ct))
+        for _ma_dm, _info_dm in dm.items():
+            if _ma_dm not in _co_phieu_vn:
+                _ki_dm = kpi.get(_ma_dm, {}) or {}
+                _dy_dm = _ki_dm.get("dividend_yield", 0)
+                if _dy_dm and isinstance(_dy_dm, (int, float)) and 0 < float(_dy_dm) < 0.5:
+                    _ng_dm = _ki_dm.get("nganh", "Khác") or "Khác"
+                    _sector_dy.setdefault(_ng_dm, []).append(float(_dy_dm) * 100)
+        if _sector_dy:
+            _sec_dy_df = pd.DataFrame([
+                {"Ngành": ng, "Cổ tức TB %": round(np.mean(vals), 2),
+                 "Cổ tức Cao nhất %": round(max(vals), 2),
+                 "Số mã": len(vals)}
+                for ng, vals in sorted(_sector_dy.items(), key=lambda x: np.mean(x[1]), reverse=True)
+            ])
+            fig_dy = go.Figure(data=go.Heatmap(
+                z=[_sec_dy_df["Cổ tức TB %"].values],
+                x=_sec_dy_df["Ngành"].values,
+                y=["Cổ tức TB %"],
+                colorscale="YlOrRd",
+                text=[f"{v:.2f}%" for v in _sec_dy_df["Cổ tức TB %"].values],
+                texttemplate="%{text}",
+                hovertemplate="Ngành: %{x}<br>Cổ tức TB: %{z:.2f}%<extra></extra>"
+            ))
+            fig_dy.update_layout(height=200, margin=dict(l=20, r=20, t=10, b=60),
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#ECE8E1"))
+            st.plotly_chart(fig_dy, use_container_width=True)
+            st.dataframe(_sec_dy_df, use_container_width=True, hide_index=True)
+            st.caption(f"🔥 Ngành có cổ tức trung bình cao nhất. Dữ liệu từ co_phieu_vn.json ({len(_co_phieu_vn)} mã VN) + yfinance.")
         else:
-            st.info("⚠️ Cần dữ liệu thị trường để phân tích cổ tức theo ngành.")
+            st.info("⚠️ Không có dữ liệu cổ tức từ co_phieu_vn.json hoặc yfinance.")
 
         st.write("---")
         st.write("## 🔄 Phân tích Mùa vụ — Seasonality Analysis (384 mã)")
