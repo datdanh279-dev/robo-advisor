@@ -1952,48 +1952,74 @@ def _render_tonghop():
                     info = kpi_data.get(ma, {}) or co_phieu_vn.get(ma, {})
                     sector_map[ma] = (info.get("nganh", "") or info.get("sector", "") or "Khác").strip()
                     beta_map[ma] = float(info.get("beta", 1.0) or 1.0)
-                import yfinance as _yf_corr
                 n = len(ma_heat)
                 corr = np.eye(n)
                 used_real = 0
-                for i in range(n):
-                    for j in range(i+1, n):
-                        rho_real = None
-                        try:
-                            sym_i = ma_heat[i] + ".VN"
-                            sym_j = ma_heat[j] + ".VN"
-                            hi = _yf_corr.Ticker(sym_i).history(period="6mo", timeout=5)
-                            hj = _yf_corr.Ticker(sym_j).history(period="6mo", timeout=5)
-                            if not hi.empty and not hj.empty and len(hi) > 20 and len(hj) > 20:
-                                ri = hi['Close'].pct_change().dropna()
-                                rj = hj['Close'].pct_change().dropna()
-                                common = sorted(set(ri.index) & set(rj.index))
-                                if len(common) > 15:
-                                    rho_real = float(ri.loc[common].corr(rj.loc[common]))
-                                    used_real += 1
-                        except Exception:
-                            pass
-                        if rho_real is not None:
-                            corr[i, j] = max(-0.95, min(0.95, rho_real))
-                        else:
+                _stocks_data = {}
+                _vn_set_c = set((DOCS.get("co_phieu_vn") or {}).keys())
+                _to_fetch = [(ma, ".VN" if ma in _vn_set_c else "") for ma in ma_heat]
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                import yfinance as _yf_batch
+                def _fetch_one_corr(item):
+                    sym, sfx = item
+                    try:
+                        t = _yf_batch.Ticker(sym + sfx)
+                        h = t.history(period="6mo", timeout=5)
+                        if not h.empty and len(h) > 20:
+                            r = h['Close'].pct_change().dropna()
+                            return sym, r
+                    except Exception:
+                        pass
+                    return sym, None
+                with ThreadPoolExecutor(max_workers=20) as exe:
+                    futs = {exe.submit(_fetch_one_corr, item): item for item in _to_fetch}
+                    for fut in as_completed(futs):
+                        sym, rets = fut.result()
+                        if rets is not None and len(rets) > 15:
+                            _stocks_data[sym] = rets
+                if len(_stocks_data) >= 2:
+                    ordered = [m for m in ma_heat if m in _stocks_data]
+                    for i in range(len(ordered)):
+                        for j in range(i+1, len(ordered)):
+                            ri = _stocks_data[ordered[i]]
+                            rj = _stocks_data[ordered[j]]
+                            common = sorted(set(ri.index) & set(rj.index))
+                            if len(common) > 15:
+                                corr[i, j] = max(-0.95, min(0.95, float(ri.loc[common].corr(rj.loc[common]))))
+                                corr[j, i] = corr[i, j]
+                                used_real += 1
+                            else:
+                                if sector_map.get(ordered[i]) == sector_map.get(ordered[j]) and sector_map.get(ordered[i], "Khác") != "Khác":
+                                    base = 0.72
+                                else:
+                                    base = 0.32
+                                bi = beta_map.get(ordered[i], 1.0)
+                                bj = beta_map.get(ordered[j], 1.0)
+                                corr[i, j] = max(-0.95, min(0.95, base + 0.05 * (bi-1)*(bj-1)))
+                                corr[j, i] = corr[i, j]
+                    df_corr = pd.DataFrame(corr, index=ordered, columns=ordered)
+                else:
+                    for i in range(n):
+                        for j in range(i+1, n):
                             if sector_map[ma_heat[i]] == sector_map[ma_heat[j]] and sector_map[ma_heat[i]] != "Khác":
                                 base = 0.72
                             else:
                                 base = 0.32
-                            beta_i, beta_j = beta_map[ma_heat[i]], beta_map[ma_heat[j]]
-                            beta_adj = 0.05 * (beta_i - 1) * (beta_j - 1)
-                            corr[i, j] = max(-0.95, min(0.95, base + beta_adj))
-                        corr[j, i] = corr[i, j]
-                df_corr = pd.DataFrame(corr, index=ma_heat, columns=ma_heat)
+                            bi, bj = beta_map[ma_heat[i]], beta_map[ma_heat[j]]
+                            corr[i, j] = max(-0.95, min(0.95, base + 0.05*(bi-1)*(bj-1)))
+                            corr[j, i] = corr[i, j]
+                    df_corr = pd.DataFrame(corr, index=ma_heat, columns=ma_heat)
                 if used_real > 0:
                     title_corr = f"Ma trận tương quan từ giá thật (yfinance 6T, {used_real}/{n*(n-1)//2} cặp)"
                 else:
                     title_corr = "Ma trận tương quan (yfinance tạm không khả dụng)"
-                fig_heat = px.imshow(df_corr, text_auto=".2f", color_continuous_scale="RdBu_r",
-                    zmin=-1, zmax=1, title=title_corr)
-                fig_heat.update_layout(height=450,
+                fig_heat = go.Figure(data=go.Heatmap(
+                    z=df_corr.values, x=list(df_corr.columns), y=list(df_corr.index),
+                    text=df_corr.values.round(2), texttemplate="%{text}", textfont={"color": "#ECE8E1"},
+                    colorscale="RdBu_r", zmin=-1, zmax=1))
+                fig_heat.update_layout(height=450, title=title_corr,
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
-                st.plotly_chart(fig_heat, width='stretch')
+                st.plotly_chart(fig_heat, use_container_width=True)
                 if used_real > 0:
                     st.caption(f"✅ Tương quan tính từ giá thật {used_real}/{n*(n-1)//2} cặp mã (yfinance 6T).")
                 else:
@@ -7373,11 +7399,16 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.write("**Top 10 mã vốn hóa lớn nhất:**")
                 st.dataframe(df_cap.head(10)[["ma", "ten", "gia", "von_hoa_ty"]].round(1),
                     use_container_width=True, hide_index=True)
-                fig_cap = px.bar(df_cap.head(20), x="ma", y="von_hoa_ty",
-                    color="von_hoa_ty", color_continuous_scale="Viridis",
-                    labels={"ma": "Mã CP", "von_hoa_ty": "Vốn hóa (tỷ VND)"},
-                    title="Top 20 mã vốn hóa lớn nhất (tỷ VND)")
-                fig_cap.update_layout(height=350, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                _top20 = df_cap.head(20)
+                fig_cap = go.Figure(data=go.Bar(
+                    x=_top20["ma"], y=_top20["von_hoa_ty"],
+                    marker=dict(color=_top20["von_hoa_ty"], colorscale="Viridis", showscale=True,
+                        colorbar=dict(title="Tỷ VND", x=1.02)),
+                    text=_top20["von_hoa_ty"].round(0), textposition="outside",
+                    hovertemplate="%{x}<br>%{y:,.0f} tỷ VND<extra></extra>"))
+                fig_cap.update_layout(height=350, title="Top 20 mã vốn hóa lớn nhất (tỷ VND)",
+                    xaxis_title="Mã CP", yaxis_title="Vốn hóa (tỷ VND)",
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
                 st.plotly_chart(fig_cap, use_container_width=True)
                 st.caption(f"📊 Tính từ marketCap của {len(cap_data)} mã từ yfinance.info. Tổng vốn hóa ≈ quy mô thị trường. Top 5 = blue chips chiếm {top5_pct:.1f}%.")
         else:
@@ -8840,11 +8871,13 @@ elif st.session_state.trang_thai == "dashboard":
                 "Ngành": list(nganh_data.keys()),
                 "Tỷ trọng": [v*100 for v in nganh_data.values()]
             }).sort_values("Tỷ trọng", ascending=False)
-            fig = px.pie(df_nganh, values="Tỷ trọng", names="Ngành",
-                         title="Tỷ trọng danh mục theo ngành",
-                         color_discrete_sequence=px.colors.sequential.YlOrRd)
+            fig = go.Figure(data=go.Pie(
+                labels=df_nganh["Ngành"], values=df_nganh["Tỷ trọng"],
+                marker=dict(colors=px.colors.sequential.YlOrRd[:len(df_nganh)]),
+                textinfo="label+percent", hole=0.3))
             fig.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)", font_color="#ECE8E1",
+                title="Tỷ trọng danh mục theo ngành",
+                paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"),
                 plot_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=20, r=20, t=40, b=20)
             )
