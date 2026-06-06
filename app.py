@@ -9083,7 +9083,7 @@ elif st.session_state.trang_thai == "chat":
     def _expert_tab_ui():
         st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
         st.markdown(
-            "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại** do AI đóng vai. "
+            "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại**. "
             "Chủ tịch Hội đồng sẽ tổng hợp và chọn ra phương án tốt nhất."
         )
         st.markdown("---")
