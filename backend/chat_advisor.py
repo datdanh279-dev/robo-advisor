@@ -1204,6 +1204,8 @@ def tim_cau_tra_loi(cau_hoi, lich_su=None, context=None):
     if smart:
         return smart
 
+    return _xu_ly_fallback(cau_hoi, cau_thuong, cau_khong_dau, lich_su)
+
 
 def _xu_ly_smart(cau_hoi, cau_thuong, cau_khong_dau, ctx):
     """Trả lời thông minh dựa trên ngữ cảnh DM user + real-time market data.
@@ -1611,6 +1613,10 @@ def _goi_y_mua_theo_risk(risk, market_data, dm, kpi):
         f"• Khối ngoại mua/bán ròng\n\n"
         f"💡 *\"Đừng bao giờ mua cổ phiếu mà bạn không hiểu.\" — Warren Buffett*"
     )
+
+def _xu_ly_fallback(cau_hoi, cau_thuong, cau_khong_dau, lich_su):
+    """Fallback handler: AI advisors, comparison, stock info, crypto, gold, etc."""
+    global STOCK_INFO, WORLD_STOCK_INFO
 
     for tu_khoa in ["tạm biệt", "cảm ơn", "hello", "xin chào"]:
         if tu_khoa in cau_thuong or xu_ly_bo_dau(tu_khoa) in cau_khong_dau:

@@ -289,42 +289,42 @@ async def _call_expert(session, expert, question, api_keys, semaphore, context="
     async with semaphore:
         await asyncio.sleep(0.3)  # Stagger 300ms giữa các request để tránh rate limit
 
-    if expert["backend"] == "openai":
-        api_key = api_keys.get("openai")
-        if not api_key:
-            return "❌ OPENAI_API_KEY chưa được cấu hình."
-        kwargs["api_key"] = api_key
-        kwargs["model"] = expert["model"]
-        result = await _call_openai(session, **kwargs)
+        if expert["backend"] == "openai":
+            api_key = api_keys.get("openai")
+            if not api_key:
+                return "❌ OPENAI_API_KEY chưa được cấu hình."
+            kwargs["api_key"] = api_key
+            kwargs["model"] = expert["model"]
+            result = await _call_openai(session, **kwargs)
 
-    elif expert["backend"] == "groq":
-        api_key = api_keys.get("groq")
-        if not api_key:
-            return "❌ GROQ_API_KEY chưa được cấu hình.\n\nLấy key miễn phí tại https://console.groq.com/keys (không cần thẻ tín dụng)."
-        kwargs["api_key"] = api_key
-        kwargs["model"] = expert["model"]
-        result = await _call_groq(session, **kwargs)
+        elif expert["backend"] == "groq":
+            api_key = api_keys.get("groq")
+            if not api_key:
+                return "❌ GROQ_API_KEY chưa được cấu hình.\n\nLấy key miễn phí tại https://console.groq.com/keys (không cần thẻ tín dụng)."
+            kwargs["api_key"] = api_key
+            kwargs["model"] = expert["model"]
+            result = await _call_groq(session, **kwargs)
 
-    elif expert["backend"] == "gemini":
-        api_key = api_keys.get("gemini")
-        if not api_key:
-            return "❌ GEMINI_API_KEY chưa được cấu hình."
-        kwargs["api_key"] = api_key
-        kwargs["model"] = expert["model"]
-        result = await _call_gemini(session, **kwargs)
+        elif expert["backend"] == "gemini":
+            api_key = api_keys.get("gemini")
+            if not api_key:
+                return "❌ GEMINI_API_KEY chưa được cấu hình."
+            kwargs["api_key"] = api_key
+            kwargs["model"] = expert["model"]
+            result = await _call_gemini(session, **kwargs)
 
-    elif expert["backend"] == "openrouter":
-        api_key = api_keys.get("openrouter")
-        if not api_key:
-            return "❌ OPENROUTER_API_KEY chưa được cấu hình.\n\nDùng OpenRouter (https://openrouter.ai) để truy cập Qwen, DeepSeek, Claude, và các model khác."
-        kwargs["api_key"] = api_key
-        kwargs["model"] = expert["model"]
-        result = await _call_openrouter(session, **kwargs)
+        elif expert["backend"] == "openrouter":
+            api_key = api_keys.get("openrouter")
+            if not api_key:
+                return "❌ OPENROUTER_API_KEY chưa được cấu hình.\n\nDùng OpenRouter (https://openrouter.ai) để truy cập Qwen, DeepSeek, Claude, và các model khác."
+            kwargs["api_key"] = api_key
+            kwargs["model"] = expert["model"]
+            result = await _call_openrouter(session, **kwargs)
 
-    else:
-        result = None
+        else:
+            result = None
 
-    return result or f"⚠️ {expert['name']} không thể trả lời ngay lúc này."
+        return result or f"⚠️ {expert['name']} không thể trả lời ngay lúc này."
 
 
 async def _call_chairman(session, question, expert_results, api_key, api_keys):
