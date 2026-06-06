@@ -9080,7 +9080,6 @@ elif st.session_state.trang_thai == "chat":
         except Exception:
             pass
 
-    @st.fragment
     def _expert_tab_ui():
         st.markdown("### 👑 Hội đồng 6 Chuyên gia — Huyền thoại Đầu tư Thế giới")
         st.markdown(
@@ -9157,24 +9156,26 @@ elif st.session_state.trang_thai == "chat":
                 st.warning("⚠️ Kết quả không hợp lệ. Vui lòng thử lại.")
                 st.session_state.expert_results = None
             else:
-                st.markdown("---")
-                st.markdown("### 🗳️ Ý kiến Chuyên gia")
-
-                cols = st.columns(3)
-                for i, expert in enumerate(results["experts"]):
-                    with cols[i % 3]:
-                        resp = expert.get("response") or "⚠️ Không có phản hồi."
-                        with st.expander(
-                            f"**{expert.get('name', 'Chuyên gia')}** — {expert.get('title', '')}",
-                            expanded=(i < 3),
-                        ):
-                            st.write(resp)
-
+                parts = ['<hr style="border-color:rgba(255,215,0,0.2);">', '<h3 style="color:#FFD700;">🗳️ Ý kiến Chuyên gia</h3>']
+                for expert in results["experts"]:
+                    name = expert.get("name", "Chuyên gia")
+                    title = expert.get("title", "")
+                    resp = expert.get("response") or "⚠️ Không có phản hồi."
+                    _safe_resp = resp.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+                    parts.append(
+                        f'<details style="margin-bottom:8px;background:rgba(255,255,255,0.02);'
+                        f'border:1px solid rgba(255,215,0,0.15);border-radius:8px;padding:8px 12px;">'
+                        f'<summary style="font-weight:600;cursor:pointer;color:#FFD700;">{name} — {title}</summary>'
+                        f'<div style="margin-top:8px;color:#ECE8E1;font-size:0.9rem;line-height:1.5;">{_safe_resp}</div>'
+                        f'</details>'
+                    )
                 chairman = results.get("chairman")
                 if chairman:
-                    st.write("---")
-                    st.write("#### 👑 Kết luận của Chủ tịch Hội đồng")
-                    st.write(chairman)
+                    _safe_chair = chairman.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    parts.append('<hr style="border-color:rgba(255,215,0,0.2);">')
+                    parts.append('<h4 style="color:#FFD700;">👑 Kết luận của Chủ tịch Hội đồng</h4>')
+                    parts.append(f'<div style="color:#ECE8E1;font-size:0.9rem;line-height:1.6;">{_safe_chair}</div>')
+                st.markdown("\n".join(parts), unsafe_allow_html=True)
 
             if st.button("🗑️ Xóa kết quả", use_container_width=True, key="clear_expert"):
                 st.session_state.expert_results = None
