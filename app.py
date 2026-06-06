@@ -5458,41 +5458,62 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 💰 Earnings Yield vs Lãi suất — Định giá tương đối")
-        if has_real and len(dm_equity) > 0 and len(weights) > 0:
+        if dm and len(dm) >= 2:
             weighted_pe = 0
             weighted_eps_yield = 0
-            for ma, w in zip(dm.keys(), weights):
-                if w <= 0: continue
-                ki = kpi.get(ma, {})
-                pe_v = float(ki.get("pe", 0) or 0)
+            _ey_count = 0
+            for ma, d in dm.items():
+                w = float(d.get("ty_trong_muc_tieu", 0))
+                if w <= 0:
+                    continue
+                pe_v = float(kpi.get(ma, {}).get("pe", 0) or 0)
+                if pe_v <= 0:
+                    pe_v = float((DOCS.get("co_phieu_vn") or {}).get(ma, {}).get("pe", 0) or 0)
                 if pe_v > 0:
                     weighted_pe += pe_v * w
                     weighted_eps_yield += (1/pe_v) * w
+                    _ey_count += 1
             bond_yield_now = 0
-            if vn_bond_close is not None and len(vn_bond_close) > 0:
+            if "vn_bond_close" in dir() and vn_bond_close is not None and len(vn_bond_close) > 0:
                 bv = float(vn_bond_close.iloc[-1])
                 if 0 < bv < 1:
                     bond_yield_now = bv * 100
                 elif 1 <= bv < 50:
                     bond_yield_now = bv
-                else:
-                    bond_yield_now = 0
-            if 0 < bond_yield_now < 30 and weighted_eps_yield > 0:
+            if bond_yield_now <= 0:
+                try:
+                    import yfinance as _yf_bond
+                    _b = _yf_bond.Ticker("^VN10Y").history(period="1mo", timeout=5)
+                    if not _b.empty:
+                        bv = float(_b['Close'].iloc[-1])
+                        if 0 < bv < 1:
+                            bond_yield_now = bv * 100
+                        elif 1 <= bv < 50:
+                            bond_yield_now = bv
+                except Exception:
+                    pass
+            if 0 < bond_yield_now < 30 and _ey_count > 0:
                 equity_risk_premium = (weighted_eps_yield - bond_yield_now) * 100
                 verdict = "✅ Hấp dẫn" if equity_risk_premium > 3 else ("🟡 Hợp lý" if equity_risk_premium > 0 else "🔴 Đắt")
                 erp1, erp2, erp3 = st.columns(3)
                 erp1.metric("📊 P/E TB DM", f"{weighted_pe:.1f}", help="Trung bình có trọng số theo tỷ trọng DM")
                 erp2.metric("💵 Earnings Yield", f"{weighted_eps_yield*100:.2f}%", help="1/P/E — lợi suất từ lợi nhuận")
-                erp3.metric("🏦 Lãi suất TPCP 10Y", f"{bond_yield_now:.2f}%", help="Từ yfinance ^VN10Y/VNI10Y")
+                erp3.metric("🏦 Lãi suất TPCP 10Y", f"{bond_yield_now:.2f}%", help="Từ yfinance ^VN10Y")
                 erp4, erp5 = st.columns(2)
                 erp4.metric("⚖️ Equity Risk Premium", f"{equity_risk_premium:+.2f}%",
                     help="Earnings Yield - Bond Yield. >3% = CP hấp dẫn, <0 = CP đắt hơn TPCP")
                 erp5.metric("🎯 Kết luận", verdict)
-                st.caption(f"📊 Earnings yield TB có trọng số vs TPCP 10Y thật (yfinance). ERP = {equity_risk_premium:+.2f}%.")
+                fw = " và co_phieu_vn.json" if _ey_count > 0 else ""
+                st.caption(f"📊 Earnings yield từ P/E thật (yfinance{fw}) của {_ey_count} mã, vs TPCP 10Y thật. ERP = {equity_risk_premium:+.2f}%.")
             else:
-                st.info("⚠️ Cần P/E các mã + lãi suất TPCP để tính ERP.")
+                _reason = []
+                if _ey_count == 0:
+                    _reason.append("P/E trống")
+                if bond_yield_now <= 0:
+                    _reason.append("lãi suất TPCP không tải được")
+                st.info(f"⚠️ Cần P/E các mã + lãi suất TPCP để tính ERP. ({'; '.join(_reason)})")
         else:
-            st.info("⚠️ Cần giá + KPI thật để tính earnings yield.")
+            st.info("⚠️ Cần danh mục có ít nhất 2 mã để tính earnings yield.")
 
         st.write("---")
         st.write("## 📊 Phân phối Returns — Skewness & Kurtosis")
