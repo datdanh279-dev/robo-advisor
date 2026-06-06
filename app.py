@@ -8243,55 +8243,63 @@ elif st.session_state.trang_thai == "deep_analysis":
 
             st.write("### 🔗 Cross-Correlation Top 50 vốn hóa — Phân nhóm cùng ngành")
             try:
-                import requests as _rq_xc
-                xc_targets = list(market_data)[:50]
-                xc_prices = {}
-                _xc_prog = st.progress(0.0, "Đang tải correlation 50 mã...")
-                with ThreadPoolExecutor(max_workers=15) as ex_xc:
-                    futs_xc = {ex_xc.submit(_fetch_one_chart, (d["ma"], ".VN" if d.get("vung") == "VN" else ""), "3mo", "1d", 3): d for d in xc_targets}
-                    for idx, fut in enumerate(as_completed(futs_xc)):
-                        ma, closes = fut.result()
-                        if len(closes) > 30:
-                            xc_prices[ma] = pd.Series(closes).pct_change().dropna()
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                import requests as _rq_xc2, pandas as _pd_xc2, plotly.graph_objects as _go_xc
+                xc_ma_list = [ma for ma, info in dm.items() if info.get("gia_thi_truong", 0) * info.get("so_luong", 0) > 0 and tong_gt > 0]
+                if len(xc_ma_list) < 2:
+                    st.info("Cần ≥2 mã trong danh mục.")
+                    return
+                _vn_keys_xc = set((DOCS.get("co_phieu_vn") or {}).keys())
+                _xc_prices = {}
+                def _fetch_xc(sym, suffix):
+                    try:
+                        r = _rq_xc2.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
+                            params={"range": "3mo", "interval": "1d"},
+                            timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                        if r.status_code == 200:
+                            d = r.json()
+                            quote = d.get("chart", {}).get("result", [{}])[0]
+                            ts = quote.get("timestamp", [])
+                            cs = quote.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                            pairs = [(t, c) for t, c in zip(ts, cs) if c]
+                            if len(pairs) > 20:
+                                idx = _pd_xc2.to_datetime([p[0] for p in pairs], unit="s")
+                                return sym, _pd_xc2.Series([p[1] for p in pairs], index=idx)
+                    except: pass
+                    return sym, None
+                with ThreadPoolExecutor(max_workers=12) as _ex_xc:
+                    _futs_xc = {_ex_xc.submit(_fetch_xc, m, ".VN" if m in _vn_keys_xc else ""): m for m in xc_ma_list}
+                    for _f_xc in as_completed(_futs_xc):
+                        _s_xc, _p_xc = _f_xc.result()
+                        if _p_xc is not None:
+                            _xc_prices[_s_xc] = _p_xc
+                if len(_xc_prices) >= 2:
+                    _df_xc = _pd_xc2.DataFrame({k: v.pct_change().dropna() for k, v in _xc_prices.items()}).dropna()
+                    if _df_xc.shape[1] >= 2 and len(_df_xc) > 10:
+                        _corr_xc = _df_xc.corr()
+                        _corr_xc = _corr_xc.fillna(0)
+                        _fig_xc2 = _go_xc.Figure(data=_go_xc.Heatmap(
+                            z=_corr_xc.values, x=_corr_xc.columns.tolist(), y=_corr_xc.columns.tolist(),
+                            colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
+                            text=np.round(_corr_xc.values, 2),
+                            texttemplate="%{text}", textfont={"size": 9}))
+                        _fig_xc2.update_layout(height=max(400, 30 * _corr_xc.shape[0]),
+                            title=f"Correlation Matrix — {_corr_xc.shape[0]} mã (3T daily returns)",
+                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                            font=dict(color="#ECE8E1"))
+                        st.plotly_chart(_fig_xc2, use_container_width=True)
                         try:
-                            _xc_prog.progress(min(1.0, (idx + 1) / len(xc_targets)),
-                                              f"Đang tải {idx+1}/{len(xc_targets)} mã...")
+                            _vals_xc = _corr_xc.values
+                            _avg_c = float(_vals_xc[np.triu_indices_from(_vals_xc, k=1)].mean())
+                            st.metric("📊 Correlation TB (cặp đôi)", f"{_avg_c:.3f}",
+                                help="TB corr giữa các cặp mã. Càng gần 0 = đa dạng hóa tốt")
                         except Exception:
                             pass
-                try:
-                    _xc_prog.empty()
-                except Exception:
-                    pass
-                if len(xc_prices) >= 5:
-                    df_xc = pd.DataFrame(xc_prices).dropna()
-                    if len(df_xc) > 10 and df_xc.shape[1] >= 2:
-                        corr_xc = df_xc.corr()
-                        if isinstance(corr_xc, pd.Series):
-                            corr_xc = corr_xc.to_frame()
-                        if isinstance(corr_xc, (int, float, np.floating)):
-                            corr_xc = pd.DataFrame([[corr_xc]])
-                        if hasattr(corr_xc, 'shape') and corr_xc.shape[0] >= 2 and corr_xc.shape[1] >= 2:
-                            fig_xc = px.imshow(corr_xc, text_auto=".2f", color_continuous_scale="RdBu_r",
-                                zmin=-1, zmax=1, aspect="auto",
-                                title=f"Correlation Matrix Top {len(corr_xc)} mã (3T)")
-                            fig_xc.update_layout(height=600,
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                                font=dict(color="#ECE8E1"))
-                            st.plotly_chart(fig_xc, use_container_width=True)
-                            try:
-                                vals = corr_xc.values
-                                avg_corr = float(vals[np.triu_indices_from(vals, k=1)].mean())
-                                st.metric("📊 Correlation TB (cặp đôi)", f"{avg_corr:.3f}",
-                                    help="TB corr giữa các cặp mã. Càng gần 0 = đa dạng hóa tốt")
-                            except Exception:
-                                pass
-                            st.caption(f"📊 Corr>0.7 = cùng nhóm (đỏ đậm), <0.3 = độc lập. Tính từ {len(corr_xc)} mã top 50 vốn hóa daily returns 3T yfinance.")
-                        else:
-                            st.info(f"⚠️ Cần ≥2 mã có dữ liệu để tính correlation. Mới có {corr_xc.shape[0] if hasattr(corr_xc, 'shape') else 1} mã.")
+                        st.caption(f"📊 Corr>0.7 = cùng nhóm (đỏ đậm), <0.3 = độc lập. Tính từ {_corr_xc.shape[0]} mã daily returns 3T yfinance.")
                     else:
-                        st.info(f"⚠️ Cần ≥10 phiên × ≥2 mã để tính correlation. Mới có {len(df_xc)} phiên × {df_xc.shape[1]} mã.")
+                        st.info(f"⚠️ Cần ≥10 phiên × ≥2 mã. Mới {len(_df_xc)} phiên × {_df_xc.shape[1]} mã.")
                 else:
-                    st.info(f"⚠️ Cần ≥5 mã có dữ liệu giá 3T. Mới có {len(xc_prices)} mã.")
+                    st.info("⚠️ Yahoo Finance không trả dữ liệu. Refresh sau 5-10 phút.")
             except Exception as e:
                 st.warning(f"⚠️ Không tính được cross-correlation: {str(e)[:80]}")
 
