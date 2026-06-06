@@ -6182,44 +6182,64 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         st.write("---")
         st.write("## 🔄 Beta Stability — Beta thay đổi qua các kỳ")
-        if has_real and len(real_prices) >= 1 and has_vn30 and dm_equity is not None and len(dm_equity) > 120:
-            eq_s10 = pd.Series(dm_equity)
-            common_b = sorted(set(eq_s10.index) & set(vn30_close.index))
-            if len(common_b) > 120:
-                dm_r = eq_s10.pct_change().dropna()
-                vn_r = vn30_close.pct_change().dropna()
-                common_b2 = sorted(set(dm_r.index) & set(vn_r.index))
-                if len(common_b2) > 120:
-                    chunks = [common_b2[i:i+30] for i in range(0, len(common_b2)-30, 30)]
-                    betas_overtime = []
-                    for chunk in chunks:
-                        if len(chunk) > 15:
-                            b_v = float(np.polyfit(vn_r.loc[chunk], dm_r.loc[chunk], 1)[0])
-                            betas_overtime.append({"Kỳ": f"{pd.Series(dm_r.index).loc[chunk[0]].strftime('%d/%m')}-{pd.Series(dm_r.index).loc[chunk[-1]].strftime('%d/%m')}",
-                                "Beta": round(b_v, 3)})
-                    if betas_overtime:
-                        df_bo = pd.DataFrame(betas_overtime)
-                        st.dataframe(df_bo, use_container_width=True, hide_index=True)
-                        b_vals = [b["Beta"] for b in betas_overtime]
-                        b_mean = float(np.mean(b_vals))
-                        b_std = float(np.std(b_vals))
-                        b_cv = b_std / abs(b_mean) if b_mean != 0 else 0
-                        bs1, bs2, bs3 = st.columns(3)
-                        bs1.metric("📊 Beta TB", f"{b_mean:.3f}")
-                        bs2.metric("📐 Beta std", f"{b_std:.3f}", help="Độ lệch chuẩn của beta qua các kỳ")
-                        bs3.metric("🎯 Beta CV", f"{b_cv:.2f}", help="Coefficient of Variation. <0.2 = ổn định, >0.5 = bất ổn")
-                        stability = "✅ Ổn định" if b_cv < 0.2 else ("🟡 Biến động" if b_cv < 0.5 else "🔴 Bất ổn")
-                        st.write(f"**Beta stability:** {stability}")
-                        fig_b = go.Figure()
-                        fig_b.add_trace(go.Scatter(x=list(range(len(b_vals))), y=b_vals, mode='lines+markers',
-                            line_color='#4FC3F7', marker_size=8, name='Beta theo kỳ'))
-                        fig_b.add_hline(y=b_mean, line_dash="dash", line_color='#FFD700', annotation_text=f"Mean={b_mean:.2f}")
-                        fig_b.update_layout(title="Beta qua các kỳ 30 phiên", xaxis_title="Kỳ", yaxis_title="Beta",
-                            height=320, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
-                        st.plotly_chart(fig_b, use_container_width=True)
-                        st.caption(f"📊 Tính rolling 30-phiên beta trên {len(common_b2)} phiên returns thật yfinance 6T. CV<0.2 = beta ổn định (DM lúc nào cũng giống thị trường).")
-        else:
-            st.info("⚠️ Cần ≥120 phiên + VN30 để tính beta stability.")
+        _bs_shown = False
+        try:
+            _bs_eq = None
+            _bs_vn30 = None
+            if "dm_equity" in dir() and dm_equity is not None and len(dm_equity) > 60:
+                _bs_eq = pd.Series(dm_equity)
+            if "vn30_close" in dir() and vn30_close is not None and len(vn30_close) > 60:
+                _bs_vn30 = vn30_close
+            else:
+                try:
+                    import yfinance as _yf_bs
+                    _b_t = _yf_bs.Ticker("^VN30").history(period="6mo", timeout=5)
+                    if not _b_t.empty and len(_b_t) > 60:
+                        _bs_vn30 = _b_t['Close']
+                except Exception:
+                    pass
+            if _bs_eq is not None and _bs_vn30 is not None:
+                common_b = sorted(set(_bs_eq.index) & set(_bs_vn30.index))
+                if len(common_b) > 30:
+                    dm_r = _bs_eq.pct_change().dropna()
+                    vn_r = _bs_vn30.pct_change().dropna()
+                    common_b2 = sorted(set(dm_r.index) & set(vn_r.index))
+                    if len(common_b2) > 30:
+                        chunk_size = 30
+                        chunks = [common_b2[i:i+chunk_size] for i in range(0, max(len(common_b2)-chunk_size, 1), chunk_size)]
+                        betas_overtime = []
+                        for chunk in chunks:
+                            if len(chunk) > 15:
+                                b_v = float(np.polyfit(vn_r.loc[chunk], dm_r.loc[chunk], 1)[0])
+                                betas_overtime.append({"Kỳ": f"{pd.Series(dm_r.index).loc[chunk[0]].strftime('%d/%m')}-{pd.Series(dm_r.index).loc[chunk[-1]].strftime('%d/%m')}",
+                                    "Beta": round(b_v, 3)})
+                        if betas_overtime:
+                            _bs_shown = True
+                            df_bo = pd.DataFrame(betas_overtime)
+                            st.dataframe(df_bo, use_container_width=True, hide_index=True)
+                            b_vals = [b["Beta"] for b in betas_overtime]
+                            b_mean = float(np.mean(b_vals))
+                            b_std = float(np.std(b_vals))
+                            b_cv = b_std / abs(b_mean) if b_mean != 0 else 0
+                            bs1, bs2, bs3 = st.columns(3)
+                            bs1.metric("📊 Beta TB", f"{b_mean:.3f}")
+                            bs2.metric("📐 Beta std", f"{b_std:.3f}", help="Độ lệch chuẩn của beta qua các kỳ")
+                            bs3.metric("🎯 Beta CV", f"{b_cv:.2f}", help="Coefficient of Variation. <0.2 = ổn định, >0.5 = bất ổn")
+                            stability = "✅ Ổn định" if b_cv < 0.2 else ("🟡 Biến động" if b_cv < 0.5 else "🔴 Bất ổn")
+                            st.write(f"**Beta stability:** {stability}")
+                            fig_b = go.Figure()
+                            fig_b.add_trace(go.Scatter(x=list(range(len(b_vals))), y=b_vals, mode='lines+markers',
+                                line_color='#4FC3F7', marker_size=8, name='Beta theo kỳ'))
+                            fig_b.add_hline(y=b_mean, line_dash="dash", line_color='#FFD700', annotation_text=f"Mean={b_mean:.2f}")
+                            fig_b.update_layout(title="Beta qua các kỳ 30 phiên", xaxis_title="Kỳ", yaxis_title="Beta",
+                                height=320, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
+                            st.plotly_chart(fig_b, use_container_width=True)
+                            st.caption(f"📊 Rolling 30-phiên beta trên {len(common_b2)} phiên returns thật. CV<0.2 = beta ổn định.")
+            if not _bs_shown:
+                n_phi = len(_bs_eq) if _bs_eq is not None else 0
+                st.info(f"⚠️ Cần DM equity + VN30 để tính beta stability. (DM: {n_phi} phiên, VN30: {'có' if _bs_vn30 is not None else 'không'})")
+        except Exception as _bs_err:
+            st.caption(f"⚠️ Beta stability lỗi: {str(_bs_err)[:80]}")
 
         st.write("---")
         st.write("## 📅 Calendar Returns — Hiệu suất theo tháng/quý")
