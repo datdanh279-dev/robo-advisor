@@ -119,7 +119,7 @@ def _seed_default_user():
     try:
         data = _read()
         username = "SÓI CÔ ĐỘC"
-        password = "080888"
+        password = "8f4Tug9LeLkGBi8"
         if not any(u["username"] == username for u in data["users"]):
             slot = len(data["users"]) + 1
             data["users"].append({
