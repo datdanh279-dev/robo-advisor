@@ -428,7 +428,7 @@ def _call_chairman(question, expert_results, api_key, api_keys):
         except Exception as e:
             logger.warning(f"Chairman OpenRouter error: {e}")
 
-    return None
+    return "⚠️ Chủ tịch chưa thể tổng hợp do API tạm thời quá tải. Vui lòng thử lại sau hoặc dùng tab Chat."
 
 
 def _get_key(name):
