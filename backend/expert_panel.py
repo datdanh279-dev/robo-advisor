@@ -1,10 +1,12 @@
+import http.client
 import json
 import logging
 import os
-import requests
+import ssl
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -196,88 +198,103 @@ CHAIRMAN_SYSTEM_PROMPT = (
 
 
 def _call_openai(prompt, question, api_key, model="gpt-4o", timeout=45):
+    import http.client
+    import ssl
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
     ]
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
+    payload = json.dumps({"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}).encode()
     try:
-        r = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            json=payload, headers=headers, timeout=timeout,
-        )
-        if r.status_code == 200:
-            data = r.json()
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection("api.openai.com", timeout=timeout, context=ctx)
+        conn.request("POST", "/v1/chat/completions",
+                      body=payload,
+                      headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+        r = conn.getresponse()
+        body = r.read()
+        if r.status == 200:
+            data = json.loads(body)
             return data["choices"][0]["message"]["content"].strip()
-        logger.warning(f"OpenAI {model} status {r.status_code}")
+        logger.warning(f"OpenAI {model} status {r.status}")
     except Exception as e:
         logger.warning(f"OpenAI {model} error: {e}")
     return None
 
 
 def _call_groq(prompt, question, api_key, model="llama-3.3-70b-versatile", timeout=90):
+    import http.client
+    import ssl
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
     ]
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
+    payload = json.dumps({"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}).encode()
     try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json=payload, headers=headers, timeout=timeout,
-        )
-        if r.status_code == 200:
-            data = r.json()
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection("api.groq.com", timeout=timeout, context=ctx)
+        conn.request("POST", "/openai/v1/chat/completions",
+                      body=payload,
+                      headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+        r = conn.getresponse()
+        body = r.read()
+        if r.status == 200:
+            data = json.loads(body)
             return data["choices"][0]["message"]["content"].strip()
-        logger.warning(f"Groq {model} status {r.status_code}")
-        return f"⚠️ Groq API error (status {r.status_code})"
-    except requests.Timeout:
-        logger.warning(f"Groq {model} timeout after {timeout}s")
-        return f"⚠️ Groq API timeout after {timeout}s"
+        logger.warning(f"Groq {model} status {r.status}")
+        return f"⚠️ Groq API error (status {r.status})"
     except Exception as e:
-        logger.warning(f"Groq {model} error: {e}")
+        tb = traceback.format_exc()
+        logger.warning(f"Groq {model} error: {e}\n{tb}")
         return f"⚠️ Groq API error: {e}"
 
 
 def _call_gemini(prompt, question, api_key, model="gemini-2.0-flash", timeout=45):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    payload = {"contents": [{"parts": [{"text": f"{prompt}\n\nCâu hỏi: {question}"}]}]}
+    import http.client
+    import ssl
+    import urllib.parse
+    path = f"/v1beta/models/{urllib.parse.quote(model, safe='')}:generateContent?key={api_key}"
+    payload = json.dumps({"contents": [{"parts": [{"text": f"{prompt}\n\nCâu hỏi: {question}"}]}]}).encode()
     try:
-        r = requests.post(url, json=payload, timeout=timeout)
-        if r.status_code == 200:
-            data = r.json()
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection("generativelanguage.googleapis.com", timeout=timeout, context=ctx)
+        conn.request("POST", path, body=payload, headers={"Content-Type": "application/json"})
+        r = conn.getresponse()
+        body = r.read()
+        if r.status == 200:
+            data = json.loads(body)
             candidates = data.get("candidates", [])
             if candidates:
                 return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
-        logger.warning(f"Gemini status {r.status_code}")
+        logger.warning(f"Gemini status {r.status}")
     except Exception as e:
         logger.warning(f"Gemini error: {e}")
     return None
 
 
 def _call_openrouter(prompt, question, api_key, model, timeout=60):
+    import http.client
+    import ssl
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": question},
     ]
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://robo-advisor.streamlit.app",
-        "X-Title": "Robo-Advisor Expert Panel",
-    }
-    payload = {"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}
+    payload = json.dumps({"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 1024}).encode()
     try:
-        r = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            json=payload, headers=headers, timeout=timeout,
-        )
-        if r.status_code == 200:
-            data = r.json()
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection("openrouter.ai", timeout=timeout, context=ctx)
+        conn.request("POST", "/api/v1/chat/completions",
+                      body=payload,
+                      headers={"Authorization": f"Bearer {api_key}",
+                               "Content-Type": "application/json",
+                               "HTTP-Referer": "https://robo-advisor.streamlit.app",
+                               "X-Title": "Robo-Advisor Expert Panel"})
+        r = conn.getresponse()
+        body = r.read()
+        if r.status == 200:
+            data = json.loads(body)
             return data["choices"][0]["message"]["content"].strip()
-        logger.warning(f"OpenRouter {model} status {r.status_code}")
+        logger.warning(f"OpenRouter {model} status {r.status}")
     except Exception as e:
         logger.warning(f"OpenRouter {model} error: {e}")
     return None
@@ -331,6 +348,8 @@ def _call_expert(expert, question, api_keys, lock, context=""):
 
 
 def _call_chairman(question, expert_results, api_key, api_keys):
+    import http.client
+    import ssl
     global _CHAIRMAN_ATTEMPTED
     _CHAIRMAN_ATTEMPTED = False
 
@@ -342,39 +361,42 @@ def _call_chairman(question, expert_results, api_key, api_keys):
     prompt = f"{CHAIRMAN_SYSTEM_PROMPT}\n\nCÂU HỎI: {question}\n\nCÁC Ý KIẾN CHUYÊN GIA:\n{context}\n\nKẾT LUẬN CỦA CHỦ TỊCH:"
 
     messages = [{"role": "user", "content": prompt}]
+    payload_body = json.dumps({"messages": messages, "temperature": 0.5, "max_tokens": 1500})
 
     # Try Groq first (free, Llama 3.3 70B)
     groq_key = api_keys.get("groq")
     if groq_key:
-        groq_headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
-        groq_payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
         try:
-            r = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json=groq_payload, headers=groq_headers, timeout=60,
-            )
-            if r.status_code == 200:
-                data = r.json()
+            ctx = ssl.create_default_context()
+            conn = http.client.HTTPSConnection("api.groq.com", timeout=60, context=ctx)
+            conn.request("POST", "/openai/v1/chat/completions",
+                          body=json.dumps({"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
+                          headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"})
+            r = conn.getresponse()
+            body = r.read()
+            if r.status == 200:
+                data = json.loads(body)
                 return data["choices"][0]["message"]["content"].strip()
-            logger.warning(f"Chairman Groq status {r.status_code}")
+            logger.warning(f"Chairman Groq status {r.status}")
         except Exception as e:
             logger.warning(f"Chairman Groq error: {e}")
         _CHAIRMAN_ATTEMPTED = True
 
-    # Try OpenAI first (best for chairman role)
+    # Try OpenAI (best for chairman role)
     openai_key = api_key or api_keys.get("openai")
     if openai_key:
-        headers = {"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"}
-        payload = {"model": "gpt-4o", "messages": messages, "temperature": 0.5, "max_tokens": 1500}
         try:
-            r = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                json=payload, headers=headers, timeout=60,
-            )
-            if r.status_code == 200:
-                data = r.json()
+            ctx = ssl.create_default_context()
+            conn = http.client.HTTPSConnection("api.openai.com", timeout=60, context=ctx)
+            conn.request("POST", "/v1/chat/completions",
+                          body=json.dumps({"model": "gpt-4o", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
+                          headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"})
+            r = conn.getresponse()
+            body = r.read()
+            if r.status == 200:
+                data = json.loads(body)
                 return data["choices"][0]["message"]["content"].strip()
-            logger.warning(f"Chairman OpenAI status {r.status_code}")
+            logger.warning(f"Chairman OpenAI status {r.status}")
         except Exception as e:
             logger.warning(f"Chairman OpenAI error: {e}")
         _CHAIRMAN_ATTEMPTED = True
@@ -382,27 +404,21 @@ def _call_chairman(question, expert_results, api_key, api_keys):
     # Fallback: try OpenRouter
     or_key = api_keys.get("openrouter")
     if or_key and _CHAIRMAN_ATTEMPTED:
-        or_headers = {
-            "Authorization": f"Bearer {or_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://robo-advisor.streamlit.app",
-            "X-Title": "Robo-Advisor Expert Panel",
-        }
-        or_payload = {
-            "model": "openrouter/free",
-            "messages": messages,
-            "temperature": 0.5,
-            "max_tokens": 1500,
-        }
         try:
-            r = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                json=or_payload, headers=or_headers, timeout=60,
-            )
-            if r.status_code == 200:
-                data = r.json()
+            ctx = ssl.create_default_context()
+            conn = http.client.HTTPSConnection("openrouter.ai", timeout=60, context=ctx)
+            conn.request("POST", "/api/v1/chat/completions",
+                          body=json.dumps({"model": "openrouter/free", "messages": messages, "temperature": 0.5, "max_tokens": 1500}).encode(),
+                          headers={"Authorization": f"Bearer {or_key}",
+                                   "Content-Type": "application/json",
+                                   "HTTP-Referer": "https://robo-advisor.streamlit.app",
+                                   "X-Title": "Robo-Advisor Expert Panel"})
+            r = conn.getresponse()
+            body = r.read()
+            if r.status == 200:
+                data = json.loads(body)
                 return data["choices"][0]["message"]["content"].strip()
-            logger.warning(f"Chairman OpenRouter status {r.status_code}")
+            logger.warning(f"Chairman OpenRouter status {r.status}")
         except Exception as e:
             logger.warning(f"Chairman OpenRouter error: {e}")
 
@@ -544,4 +560,5 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
         "experts": [{"id": e["id"], "name": e["name"], "title": e["title"], "color": e["color"], "response": r} for e, r in zip(EXPERTS, expert_results)],
         "chairman": chairman_result,
         "mode": loai,
+        "_version": "2026-06-06-sync-only",
     }
