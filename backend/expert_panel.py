@@ -593,31 +593,58 @@ def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None, force_full=F
         "groq": groq_key,
     }
 
-    # Build context from DOCS for AI injection
+    # Build context from DOCS for AI injection — DÙNG BCTC THẬT
     thi_truong_context = ""
     if docs:
         lines = []
-        for key in ["co_phieu_vn", "co_phieu_tg"]:
-            bucket = docs.get(key, {})
-            if bucket:
-                items = []
-                for ma, info in list(bucket.items())[:15]:
-                    ten = info.get("ten", ma)
-                    gia = info.get("gia", "N/A")
-                    thay_doi = info.get("thay_doi_pct", "")
-                    kpi = docs.get("kpi", {}).get(ma, {})
-                    pe = kpi.get("pe", "N/A")
-                    pb = kpi.get("pb", "N/A")
-                    items.append(f"- {ma} ({ten}): Giá {gia}, Thay đổi {thay_doi}, P/E {pe}, P/B {pb}")
-                label = "Cổ phiếu Việt Nam" if key == "co_phieu_vn" else "Cổ phiếu Thế giới"
-                lines.append(f"**{label}** (top 15):")
-                lines.extend(items)
+        # BCTC thật cho TOÀN BỘ cổ phiếu VN
+        bucket_vn = docs.get("co_phieu_vn", {})
+        if bucket_vn:
+            items = []
+            for ma, info in bucket_vn.items():
+                ten = info.get("ten", ma)
+                nganh = info.get("nganh", "")
+                gia = info.get("gia", 0)
+                pe = info.get("pe", "N/A")
+                pb = info.get("pb", "N/A")
+                roe = info.get("roe", "N/A")
+                eps = info.get("eps", "N/A")
+                no_vay = info.get("no_vay", 0)
+                von_csh = info.get("von_csh", 0)
+                dt = info.get("dt_2025", 0)
+                lnst = info.get("lnst_2025", 0)
+                de = info.get("de_ratio", "N/A")
+                vh = info.get("von_hoa", 0)
+                co_tuc = info.get("co_tuc_pct", 0)
+                items.append(
+                    f"- {ma} ({ten}) [{nganh}]: Gia {gia:,.0f}, PE {pe}, PB {pb}, "
+                    f"ROE {roe}%, EPS {eps:,.0f}, No {no_vay:,.0f}d, VCSH {von_csh:,.0f}d, "
+                    f"DT {dt:,.0f}d, LNST {lnst:,.0f}d, D/E {de}, VH {vh:,.0f}d, CoTuc {co_tuc:,}"
+                )
+            lines.append(f"**BCTC CO PHIEU VIET NAM ({len(bucket_vn)} ma) — so lieu thuc (ty dong):**")
+            lines.extend(items)
+        # BCTC cho cổ phiếu Thế giới — ít field hơn
+        bucket_tg = docs.get("co_phieu_tg", {})
+        if bucket_tg:
+            items = []
+            for ma, info in bucket_tg.items():
+                ten = info.get("ten", ma)
+                nganh = info.get("nganh", "")
+                gia = info.get("gia", 0)
+                pe = info.get("pe", "N/A")
+                pb = info.get("pb", "N/A")
+                vh = info.get("von_hoa", 0)
+                items.append(
+                    f"- {ma} ({ten}) [{nganh}]: Gia {gia:,.0f}, PE {pe}, PB {pb}, VH {vh:,.0f}d"
+                )
+            lines.append(f"**CO PHIEU THE GIOI ({len(bucket_tg)} ma) — so lieu thuc:**")
+            lines.extend(items)
         if lines:
             thi_truong_context = "\n".join(lines)
 
         esg = docs.get("esg", {})
         if esg:
-            esg_lines = ["**Điểm ESG theo ngành (E·S·G %):**"]
+            esg_lines = ["**Diem ESG theo nganh (E·S·G %):**"]
             for nganh, info in list(esg.items())[:12]:
                 if str(nganh).lower() == "nan":
                     continue
