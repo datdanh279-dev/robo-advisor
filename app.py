@@ -1203,6 +1203,10 @@ with sidebar:
             st.info("💡 Bạn chưa làm khảo sát rủi ro. Trang sẽ hiện danh mục thực tế và đề xuất mặc định.")
         st.rerun()
 
+    if st.button("🧠 Tư vấn Đầu tư", width='stretch'):
+        st.session_state.trang_thai = "advisor"
+        st.rerun()
+
     if st.button("💬 Chat phân tích", width='stretch'):
         st.session_state.trang_thai = "chat"
         st.rerun()
@@ -3299,6 +3303,10 @@ elif st.session_state.trang_thai == "portfolio":
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     else:
         st.info("Chưa có dữ liệu danh mục. Hãy cập nhật dữ liệu trước.")
+
+elif st.session_state.trang_thai == "advisor":
+    from backend.advisor import render as render_advisor
+    render_advisor(DOCS)
 
 elif st.session_state.trang_thai == "deep_analysis":
     # ============================================
