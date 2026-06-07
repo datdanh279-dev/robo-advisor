@@ -8833,411 +8833,374 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write(f"**Tổng giá trị DM:** {tong_gt:,.0f} ₫ | **Lãi/Lỗ:** {tong_lai_lo:+,.0f} ₫ | **Return:** {return_pct:+.2f}% | **Số mã:** {n_ma}")
             if is_demo:
                 st.info("📐 Đang hiển thị danh mục mẫu. Vào Sidebar → Cập nhật dữ liệu để dùng danh mục thực.")
-    if st.session_state.trang_thai == "dashboard":
-        st.markdown('<div class="main-header" style="font-size:1.8rem;font-weight:700;color:#FFD700;margin:0.5rem 0;">📊 Dashboard tổng quan</div>', unsafe_allow_html=True)
-        st.markdown("---")
-
-        co_phieu_vn = DOCS.get("co_phieu_vn", {})
-        co_phieu_tg = DOCS.get("co_phieu_tg", {})
-        kpi = DOCS.get("kpi", {})
-        live = DOCS.get("live", {})
-
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("🇻🇳 Cổ phiếu VN", f"{len(co_phieu_vn)} mã",
-                      help=f"Trên {len(DOCS.get('danh_sach_portfolio', []))} sàn HOSE/HNX")
-        with col2:
-            st.metric("🌐 Cổ phiếu TG", f"{len(co_phieu_tg)} mã",
-                      help="Mỹ, Châu Âu, Châu Á")
-        with col3:
-            ma_pt = st.session_state.get("ma_phan_tich", "")
-            st.metric("📈 Đang theo dõi", f"{len(kpi)} mã",
-                      help="Danh mục đang quản lý")
-        with col4:
-            st.metric("🔄 Cập nhật", DOCS.get("ngay_cap_nhat", "N/A"),
-                      help="Dữ liệu mới nhất")
-
-        st.markdown("---")
-        st.subheader("📂 Danh mục đầu tư hiện tại")
-
-        if kpi:
-            rows = []
-            for ma, info in sorted(kpi.items(),
-                                    key=lambda x: x[1].get("ty_trong_ht", 0) if x[1].get("ty_trong_ht") else 0,
-                                    reverse=True):
-                if info.get("ty_trong_ht"):
-                    rows.append({
-                        "Mã": ma,
-                        "Ngành": info.get("nganh", ""),
-                        "Giá": f"{info.get('gia', 0):,.0f}",
-                        "P/E": f"{info.get('pe', 0):.1f}",
-                        "ROE%": f"{info.get('roe', 0)*100:.1f}",
-                        "P&L%": f"{info.get('lai_lo_pct', 0)*100:.1f}",
-                        "Điểm MUA": f"{info.get('diem_mua', 0):.0f}",
-                        "Điểm BÁN": f"{info.get('diem_ban', 0):.0f}",
-                        "KL": info.get("ket_luan", ""),
-                        "Tỷ trọng%": f"{info.get('ty_trong_ht', 0)*100:.1f}",
-                    })
-            if rows:
-                df = pd.DataFrame(rows)
-                st.dataframe(df, use_container_width=True, hide_index=True,
-                             column_config={c: c for c in df.columns})
-            else:
-                st.info("Chưa có dữ liệu danh mục.")
+elif st.session_state.trang_thai == "dashboard":
+    st.markdown('<div class="main-header" style="font-size:1.8rem;font-weight:700;color:#FFD700;margin:0.5rem 0;">📊 Dashboard tổng quan</div>', unsafe_allow_html=True)
+    st.markdown("---")
+    co_phieu_vn = DOCS.get("co_phieu_vn", {})
+    co_phieu_tg = DOCS.get("co_phieu_tg", {})
+    kpi = DOCS.get("kpi", {})
+    live = DOCS.get("live", {})
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("🇻🇳 Cổ phiếu VN", f"{len(co_phieu_vn)} mã",
+                  help=f"Trên {len(DOCS.get('danh_sach_portfolio', []))} sàn HOSE/HNX")
+    with col2:
+        st.metric("🌐 Cổ phiếu TG", f"{len(co_phieu_tg)} mã",
+                  help="Mỹ, Châu Âu, Châu Á")
+    with col3:
+        ma_pt = st.session_state.get("ma_phan_tich", "")
+        st.metric("📈 Đang theo dõi", f"{len(kpi)} mã",
+                  help="Danh mục đang quản lý")
+    with col4:
+        st.metric("🔄 Cập nhật", DOCS.get("ngay_cap_nhat", "N/A"),
+                  help="Dữ liệu mới nhất")
+    st.markdown("---")
+    st.subheader("📂 Danh mục đầu tư hiện tại")
+    if kpi:
+        rows = []
+        for ma, info in sorted(kpi.items(),
+                                key=lambda x: x[1].get("ty_trong_ht", 0) if x[1].get("ty_trong_ht") else 0,
+                                reverse=True):
+            if info.get("ty_trong_ht"):
+                rows.append({
+                    "Mã": ma,
+                    "Ngành": info.get("nganh", ""),
+                    "Giá": f"{info.get('gia', 0):,.0f}",
+                    "P/E": f"{info.get('pe', 0):.1f}",
+                    "ROE%": f"{info.get('roe', 0)*100:.1f}",
+                    "P&L%": f"{info.get('lai_lo_pct', 0)*100:.1f}",
+                    "Điểm MUA": f"{info.get('diem_mua', 0):.0f}",
+                    "Điểm BÁN": f"{info.get('diem_ban', 0):.0f}",
+                    "KL": info.get("ket_luan", ""),
+                    "Tỷ trọng%": f"{info.get('ty_trong_ht', 0)*100:.1f}",
+                })
+        if rows:
+            df = pd.DataFrame(rows)
+            st.dataframe(df, use_container_width=True, hide_index=True,
+                         column_config={c: c for c in df.columns})
         else:
-            st.info("Chưa có dữ liệu KPI.")
-
+            st.info("Chưa có dữ liệu danh mục.")
+    else:
+        st.info("Chưa có dữ liệu KPI.")
+    st.markdown("---")
+    sub1, sub2 = st.columns(2)
+    with sub1:
+        st.subheader("🏆 Top 10 ROE cao nhất")
+        vn_list = []
+        for ma, info in co_phieu_vn.items():
+            roe = info.get("roe")
+            if roe and isinstance(roe, (int, float)):
+                vn_list.append({"Mã": ma, "Tên": info.get("ten", ""), "Ngành": info.get("nganh", ""),
+                                "ROE%": roe, "P/E": info.get("pe", 0), "P/B": info.get("pb", 0)})
+        df_roe = pd.DataFrame(sorted(vn_list, key=lambda x: x["ROE%"], reverse=True)[:10])
+        if not df_roe.empty:
+            st.dataframe(df_roe, use_container_width=True, hide_index=True)
+    with sub2:
+        st.subheader("🚀 Top 10 Upside tiềm năng")
+        upside_list = []
+        for ma, info in kpi.items():
+            up = info.get("upside")
+            if up and isinstance(up, (int, float)):
+                upside_list.append({"Mã": ma, "Ngành": info.get("nganh", ""),
+                                    "Upside%": up, "Giá": info.get("gia", 0),
+                                    "KL": info.get("ket_luan", ""),
+                                    "Hành động": info.get("hanh_dong", "")})
+        df_up = pd.DataFrame(sorted(upside_list, key=lambda x: x["Upside%"], reverse=True)[:10])
+        if not df_up.empty:
+            st.dataframe(df_up, use_container_width=True, hide_index=True)
+    st.markdown("---")
+    st.subheader("🧩 Phân bổ ngành")
+    if kpi:
+        nganh_data = {}
+        for ma, info in kpi.items():
+            n = info.get("nganh", "Khác")
+            w = info.get("ty_trong_ht", 0)
+            if n in nganh_data:
+                nganh_data[n] += w
+            else:
+                nganh_data[n] = w
+        if nganh_data:
+            df_nganh = pd.DataFrame({
+                "Ngành": list(nganh_data.keys()),
+                "Tỷ trọng": [v*100 for v in nganh_data.values()]
+            }).sort_values("Tỷ trọng", ascending=False)
+            fig = go.Figure(data=go.Pie(
+                labels=df_nganh["Ngành"], values=df_nganh["Tỷ trọng"],
+                marker=dict(colors=px.colors.sequential.YlOrRd[:len(df_nganh)]),
+                textinfo="label+percent", hole=0.3))
+            fig.update_layout(
+                title="Tỷ trọng danh mục theo ngành",
+                paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"),
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    st.markdown("---")
+    st.subheader("📊 Tổng quan chỉ số thị trường")
+    tt = lay_thong_tin_thi_truong()
+    qt = lay_thong_tin_quoc_te()
+    if tt or qt:
+        c1, c2, c3, c4 = st.columns(4)
+        vn_key = next((k for k in tt if "index" in k.lower() or "vn" in k.lower()), None)
+        gold_key = next((k for k in tt if "vang" in k.lower() or "gold" in k.lower()), None)
+        btc_key = next((k for k in qt if "bitcoin" in k.lower() or "btc" in k.lower()), None)
+        sp_key = next((k for k in qt if "sp" in k.lower() or "s&p" in k.lower()), None)
+        with c1:
+            if vn_key:
+                vni = tt[vn_key]
+                vni_gia = vni.get('gia_hien_tai', vni.get('gia', 0))
+                st.metric("🇻🇳 VN-Index",
+                          f"{vni_gia:,.1f} điểm",
+                          f"{vni.get('thay_doi_1nam', vni.get('thay_doi_pct', 0))*100:+.2f}%")
+        with c2:
+            if gold_key:
+                g = tt[gold_key]
+                g_gia = g.get('gia_hien_tai', g.get('gia', 0))
+                st.metric("🥇 Vàng SJC",
+                          f"{g_gia:,.0f} VND/lượng",
+                          f"{g.get('thay_doi_1nam', g.get('thay_doi_pct', 0))*100:+.2f}%")
+        with c3:
+            if btc_key:
+                btc = qt[btc_key]
+                btc_gia = btc.get('gia_hien_tai', btc.get('gia', 0))
+                st.metric("₿ Bitcoin",
+                          f"${btc_gia:,.0f} USD",
+                          f"{btc.get('thay_doi_1nam', btc.get('thay_doi_pct', 0))*100:+.2f}%")
+        with c4:
+            if sp_key:
+                sp = qt[sp_key]
+                sp_gia = sp.get('gia_hien_tai', sp.get('gia', 0))
+                st.metric("🇺🇸 S&P 500",
+                          f"{sp_gia:,.0f} điểm",
+                          f"{sp.get('thay_doi_1nam', sp.get('thay_doi_pct', 0))*100:+.2f}%")
+elif st.session_state.trang_thai == "chat":
+    st.markdown('<div class="main-header" style="font-size:1.8rem;font-weight:700;color:#FFD700;margin:0.5rem 0;">💬 Chat với Robo-Advisor</div>', unsafe_allow_html=True)
+    tab_chat_v2, tab_expert_v2 = st.tabs(["💬 Chat", "👑 Hội đồng Chuyên gia"])
+    with tab_chat_v2:
+        st.markdown("Hỏi tôi về đầu tư, cổ phiếu, vàng, bất động sản, hay bất kỳ chủ đề tài chính nào! 🤖💡")
+        st.markdown("💡 *Tôi hiểu được: phân tích DM của bạn, top mã tăng/giảm hôm nay, vol đột biến, gợi ý phân bổ vốn theo hồ sơ rủi ro...*")
         st.markdown("---")
-        sub1, sub2 = st.columns(2)
-
-        with sub1:
-            st.subheader("🏆 Top 10 ROE cao nhất")
-            vn_list = []
-            for ma, info in co_phieu_vn.items():
-                roe = info.get("roe")
-                if roe and isinstance(roe, (int, float)):
-                    vn_list.append({"Mã": ma, "Tên": info.get("ten", ""), "Ngành": info.get("nganh", ""),
-                                    "ROE%": roe, "P/E": info.get("pe", 0), "P/B": info.get("pb", 0)})
-            df_roe = pd.DataFrame(sorted(vn_list, key=lambda x: x["ROE%"], reverse=True)[:10])
-            if not df_roe.empty:
-                st.dataframe(df_roe, use_container_width=True, hide_index=True)
-
-        with sub2:
-            st.subheader("🚀 Top 10 Upside tiềm năng")
-            upside_list = []
-            for ma, info in kpi.items():
-                up = info.get("upside")
-                if up and isinstance(up, (int, float)):
-                    upside_list.append({"Mã": ma, "Ngành": info.get("nganh", ""),
-                                        "Upside%": up, "Giá": info.get("gia", 0),
-                                        "KL": info.get("ket_luan", ""),
-                                        "Hành động": info.get("hanh_dong", "")})
-            df_up = pd.DataFrame(sorted(upside_list, key=lambda x: x["Upside%"], reverse=True)[:10])
-            if not df_up.empty:
-                st.dataframe(df_up, use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-        st.subheader("🧩 Phân bổ ngành")
-
-        if kpi:
-            nganh_data = {}
-            for ma, info in kpi.items():
-                n = info.get("nganh", "Khác")
-                w = info.get("ty_trong_ht", 0)
-                if n in nganh_data:
-                    nganh_data[n] += w
-                else:
-                    nganh_data[n] = w
-            if nganh_data:
-                df_nganh = pd.DataFrame({
-                    "Ngành": list(nganh_data.keys()),
-                    "Tỷ trọng": [v*100 for v in nganh_data.values()]
-                }).sort_values("Tỷ trọng", ascending=False)
-                fig = go.Figure(data=go.Pie(
-                    labels=df_nganh["Ngành"], values=df_nganh["Tỷ trọng"],
-                    marker=dict(colors=px.colors.sequential.YlOrRd[:len(df_nganh)]),
-                    textinfo="label+percent", hole=0.3))
-                fig.update_layout(
-                    title="Tỷ trọng danh mục theo ngành",
-                    paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"),
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    margin=dict(l=20, r=20, t=40, b=20)
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("📊 Tổng quan chỉ số thị trường")
-
-        tt = lay_thong_tin_thi_truong()
-        qt = lay_thong_tin_quoc_te()
-        if tt or qt:
-            c1, c2, c3, c4 = st.columns(4)
-            vn_key = next((k for k in tt if "index" in k.lower() or "vn" in k.lower()), None)
-            gold_key = next((k for k in tt if "vang" in k.lower() or "gold" in k.lower()), None)
-            btc_key = next((k for k in qt if "bitcoin" in k.lower() or "btc" in k.lower()), None)
-            sp_key = next((k for k in qt if "sp" in k.lower() or "s&p" in k.lower()), None)
-            with c1:
-                if vn_key:
-                    vni = tt[vn_key]
-                    vni_gia = vni.get('gia_hien_tai', vni.get('gia', 0))
-                    st.metric("🇻🇳 VN-Index",
-                              f"{vni_gia:,.1f} điểm",
-                              f"{vni.get('thay_doi_1nam', vni.get('thay_doi_pct', 0))*100:+.2f}%")
-            with c2:
-                if gold_key:
-                    g = tt[gold_key]
-                    g_gia = g.get('gia_hien_tai', g.get('gia', 0))
-                    st.metric("🥇 Vàng SJC",
-                              f"{g_gia:,.0f} VND/lượng",
-                              f"{g.get('thay_doi_1nam', g.get('thay_doi_pct', 0))*100:+.2f}%")
-            with c3:
-                if btc_key:
-                    btc = qt[btc_key]
-                    btc_gia = btc.get('gia_hien_tai', btc.get('gia', 0))
-                    st.metric("₿ Bitcoin",
-                              f"${btc_gia:,.0f} USD",
-                              f"{btc.get('thay_doi_1nam', btc.get('thay_doi_pct', 0))*100:+.2f}%")
-            with c4:
-                if sp_key:
-                    sp = qt[sp_key]
-                    sp_gia = sp.get('gia_hien_tai', sp.get('gia', 0))
-                    st.metric("🇺🇸 S&P 500",
-                              f"{sp_gia:,.0f} điểm",
-                              f"{sp.get('thay_doi_1nam', sp.get('thay_doi_pct', 0))*100:+.2f}%")
-
-    elif st.session_state.trang_thai == "chat":
-        st.markdown('<div class="main-header" style="font-size:1.8rem;font-weight:700;color:#FFD700;margin:0.5rem 0;">💬 Chat với Robo-Advisor</div>', unsafe_allow_html=True)
-
-        tab_chat_v2, tab_expert_v2 = st.tabs(["💬 Chat", "👑 Hội đồng Chuyên gia"])
-
-        with tab_chat_v2:
-            st.markdown("Hỏi tôi về đầu tư, cổ phiếu, vàng, bất động sản, hay bất kỳ chủ đề tài chính nào! 🤖💡")
-            st.markdown("💡 *Tôi hiểu được: phân tích DM của bạn, top mã tăng/giảm hôm nay, vol đột biến, gợi ý phân bổ vốn theo hồ sơ rủi ro...*")
+        if not st.session_state.chat_history:
+            st.markdown(
+                '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.05),rgba(33,150,243,0.03));'
+                'border:1px solid rgba(255,215,0,0.15);border-radius:12px;padding:14px 18px;margin-bottom:14px;">'
+                '<div style="font-weight:600;color:#FFD700;margin-bottom:8px;">⚡ Gợi ý nhanh từ AI — bấm để hỏi ngay:</div>'
+                '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                '<span style="background:#2196F322;border:1px solid #2196F355;border-radius:20px;padding:6px 14px;font-size:0.85rem;">📊 Phân tích danh mục của tôi</span>'
+                '<span style="background:#4CAF5022;border:1px solid #4CAF5055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">📈 Mã nào đang MUA tốt?</span>'
+                '<span style="background:#FF980022;border:1px solid #FF980055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">🛡️ Cách phân bổ vốn 100tr?</span>'
+                '<span style="background:#9C27B022;border:1px solid #9C27B055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">🥇 Vàng SJC có nên mua?</span>'
+                '</div></div>',
+                unsafe_allow_html=True,
+            )
+            _quick_qs = [
+                "Phân tích danh mục hiện tại của tôi — nên tăng/giảm mã nào?",
+                "Top 3 mã cổ phiếu VN đang MUA tốt nhất tháng này?",
+                "Tôi có 100 triệu, nên phân bổ vào cổ phiếu/vàng/tiết kiệm thế nào?",
+                "Vàng SJC và vàng nhẫn — nên chọn loại nào 2026?",
+            ]
+            _qcols = st.columns(2)
+            for _i, _q in enumerate(_quick_qs):
+                with _qcols[_i % 2]:
+                    if st.button(_q, key=f"qq_{_i}", use_container_width=True):
+                        st.session_state.chat_history.append({"role": "user", "content": _q})
+                        st.session_state.chat_pending = _q
             st.markdown("---")
-
-            if not st.session_state.chat_history:
+        for i, msg in enumerate(st.session_state.chat_history):
+            if msg["role"] == "bot":
                 st.markdown(
-                    '<div style="background:linear-gradient(135deg,rgba(255,215,0,0.05),rgba(33,150,243,0.03));'
-                    'border:1px solid rgba(255,215,0,0.15);border-radius:12px;padding:14px 18px;margin-bottom:14px;">'
-                    '<div style="font-weight:600;color:#FFD700;margin-bottom:8px;">⚡ Gợi ý nhanh từ AI — bấm để hỏi ngay:</div>'
-                    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-                    '<span style="background:#2196F322;border:1px solid #2196F355;border-radius:20px;padding:6px 14px;font-size:0.85rem;">📊 Phân tích danh mục của tôi</span>'
-                    '<span style="background:#4CAF5022;border:1px solid #4CAF5055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">📈 Mã nào đang MUA tốt?</span>'
-                    '<span style="background:#FF980022;border:1px solid #FF980055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">🛡️ Cách phân bổ vốn 100tr?</span>'
-                    '<span style="background:#9C27B022;border:1px solid #9C27B055;border-radius:20px;padding:6px 14px;font-size:0.85rem;">🥇 Vàng SJC có nên mua?</span>'
-                    '</div></div>',
+                    f'<div class="chat-message bot-message">🤖 <strong>Robo-Advisor:</strong><br>{_safe_html(msg["content"])}</div>',
                     unsafe_allow_html=True,
                 )
-                _quick_qs = [
-                    "Phân tích danh mục hiện tại của tôi — nên tăng/giảm mã nào?",
-                    "Top 3 mã cổ phiếu VN đang MUA tốt nhất tháng này?",
-                    "Tôi có 100 triệu, nên phân bổ vào cổ phiếu/vàng/tiết kiệm thế nào?",
-                    "Vàng SJC và vàng nhẫn — nên chọn loại nào 2026?",
-                ]
-                _qcols = st.columns(2)
-                for _i, _q in enumerate(_quick_qs):
-                    with _qcols[_i % 2]:
-                        if st.button(_q, key=f"qq_{_i}", use_container_width=True):
-                            st.session_state.chat_history.append({"role": "user", "content": _q})
-                            st.session_state.chat_pending = _q
-                st.markdown("---")
-
-            for i, msg in enumerate(st.session_state.chat_history):
-                if msg["role"] == "bot":
-                    st.markdown(
-                        f'<div class="chat-message bot-message">🤖 <strong>Robo-Advisor:</strong><br>{_safe_html(msg["content"])}</div>',
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    st.markdown(
-                        f'<div class="chat-message user-message">👤 <strong>Bạn:</strong><br>{_safe_html(msg["content"])}</div>',
-                        unsafe_allow_html=True,
-                    )
-
-            cau_hoi = st.chat_input("VD: Nên đầu tư cổ phiếu gì?", key="chat_input")
-            if cau_hoi:
-                st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
-                st.session_state.chat_pending = cau_hoi
-
-            if st.session_state.chat_history and st.button("🗑️ Xóa", key="clear_chat", use_container_width=True, help="Xóa lịch sử chat"):
-                st.session_state.chat_history = []
-                st.session_state.chat_pending = None
-
-        # Inline chat processing: no st.status, no st.rerun
-        if st.session_state.get("chat_pending"):
-            _q = st.session_state.chat_pending
-            st.session_state.chat_pending = None
-            st.markdown("⏳ Đang xử lý...")
-            try:
-                _ctx = _build_chat_context()
-                _tra_loi = tim_cau_tra_loi(_q, st.session_state.chat_history, context=_ctx)
-            except Exception as _chat_err:
-                _tra_loi = f"Xin lỗi, đã xảy ra lỗi: {_chat_err}"
-            st.session_state.chat_history.append({"role": "bot", "content": _tra_loi})
-            try:
-                username = st.session_state.get("username", "unknown")
-                save_chat(username, "user", _q)
-                save_chat(username, "bot", _tra_loi)
-            except Exception:
-                pass
-
-        def _expert_tab_ui():
-            st.markdown("### 👑 Hội đồng Chuyên gia — Huyền thoại Đầu tư Thế giới")
-            st.markdown(
-                "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại**. "
-                "Chủ tịch Hội đồng sẽ tổng hợp và chọn ra phương án tốt nhất."
-            )
-            st.markdown("---")
-            _expert_chips_html = '<div style="margin:6px 0 14px 0;line-height:2.2;">'
-            for exp in [
-                {"name": "Warren Buffett", "title": "Nhà đầu tư giá trị", "color": "#4CAF50"},
-                {"name": "George Soros", "title": "Nhà đầu cơ vĩ đại", "color": "#2196F3"},
-                {"name": "Peter Lynch", "title": "Chuyên gia tăng trưởng", "color": "#FF9800"},
-                {"name": "Ray Dalio", "title": "Chiến lược vĩ mô", "color": "#9C27B0"},
-                {"name": "Benjamin Graham", "title": "Cha đẻ đầu tư giá trị", "color": "#607D8B"},
-                {"name": "Charlie Munger", "title": "Triết gia đầu tư", "color": "#795548"},
-            ]:
-                _expert_chips_html += (
-                    f'<span style="display:inline-block;background:rgba(255,255,255,0.04);'
-                    f'border:1px solid rgba(255,215,0,0.1);border-radius:20px;padding:4px 14px;margin:3px 4px;'
-                    f'font-size:0.8rem;white-space:nowrap;">'
-                    f'<b style="color:{exp["color"]};">{exp["name"]}</b>'
-                    f'<span style="color:#8892B0;margin-left:6px;">— {exp["title"]}</span></span>'
+            else:
+                st.markdown(
+                    f'<div class="chat-message user-message">👤 <strong>Bạn:</strong><br>{_safe_html(msg["content"])}</div>',
+                    unsafe_allow_html=True,
                 )
-            _expert_chips_html += '</div>'
-            st.markdown(_expert_chips_html, unsafe_allow_html=True)
-            st.markdown("---")
-
-            if "expert_results" not in st.session_state:
-                st.session_state.expert_results = None
-            if "expert_pending" not in st.session_state:
-                st.session_state.expert_pending = None
-            if "_last_expert_q" not in st.session_state:
-                st.session_state._last_expert_q = ""
-            if "expert_status" not in st.session_state:
-                st.session_state.expert_status = None
-
-            # Fixed-position containers (ALWAYS present - never conditional)
-            _keepalive = st.empty()
-            _output = st.empty()
-
-            cau_hoi = st.chat_input(
-                "VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
-                key="expert_chat_input",
+        cau_hoi = st.chat_input("VD: Nên đầu tư cổ phiếu gì?", key="chat_input")
+        if cau_hoi:
+            st.session_state.chat_history.append({"role": "user", "content": cau_hoi})
+            st.session_state.chat_pending = cau_hoi
+        if st.session_state.chat_history and st.button("🗑️ Xóa", key="clear_chat", use_container_width=True, help="Xóa lịch sử chat"):
+            st.session_state.chat_history = []
+            st.session_state.chat_pending = None
+    # Inline chat processing: no st.status, no st.rerun
+    if st.session_state.get("chat_pending"):
+        _q = st.session_state.chat_pending
+        st.session_state.chat_pending = None
+        st.markdown("⏳ Đang xử lý...")
+        try:
+            _ctx = _build_chat_context()
+            _tra_loi = tim_cau_tra_loi(_q, st.session_state.chat_history, context=_ctx)
+        except Exception as _chat_err:
+            _tra_loi = f"Xin lỗi, đã xảy ra lỗi: {_chat_err}"
+        st.session_state.chat_history.append({"role": "bot", "content": _tra_loi})
+        try:
+            username = st.session_state.get("username", "unknown")
+            save_chat(username, "user", _q)
+            save_chat(username, "bot", _tra_loi)
+        except Exception:
+            pass
+    def _expert_tab_ui():
+        st.markdown("### 👑 Hội đồng Chuyên gia — Huyền thoại Đầu tư Thế giới")
+        st.markdown(
+            "Gửi **1 câu hỏi**, nhận câu trả lời từ **6 huyền thoại**. "
+            "Chủ tịch Hội đồng sẽ tổng hợp và chọn ra phương án tốt nhất."
+        )
+        st.markdown("---")
+        _expert_chips_html = '<div style="margin:6px 0 14px 0;line-height:2.2;">'
+        for exp in [
+            {"name": "Warren Buffett", "title": "Nhà đầu tư giá trị", "color": "#4CAF50"},
+            {"name": "George Soros", "title": "Nhà đầu cơ vĩ đại", "color": "#2196F3"},
+            {"name": "Peter Lynch", "title": "Chuyên gia tăng trưởng", "color": "#FF9800"},
+            {"name": "Ray Dalio", "title": "Chiến lược vĩ mô", "color": "#9C27B0"},
+            {"name": "Benjamin Graham", "title": "Cha đẻ đầu tư giá trị", "color": "#607D8B"},
+            {"name": "Charlie Munger", "title": "Triết gia đầu tư", "color": "#795548"},
+        ]:
+            _expert_chips_html += (
+                f'<span style="display:inline-block;background:rgba(255,255,255,0.04);'
+                f'border:1px solid rgba(255,215,0,0.1);border-radius:20px;padding:4px 14px;margin:3px 4px;'
+                f'font-size:0.8rem;white-space:nowrap;">'
+                f'<b style="color:{exp["color"]};">{exp["name"]}</b>'
+                f'<span style="color:#8892B0;margin-left:6px;">— {exp["title"]}</span></span>'
             )
-            if cau_hoi:
-                st.session_state.expert_pending = cau_hoi
-                st.session_state.expert_results = None
-                st.session_state.expert_status = None
-                st.session_state._last_expert_q = ""
-
-            if st.session_state.get("expert_pending"):
-                _q = st.session_state.expert_pending
-                st.session_state.expert_pending = None
-                st.session_state._last_expert_q = _q
-                st.session_state.expert_status = "processing"
-                _keepalive.markdown("⏳ Đang kết nối 6 chuyên gia...")
-                _results_holder = []
-                _error_holder = []
-                def _worker():
-                    try:
-                        r = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS, force_full=True)
-                        _results_holder.append(r)
-                    except Exception as e:
-                        _error_holder.append(e)
-                import threading, time
-                t = threading.Thread(target=_worker, daemon=True)
-                t.start()
-                _elapsed = 0
-                while t.is_alive():
-                    time.sleep(1)
-                    _elapsed += 1
-                    _keepalive.markdown(f"⏳ Đang kết nối 6 chuyên gia ({_elapsed}s)...")
-                if _error_holder:
-                    raise _error_holder[0]
-                results = _results_holder[0] if _results_holder else None
-                if results and isinstance(results, dict) and results.get("experts"):
-                    st.session_state.expert_results = results
-                    st.session_state.expert_status = "ok"
-                    st.session_state.expert_mode = results.get("mode", "cao_cap")
-                else:
-                    st.session_state.expert_results = results
-                    st.session_state.expert_status = "empty"
-
-            _html_parts = []
-            _q_text = st.session_state.get("_last_expert_q", "")
-            _status = st.session_state.get("expert_status")
-            _results = st.session_state.get("expert_results")
-
-            if _q_text:
-                _html_parts.append(f'<div style="color:#ECE8E1;margin-bottom:4px;"><b>Bạn:</b> {_q_text}</div>')
-
-            if _status == "ok":
-                _mode = st.session_state.get("expert_mode", "cao_cap")
-                _mode_labels = {"don_gian": "⚡ Tiết kiệm (1 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (2 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
-                _html_parts.append(f'<div style="color:#00C9A7;">✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}</div>')
-            elif _status == "empty":
-                _html_parts.append('<div style="color:#FF9800;">⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.</div>')
-            elif _status == "error":
-                _err = st.session_state.get("expert_error", "Lỗi không xác định")
-                _html_parts.append(f'<div style="color:#f44336;">❌ Lỗi: {_err}. Vui lòng thử lại hoặc dùng tab Chat.</div>')
-
-            if _results:
-                if isinstance(_results, dict) and "experts" in _results:
+        _expert_chips_html += '</div>'
+        st.markdown(_expert_chips_html, unsafe_allow_html=True)
+        st.markdown("---")
+        if "expert_results" not in st.session_state:
+            st.session_state.expert_results = None
+        if "expert_pending" not in st.session_state:
+            st.session_state.expert_pending = None
+        if "_last_expert_q" not in st.session_state:
+            st.session_state._last_expert_q = ""
+        if "expert_status" not in st.session_state:
+            st.session_state.expert_status = None
+        # Fixed-position containers (ALWAYS present - never conditional)
+        _keepalive = st.empty()
+        _output = st.empty()
+        cau_hoi = st.chat_input(
+            "VD: Tôi nên đầu tư vào VCB, FPT, hay HPG trong năm 2026?",
+            key="expert_chat_input",
+        )
+        if cau_hoi:
+            st.session_state.expert_pending = cau_hoi
+            st.session_state.expert_results = None
+            st.session_state.expert_status = None
+            st.session_state._last_expert_q = ""
+        if st.session_state.get("expert_pending"):
+            _q = st.session_state.expert_pending
+            st.session_state.expert_pending = None
+            st.session_state._last_expert_q = _q
+            st.session_state.expert_status = "processing"
+            _keepalive.markdown("⏳ Đang kết nối 6 chuyên gia...")
+            _results_holder = []
+            _error_holder = []
+            def _worker():
+                try:
+                    r = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS, force_full=True)
+                    _results_holder.append(r)
+                except Exception as e:
+                    _error_holder.append(e)
+            import threading, time
+            t = threading.Thread(target=_worker, daemon=True)
+            t.start()
+            _elapsed = 0
+            while t.is_alive():
+                time.sleep(1)
+                _elapsed += 1
+                _keepalive.markdown(f"⏳ Đang kết nối 6 chuyên gia ({_elapsed}s)...")
+            if _error_holder:
+                raise _error_holder[0]
+            results = _results_holder[0] if _results_holder else None
+            if results and isinstance(results, dict) and results.get("experts"):
+                st.session_state.expert_results = results
+                st.session_state.expert_status = "ok"
+                st.session_state.expert_mode = results.get("mode", "cao_cap")
+            else:
+                st.session_state.expert_results = results
+                st.session_state.expert_status = "empty"
+        _html_parts = []
+        _q_text = st.session_state.get("_last_expert_q", "")
+        _status = st.session_state.get("expert_status")
+        _results = st.session_state.get("expert_results")
+        if _q_text:
+            _html_parts.append(f'<div style="color:#ECE8E1;margin-bottom:4px;"><b>Bạn:</b> {_q_text}</div>')
+        if _status == "ok":
+            _mode = st.session_state.get("expert_mode", "cao_cap")
+            _mode_labels = {"don_gian": "⚡ Tiết kiệm (1 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (2 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
+            _html_parts.append(f'<div style="color:#00C9A7;">✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}</div>')
+        elif _status == "empty":
+            _html_parts.append('<div style="color:#FF9800;">⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.</div>')
+        elif _status == "error":
+            _err = st.session_state.get("expert_error", "Lỗi không xác định")
+            _html_parts.append(f'<div style="color:#f44336;">❌ Lỗi: {_err}. Vui lòng thử lại hoặc dùng tab Chat.</div>')
+        if _results:
+            if isinstance(_results, dict) and "experts" in _results:
+                _html_parts.append('<hr style="border-color:rgba(255,215,0,0.2);">')
+                _html_parts.append('<h3 style="color:#FFD700;">🗳️ Ý kiến Chuyên gia</h3>')
+                for expert in _results["experts"]:
+                    name = expert.get("name", "Chuyên gia")
+                    title = expert.get("title", "")
+                    resp = expert.get("response") or "⚠️ Không có phản hồi."
+                    _safe_resp = resp.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+                    _html_parts.append(
+                        f'<details style="margin-bottom:8px;background:rgba(255,255,255,0.02);'
+                        f'border:1px solid rgba(255,215,0,0.15);border-radius:8px;padding:8px 12px;">'
+                        f'<summary style="font-weight:600;cursor:pointer;color:#FFD700;">{name} — {title}</summary>'
+                        f'<div style="margin-top:8px;color:#ECE8E1;font-size:0.9rem;line-height:1.5;">{_safe_resp}</div>'
+                        f'</details>'
+                    )
+                chairman = _results.get("chairman")
+                if chairman:
+                    _safe_chair = chairman.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                     _html_parts.append('<hr style="border-color:rgba(255,215,0,0.2);">')
-                    _html_parts.append('<h3 style="color:#FFD700;">🗳️ Ý kiến Chuyên gia</h3>')
-                    for expert in _results["experts"]:
-                        name = expert.get("name", "Chuyên gia")
-                        title = expert.get("title", "")
-                        resp = expert.get("response") or "⚠️ Không có phản hồi."
-                        _safe_resp = resp.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-                        _html_parts.append(
-                            f'<details style="margin-bottom:8px;background:rgba(255,255,255,0.02);'
-                            f'border:1px solid rgba(255,215,0,0.15);border-radius:8px;padding:8px 12px;">'
-                            f'<summary style="font-weight:600;cursor:pointer;color:#FFD700;">{name} — {title}</summary>'
-                            f'<div style="margin-top:8px;color:#ECE8E1;font-size:0.9rem;line-height:1.5;">{_safe_resp}</div>'
-                            f'</details>'
-                        )
-                    chairman = _results.get("chairman")
-                    if chairman:
-                        _safe_chair = chairman.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                        _html_parts.append('<hr style="border-color:rgba(255,215,0,0.2);">')
-                        _html_parts.append('<h4 style="color:#FFD700;">👑 Kết luận của Chủ tịch Hội đồng</h4>')
-                        _html_parts.append(f'<div style="color:#ECE8E1;font-size:0.9rem;line-height:1.6;">{_safe_chair}</div>')
-                else:
-                    _html_parts.append('<div style="color:#FF9800;">⚠️ Kết quả không hợp lệ. Vui lòng thử lại.</div>')
-
-            if not _html_parts:
-                _html_parts.append('<div style="height:1px;">&nbsp;</div>')
-
-            _output.markdown("\n".join(_html_parts), unsafe_allow_html=True)
-
-            if st.button("🗑️ Xóa kết quả", key="clear_expert", disabled=(not bool(_results)), use_container_width=True):
-                st.session_state.expert_results = None
-                st.session_state.expert_pending = None
-                st.session_state.expert_status = None
-                st.session_state._last_expert_q = ""
-                st.rerun()
-
-        if tab_expert_v2 is not None:
-            with tab_expert_v2:
-                if "_expert_unlocked" not in st.session_state:
-                    st.session_state._expert_unlocked = False
-                if not st.session_state._expert_unlocked:
-                    st.markdown("### 👑 Hội đồng Chuyên gia — Huyền thoại Đầu tư Thế giới")
-                    st.markdown("Tính năng **6 Chuyên gia + Chủ tịch Hội đồng** yêu cầu mật khẩu kích hoạt.")
-                    _pw = st.text_input("🔑 Nhập mật khẩu kích hoạt:", type="password", key="expert_pw_input")
-                    if st.button("🔓 Mở khóa", key="expert_unlock_btn", use_container_width=True):
-                        if _pw == "viettracuu@2026":
-                            st.session_state._expert_unlocked = True
-                            st.rerun()
-                        else:
-                            st.error("❌ Mật khẩu không đúng. Liên hệ admin để được cấp quyền truy cập.")
-                    st.info("Mở khóa để dùng phân tích chuyên sâu từ 6 huyền thoại đầu tư thế giới.")
-                else:
-                    try:
-                        _expert_tab_ui()
-                    except Exception as _tab_err:
-                        st.error(f"❌ Lỗi tab Chuyên gia: {_tab_err}")
-                        st.info("Vui lòng thử lại hoặc dùng tab Chat.")
-
-
-
-    username = st.session_state.get("username")
-    if username and st.session_state.get("authenticated") and st.session_state.get("trang_thai"):
-        keys = {"trang_thai", "chat_history", "loai_nha_dau_tu", "diem_rui_ro", "da_phan_tich"}
-        to_save = {k: st.session_state[k] for k in keys if k in st.session_state}
-        if to_save:
-            try:
-                save_state(username, to_save)
-            except Exception:
-                pass
-
-    st.markdown("""<hr class="gold-divider">""", unsafe_allow_html=True)
-    st.markdown(
-        '<center style="color: #8892B0; font-size: 0.85rem; letter-spacing: 1px;">'
-        '🤖 Robo-Advisor — Công cụ mô phỏng &amp; phân tích thị trường cho người Việt<br>'
-        '<span style="color: #FFD700;">© 2026 • Phiên bản Hoàng gia &amp; Thịnh vượng v3.0</span></center>',
-        unsafe_allow_html=True,
-    )
-
+                    _html_parts.append('<h4 style="color:#FFD700;">👑 Kết luận của Chủ tịch Hội đồng</h4>')
+                    _html_parts.append(f'<div style="color:#ECE8E1;font-size:0.9rem;line-height:1.6;">{_safe_chair}</div>')
+            else:
+                _html_parts.append('<div style="color:#FF9800;">⚠️ Kết quả không hợp lệ. Vui lòng thử lại.</div>')
+        if not _html_parts:
+            _html_parts.append('<div style="height:1px;">&nbsp;</div>')
+        _output.markdown("\n".join(_html_parts), unsafe_allow_html=True)
+        if st.button("🗑️ Xóa kết quả", key="clear_expert", disabled=(not bool(_results)), use_container_width=True):
+            st.session_state.expert_results = None
+            st.session_state.expert_pending = None
+            st.session_state.expert_status = None
+            st.session_state._last_expert_q = ""
+            st.rerun()
+    if tab_expert_v2 is not None:
+        with tab_expert_v2:
+            if "_expert_unlocked" not in st.session_state:
+                st.session_state._expert_unlocked = False
+            if not st.session_state._expert_unlocked:
+                st.markdown("### 👑 Hội đồng Chuyên gia — Huyền thoại Đầu tư Thế giới")
+                st.markdown("Tính năng **6 Chuyên gia + Chủ tịch Hội đồng** yêu cầu mật khẩu kích hoạt.")
+                _pw = st.text_input("🔑 Nhập mật khẩu kích hoạt:", type="password", key="expert_pw_input")
+                if st.button("🔓 Mở khóa", key="expert_unlock_btn", use_container_width=True):
+                    if _pw == "viettracuu@2026":
+                        st.session_state._expert_unlocked = True
+                        st.rerun()
+                    else:
+                        st.error("❌ Mật khẩu không đúng. Liên hệ admin để được cấp quyền truy cập.")
+                st.info("Mở khóa để dùng phân tích chuyên sâu từ 6 huyền thoại đầu tư thế giới.")
+            else:
+                try:
+                    _expert_tab_ui()
+                except Exception as _tab_err:
+                    st.error(f"❌ Lỗi tab Chuyên gia: {_tab_err}")
+                    st.info("Vui lòng thử lại hoặc dùng tab Chat.")
+username = st.session_state.get("username")
+if username and st.session_state.get("authenticated") and st.session_state.get("trang_thai"):
+    keys = {"trang_thai", "chat_history", "loai_nha_dau_tu", "diem_rui_ro", "da_phan_tich"}
+    to_save = {k: st.session_state[k] for k in keys if k in st.session_state}
+    if to_save:
+        try:
+            save_state(username, to_save)
+        except Exception:
+            pass
+st.markdown("""<hr class="gold-divider">""", unsafe_allow_html=True)
+st.markdown(
+    '<center style="color: #8892B0; font-size: 0.85rem; letter-spacing: 1px;">'
+    '🤖 Robo-Advisor — Công cụ mô phỏng &amp; phân tích thị trường cho người Việt<br>'
+    '<span style="color: #FFD700;">© 2026 • Phiên bản Hoàng gia &amp; Thịnh vượng v3.0</span></center>',
+    unsafe_allow_html=True,
+)
