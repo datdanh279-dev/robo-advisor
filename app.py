@@ -9173,7 +9173,7 @@ elif st.session_state.trang_thai == "chat":
 
         if _status == "ok":
             _mode = st.session_state.get("expert_mode", "cao_cap")
-            _mode_labels = {"don_gian": "⚡ Tiết kiệm (1 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (2 chuyên gia)", "cao_cap": "🚀 Toàn diện (3 chuyên gia + Chủ tịch)"}
+            _mode_labels = {"don_gian": "⚡ Tiết kiệm (1 chuyên gia)", "trung_binh": "🔋 Tiêu chuẩn (2 chuyên gia)", "cao_cap": "🚀 Toàn diện (6 chuyên gia + Chủ tịch)"}
             _html_parts.append(f'<div style="color:#00C9A7;">✅ Đã nhận phản hồi. Chế độ: {_mode_labels.get(_mode, _mode)}</div>')
         elif _status == "empty":
             _html_parts.append('<div style="color:#FF9800;">⚠️ Hệ thống trả về kết quả rỗng. Vui lòng thử lại sau vài giây.</div>')
@@ -9227,7 +9227,7 @@ elif st.session_state.trang_thai == "chat":
                 st.markdown("Tính năng **6 Chuyên gia + Chủ tịch Hội đồng** yêu cầu mật khẩu kích hoạt.")
                 _pw = st.text_input("🔑 Nhập mật khẩu kích hoạt:", type="password", key="expert_pw_input")
                 if st.button("🔓 Mở khóa", key="expert_unlock_btn", use_container_width=True):
-                    if _pw == "8888":
+                    if _pw == "viettracuu@2026":
                         st.session_state._expert_unlocked = True
                         st.rerun()
                     else:

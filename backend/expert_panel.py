@@ -663,8 +663,8 @@ def _run_expert_panel(question, api_keys, thi_truong_context=""):
         can_chon = {"buffett", "lynch"}
         logger.info("Chế độ TIÊU CHUẨN: gọi 2 chuyên gia")
     else:
-        can_chon = {"buffett", "lynch", "graham"}
-        logger.info("Chế độ TOÀN DIỆN: gọi 3 chuyên gia + Chủ tịch")
+        can_chon = {"buffett", "soros", "lynch", "dalio", "graham", "munger"}
+        logger.info("Chế độ TOÀN DIỆN: gọi 6 chuyên gia + Chủ tịch")
 
     # Gọi TUẦN TỰ — mỗi lần 1 chuyên gia, cách nhau 1s để tránh rate limit
     raw = {}
