@@ -9140,7 +9140,7 @@ elif st.session_state.trang_thai == "chat":
             _error_holder = []
             def _worker():
                 try:
-                    r = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS)
+                    r = hoi_dong_chuyen_gia(_q, groq_key_override=_GROQ_KEY, docs=DOCS, force_full=True)
                     _results_holder.append(r)
                 except Exception as e:
                     _error_holder.append(e)

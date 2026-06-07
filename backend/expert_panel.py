@@ -580,7 +580,7 @@ def _get_key(name):
     return val
 
 
-def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None):
+def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None, force_full=False):
     openai_key = _get_key("OPENAI_API_KEY")
     gemini_key = _get_key("GEMINI_API_KEY")
     openrouter_key = _get_key("OPENROUTER_API_KEY")
@@ -628,7 +628,7 @@ def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None):
             thi_truong_context = (thi_truong_context + "\n\n" if thi_truong_context else "") + "\n".join(esg_lines)
 
     try:
-        results = _run_expert_panel(cau_hoi, api_keys, thi_truong_context)
+        results = _run_expert_panel(cau_hoi, api_keys, thi_truong_context, force_full)
         if not results or not isinstance(results, dict) or "experts" not in results:
             return _build_error_result(api_keys)
         return results
@@ -653,10 +653,13 @@ def _build_error_result(api_keys=None):
     }
 
 
-def _run_expert_panel(question, api_keys, thi_truong_context=""):
+def _run_expert_panel(question, api_keys, thi_truong_context="", force_full=False):
     loai = phan_loai_cau_hoi(question)
 
-    if loai == "don_gian":
+    if force_full:
+        can_chon = {"buffett", "soros", "lynch", "dalio", "graham", "munger"}
+        logger.info("Chế độ TOÀN DIỆN (force_full): gọi 6 chuyên gia + Chủ tịch")
+    elif loai == "don_gian":
         can_chon = {"buffett"}
         logger.info("Chế độ TIẾT KIỆM: chỉ gọi 1 chuyên gia")
     elif loai == "trung_binh":
