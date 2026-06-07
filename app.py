@@ -4009,6 +4009,28 @@ elif st.session_state.trang_thai == "deep_analysis":
         ], index=0)
         st.write("---")
         st.success(f"✅ Yahoo Finance: {len(real_prices)}/384 mã có giá thật, {len(real_fund)}/384 mã có P/E-P/B-ROE-EPS, VN30: {vn30_label or '—'}")
+        market_data = st.session_state.get("chat_market_data") or []
+        if not market_data or len(market_data) < 5:
+            try:
+                _fb = []
+                for _m, _ki in list((DOCS.get("co_phieu_vn") or {}).items())[:229]:
+                    _fb.append({"ma": _m, "ten": _ki.get("ten", _m)[:30], "nganh": _ki.get("nganh", "Khác"),
+                        "vung": "VN", "tien": "VND",
+                        "gia": float(_ki.get("gia_hien_tai") or _ki.get("current_price") or _ki.get("gia") or 0),
+                        "thay_doi": float(_ki.get("thay_doi_ngay") or _ki.get("change_pct") or 0),
+                        "ret_3m": float(_ki.get("ret_3m") or 0), "vol": 0, "vol_ratio": 1.0,
+                        "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0)})
+                for _m, _ki in list((DOCS.get("co_phieu_tg") or {}).items())[:155]:
+                    _fb.append({"ma": _m, "ten": _ki.get("ten", _m)[:30], "nganh": _ki.get("nganh", "Khác"),
+                        "vung": "TG", "tien": "USD",
+                        "gia": float(_ki.get("gia_hien_tai") or _ki.get("current_price") or _ki.get("gia") or 0),
+                        "thay_doi": float(_ki.get("thay_doi_ngay") or _ki.get("change_pct") or 0),
+                        "ret_3m": float(_ki.get("ret_3m") or 0), "vol": 0, "vol_ratio": 1.0,
+                        "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0)})
+                if len(_fb) >= 5:
+                    market_data = _fb
+            except Exception:
+                pass
         if _chon_nhom == "📊 Tổng quan":
             st.write("## 📊 Nguồn dữ liệu (Data Source)")
             ds1, ds2, ds3 = st.columns(3)
@@ -6574,7 +6596,6 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "⚠️ Rủi ro":
             st.write("## 💧 Liquidity Stress Test — Test thanh khoản (Position / ADTV)")
-            market_data = st.session_state.get("chat_market_data") or []
             if dm and len(dm) >= 2:
                 try:
                     liq_rows = []
@@ -7015,40 +7036,14 @@ elif st.session_state.trang_thai == "deep_analysis":
             for _s in _tg_doc_keys:
                 _scan_list.append((_s, ""))
             _all_vn_stocks = _scan_list
-            market_data = st.session_state.get("chat_market_data") or []
-            if len(market_data) < 5:
-                with st.spinner(f"📡 Đang quét {len(_all_vn_stocks)} mã toàn thị trường (VN + Thế giới)..."):
-                    market_data = _scan_market_stocks(tuple(_all_vn_stocks))
+            with st.spinner(f"📡 Đang quét {len(_all_vn_stocks)} mã toàn thị trường (VN + Thế giới)..."):
+                __scanned = _scan_market_stocks(tuple(_all_vn_stocks))
+                if __scanned and len(__scanned) >= 5:
+                    market_data = __scanned
                     try:
                         st.session_state["chat_market_data"] = market_data
                     except Exception:
                         pass
-            if (not market_data or len(market_data) < 5):
-                try:
-                    _fb = []
-                    _vn_doc = DOCS.get("co_phieu_vn") or {}
-                    _tg_doc = DOCS.get("co_phieu_tg") or {}
-                    for _m, _ki in list(_vn_doc.items())[:229]:
-                        _fb.append({"ma": _m, "ten": _ki.get("ten", _m)[:30], "nganh": _ki.get("nganh", "Khác"),
-                            "vung": "VN", "tien": "VND",
-                            "gia": float(_ki.get("gia_hien_tai") or _ki.get("current_price") or _ki.get("gia") or 0),
-                            "thay_doi": float(_ki.get("thay_doi_ngay") or _ki.get("change_pct") or 0),
-                            "ret_3m": float(_ki.get("ret_3m") or 0), "vol": 0, "vol_ratio": 1.0,
-                            "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0)})
-                    for _m, _ki in list(_tg_doc.items())[:155]:
-                        _fb.append({"ma": _m, "ten": _ki.get("ten", _m)[:30], "nganh": _ki.get("nganh", "Khác"),
-                            "vung": "TG", "tien": "USD",
-                            "gia": float(_ki.get("gia_hien_tai") or _ki.get("current_price") or _ki.get("gia") or 0),
-                            "thay_doi": float(_ki.get("thay_doi_ngay") or _ki.get("change_pct") or 0),
-                            "ret_3m": float(_ki.get("ret_3m") or 0), "vol": 0, "vol_ratio": 1.0,
-                            "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0)})
-                    market_data = _fb
-                    st.session_state["chat_market_data"] = market_data
-                    st.caption(f"📊 Dữ liệu từ co_phieu_vn.json + yfinance ({len(market_data)} mã)")
-                except Exception as _ex:
-                    st.warning(f"⚠️ Không có dữ liệu thị trường: {_ex}")
-            if not market_data or len(market_data) < 5:
-                st.warning(f"⚠️ Chỉ quét được {len(market_data) if market_data else 0}/{len(_all_vn_stocks)} mã. Một số section bên dưới sẽ bị ẩn. Có thể Yahoo Finance đang giới hạn request — thử lại sau vài phút.")
             df_mkt = pd.DataFrame(market_data) if market_data and len(market_data) >= 5 else pd.DataFrame()
             if market_data and len(market_data) >= 5:
                 st.caption(f"📊 Quét {len(market_data)}/{len(_all_vn_stocks)} mã thành công từ yfinance (VN + Thế giới)")
@@ -8407,89 +8402,89 @@ elif st.session_state.trang_thai == "deep_analysis":
             except Exception as e:
                 st.warning(f"⚠️ Không tính được cross-correlation: {str(e)[:80]}")
 
-        st.write("### 📊 PHÂN TÍCH CHUYÊN SÂU 384 MÃ — ĐẦY ĐỦ METRICS (Sharpe/Alpha/Beta/VaR/CVaR/Sortino/Calmar/MaxDD)")
-        if market_data and len(market_data) >= 10 and dd_prices:
-            try:
-                bench_label_dm = bench_label if bench_prices is not None else "VN30"
-                if bench_prices is None:
-                    bench_label_dm = "VN30"
-                metrics_rows = []
-                for d in market_data:
-                    ma = d["ma"]
-                    closes = dd_prices.get(ma, [])
-                    if len(closes) > 30:
-                        try:
-                            ps = pd.Series(closes)
-                            rets = ps.pct_change().dropna()
-                            if len(rets) < 30:
-                                continue
-                            ann_ret = float((1 + rets).prod() ** (252 / len(rets)) - 1) * 100
-                            vol_a = float(rets.std() * (252 ** 0.5) * 100)
-                            downside = rets[rets < 0]
-                            dd_a = float(downside.std() * (252 ** 0.5) * 100) if len(downside) > 0 else vol_a
-                            sharpe = (ann_ret - 3.0) / vol_a if vol_a > 0 else 0
-                            sortino = (ann_ret - 3.0) / dd_a if dd_a > 0 else 0
-                            cum = (1 + rets).cumprod()
-                            rm = cum.cummax()
-                            dd_pct = ((cum - rm) / rm)
-                            max_dd = float(dd_pct.min() * 100)
-                            calmar = ann_ret / abs(max_dd) if max_dd != 0 else 0
-                            var95 = float(np.percentile(rets, 5) * 100)
-                            cvar95 = float(rets[rets <= np.percentile(rets, 5)].mean() * 100) if len(rets[rets <= np.percentile(rets, 5)]) > 0 else var95
-                            if bench_prices is not None:
-                                common_idx_m = rets.index.intersection(bench_prices.index)
-                                if len(common_idx_m) > 20:
-                                    x_m = bench_prices.loc[common_idx_m].values
-                                    y_m = rets.loc[common_idx_m].values
-                                    if len(x_m) > 20 and float(np.std(x_m)) > 0:
-                                        beta_m, alpha_m = np.polyfit(x_m, y_m, 1)
-                                        info_ratio = float(alpha_m * 252 * 100 / (np.std(y_m - x_m) * (252 ** 0.5) * 100 + 0.001))
+        if _chon_nhom == "📋 Cơ bản":
+            st.write("### 📊 PHÂN TÍCH CHUYÊN SÂU 384 MÃ — ĐẦY ĐỦ METRICS (Sharpe/Alpha/Beta/VaR/CVaR/Sortino/Calmar/MaxDD)")
+            if market_data and len(market_data) >= 10 and dd_prices:
+                try:
+                    bench_label_dm = bench_label if bench_prices is not None else "VN30"
+                    if bench_prices is None:
+                        bench_label_dm = "VN30"
+                    metrics_rows = []
+                    for d in market_data:
+                        ma = d["ma"]
+                        closes = dd_prices.get(ma, [])
+                        if len(closes) > 30:
+                            try:
+                                ps = pd.Series(closes)
+                                rets = ps.pct_change().dropna()
+                                if len(rets) < 30:
+                                    continue
+                                ann_ret = float((1 + rets).prod() ** (252 / len(rets)) - 1) * 100
+                                vol_a = float(rets.std() * (252 ** 0.5) * 100)
+                                downside = rets[rets < 0]
+                                dd_a = float(downside.std() * (252 ** 0.5) * 100) if len(downside) > 0 else vol_a
+                                sharpe = (ann_ret - 3.0) / vol_a if vol_a > 0 else 0
+                                sortino = (ann_ret - 3.0) / dd_a if dd_a > 0 else 0
+                                cum = (1 + rets).cumprod()
+                                rm = cum.cummax()
+                                dd_pct = ((cum - rm) / rm)
+                                max_dd = float(dd_pct.min() * 100)
+                                calmar = ann_ret / abs(max_dd) if max_dd != 0 else 0
+                                var95 = float(np.percentile(rets, 5) * 100)
+                                cvar95 = float(rets[rets <= np.percentile(rets, 5)].mean() * 100) if len(rets[rets <= np.percentile(rets, 5)]) > 0 else var95
+                                if bench_prices is not None:
+                                    common_idx_m = rets.index.intersection(bench_prices.index)
+                                    if len(common_idx_m) > 20:
+                                        x_m = bench_prices.loc[common_idx_m].values
+                                        y_m = rets.loc[common_idx_m].values
+                                        if len(x_m) > 20 and float(np.std(x_m)) > 0:
+                                            beta_m, alpha_m = np.polyfit(x_m, y_m, 1)
+                                            info_ratio = float(alpha_m * 252 * 100 / (np.std(y_m - x_m) * (252 ** 0.5) * 100 + 0.001))
+                                        else:
+                                            beta_m, alpha_m, info_ratio = 0, 0, 0
                                     else:
                                         beta_m, alpha_m, info_ratio = 0, 0, 0
                                 else:
                                     beta_m, alpha_m, info_ratio = 0, 0, 0
-                            else:
-                                beta_m, alpha_m, info_ratio = 0, 0, 0
-                            metrics_rows.append({
-                                "Mã": ma, "Vùng": d.get("vung", ""),
-                                "Giá": round(float(closes[-1]), 0),
-                                "Return năm %": round(ann_ret, 2),
-                                "Vol %": round(vol_a, 1),
-                                "Sharpe": round(sharpe, 2),
-                                "Sortino": round(sortino, 2),
-                                "Calmar": round(calmar, 2),
-                                "Beta": round(float(beta_m), 2),
-                                "Alpha %/năm": round(float(alpha_m) * 252 * 100, 2),
-                                "Info Ratio": round(info_ratio, 2),
-                                "VaR 95% (1N) %": round(var95, 2),
-                                "CVaR 95%": round(cvar95, 2),
-                                "Max DD %": round(max_dd, 1),
-                                "Vốn hóa (tỷ)": round(d.get("von_hoa", 0) / 1e9, 0) if d.get("von_hoa", 0) > 0 else 0})
-                        except Exception:
-                            continue
-                if metrics_rows:
-                    df_metrics = pd.DataFrame(metrics_rows)
-                    st.caption(f"📊 Đầy đủ 13 metrics cho {len(df_metrics)}/{len(market_data)} mã từ giá thật yfinance 6T (annualized). So sánh: top theo từng chỉ số.")
-                    sort_opts = ["Sharpe", "Sortino", "Calmar", "Return năm %", "Info Ratio"]
-                    sort_opt = st.selectbox("Xếp hạng theo:", sort_opts, key="metrics_sort")
-                    df_show = df_metrics.sort_values(sort_opt, ascending=False).reset_index(drop=True)
-                    df_show.index = df_show.index + 1
-                    st.dataframe(df_show, use_container_width=True, hide_index=False, height=600)
-                    cnt_vn_m = sum(1 for r in metrics_rows if r["Vùng"] == "VN")
-                    cnt_tg_m = sum(1 for r in metrics_rows if r["Vùng"] == "TG")
-                    top_sharpe = df_metrics.nlargest(1, "Sharpe").iloc[0]
-                    top_calmar = df_metrics.nlargest(1, "Calmar").iloc[0]
-                    cm1, cm2, cm3, cm4 = st.columns(4)
-                    cm1.metric("🏆 Top Sharpe", f"{top_sharpe['Mã']} ({top_sharpe['Sharpe']:.2f})")
-                    cm2.metric("🏆 Top Calmar", f"{top_calmar['Mã']} ({top_calmar['Calmar']:.2f})")
-                    cm3.metric("📊 Sharpe TB toàn thị trường", f"{df_metrics['Sharpe'].mean():.2f}")
-                    cm4.metric("📊 Max DD TB", f"{df_metrics['Max DD %'].mean():.1f}%")
-                    st.caption(f"📊 Metrics: Return annualized, Vol annualized, Sharpe (rf=3%), Sortino (downside), Calmar (return/|maxDD|), Beta/Alpha vs {bench_label_dm}, VaR/CVaR 95% 1-day, Max DD 6T. Tính từ {len(df_metrics)} mã ({cnt_vn_m} VN + {cnt_tg_m} TG).")
-            except Exception as e:
-                st.warning(f"⚠️ Không tính được metrics 384 mã: {str(e)[:100]}")
-        else:
-            st.info("⚠️ Cần market scan + price data để tính metrics 384 mã.")
-
+                                metrics_rows.append({
+                                    "Mã": ma, "Vùng": d.get("vung", ""),
+                                    "Giá": round(float(closes[-1]), 0),
+                                    "Return năm %": round(ann_ret, 2),
+                                    "Vol %": round(vol_a, 1),
+                                    "Sharpe": round(sharpe, 2),
+                                    "Sortino": round(sortino, 2),
+                                    "Calmar": round(calmar, 2),
+                                    "Beta": round(float(beta_m), 2),
+                                    "Alpha %/năm": round(float(alpha_m) * 252 * 100, 2),
+                                    "Info Ratio": round(info_ratio, 2),
+                                    "VaR 95% (1N) %": round(var95, 2),
+                                    "CVaR 95%": round(cvar95, 2),
+                                    "Max DD %": round(max_dd, 1),
+                                    "Vốn hóa (tỷ)": round(d.get("von_hoa", 0) / 1e9, 0) if d.get("von_hoa", 0) > 0 else 0})
+                            except Exception:
+                                continue
+                    if metrics_rows:
+                        df_metrics = pd.DataFrame(metrics_rows)
+                        st.caption(f"📊 Đầy đủ 13 metrics cho {len(df_metrics)}/{len(market_data)} mã từ giá thật yfinance 6T (annualized). So sánh: top theo từng chỉ số.")
+                        sort_opts = ["Sharpe", "Sortino", "Calmar", "Return năm %", "Info Ratio"]
+                        sort_opt = st.selectbox("Xếp hạng theo:", sort_opts, key="metrics_sort")
+                        df_show = df_metrics.sort_values(sort_opt, ascending=False).reset_index(drop=True)
+                        df_show.index = df_show.index + 1
+                        st.dataframe(df_show, use_container_width=True, hide_index=False, height=600)
+                        cnt_vn_m = sum(1 for r in metrics_rows if r["Vùng"] == "VN")
+                        cnt_tg_m = sum(1 for r in metrics_rows if r["Vùng"] == "TG")
+                        top_sharpe = df_metrics.nlargest(1, "Sharpe").iloc[0]
+                        top_calmar = df_metrics.nlargest(1, "Calmar").iloc[0]
+                        cm1, cm2, cm3, cm4 = st.columns(4)
+                        cm1.metric("🏆 Top Sharpe", f"{top_sharpe['Mã']} ({top_sharpe['Sharpe']:.2f})")
+                        cm2.metric("🏆 Top Calmar", f"{top_calmar['Mã']} ({top_calmar['Calmar']:.2f})")
+                        cm3.metric("📊 Sharpe TB toàn thị trường", f"{df_metrics['Sharpe'].mean():.2f}")
+                        cm4.metric("📊 Max DD TB", f"{df_metrics['Max DD %'].mean():.1f}%")
+                        st.caption(f"📊 Metrics: Return annualized, Vol annualized, Sharpe (rf=3%), Sortino (downside), Calmar (return/|maxDD|), Beta/Alpha vs {bench_label_dm}, VaR/CVaR 95% 1-day, Max DD 6T. Tính từ {len(df_metrics)} mã ({cnt_vn_m} VN + {cnt_tg_m} TG).")
+                except Exception as e:
+                    st.warning(f"⚠️ Không tính được metrics 384 mã: {str(e)[:100]}")
+            else:
+                st.info("⚠️ Cần market scan + price data để tính metrics 384 mã.")
         st.write("---")
         if _chon_nhom == "📋 Cơ bản":
             st.write("## 🔗 50-STOCK CORRELATION MATRIX — Ma trận tương quan 50 mã")
