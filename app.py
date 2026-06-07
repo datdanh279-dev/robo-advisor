@@ -9220,11 +9220,25 @@ elif st.session_state.trang_thai == "chat":
 
     if tab_expert_v2 is not None:
         with tab_expert_v2:
-            try:
-                _expert_tab_ui()
-            except Exception as _tab_err:
-                st.error(f"❌ Lỗi tab Chuyên gia: {_tab_err}")
-                st.info("Vui lòng thử lại hoặc dùng tab Chat.")
+            if "_expert_unlocked" not in st.session_state:
+                st.session_state._expert_unlocked = False
+            if not st.session_state._expert_unlocked:
+                st.markdown("### 👑 Hội đồng Chuyên gia — Huyền thoại Đầu tư Thế giới")
+                st.markdown("Tính năng **6 Chuyên gia + Chủ tịch Hội đồng** yêu cầu mật khẩu kích hoạt.")
+                _pw = st.text_input("🔑 Nhập mật khẩu kích hoạt:", type="password", key="expert_pw_input")
+                if st.button("🔓 Mở khóa", key="expert_unlock_btn", use_container_width=True):
+                    if _pw == "8888":
+                        st.session_state._expert_unlocked = True
+                        st.rerun()
+                    else:
+                        st.error("❌ Mật khẩu không đúng. Liên hệ admin để được cấp quyền truy cập.")
+                st.info("Mở khóa để dùng phân tích chuyên sâu từ 6 huyền thoại đầu tư thế giới.")
+            else:
+                try:
+                    _expert_tab_ui()
+                except Exception as _tab_err:
+                    st.error(f"❌ Lỗi tab Chuyên gia: {_tab_err}")
+                    st.info("Vui lòng thử lại hoặc dùng tab Chat.")
 
 
 
