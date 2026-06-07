@@ -359,7 +359,7 @@ def tab_backtest(docs):
             scored.append((ma, info, ts_d, s))
         scored.sort(key=lambda x: -x[3])
         top = scored[:12]
-        total_s = sum(s[3] for _, _, _, s in top) or 1
+        total_s = sum(item[3] for item in top) or 1
         for ma, info, ts_d, s in top:
             ty = s / total_s
             tien = von * ty

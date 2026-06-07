@@ -442,7 +442,7 @@ def _local_expert_analysis(expert, question, context):
     return None
 
 
-def _call_chairman(question, expert_results, api_key, api_keys):
+def _call_chairman(question, expert_results, api_key, api_keys, thi_truong_context=""):
     import http.client
     import ssl
     global _CHAIRMAN_ATTEMPTED
@@ -453,7 +453,11 @@ def _call_chairman(question, expert_results, api_key, api_keys):
         reviews.append(f"=== {expert['name']} ({expert['title']}) ===\n{result}\n")
 
     context = "\n\n".join(reviews)
-    prompt = f"{CHAIRMAN_SYSTEM_PROMPT}\n\nCÂU HỎI: {question}\n\nCÁC Ý KIẾN CHUYÊN GIA:\n{context}\n\nKẾT LUẬN CỦA CHỦ TỊCH:"
+    # Add BCTC context so chairman has raw data too
+    btc_block = ""
+    if thi_truong_context:
+        btc_block = f"\n\nDU LIEU BCTC THUC (385 ma):\n{thi_truong_context}"
+    prompt = f"{CHAIRMAN_SYSTEM_PROMPT}\n\nCÂU HỎI: {question}\n\nCÁC Ý KIẾN CHUYÊN GIA:\n{context}{btc_block}\n\nKẾT LUẬN CỦA CHỦ TỊCH:"
 
     messages = [{"role": "user", "content": prompt}]
     payload_body = json.dumps({"messages": messages, "temperature": 0.5, "max_tokens": 1500})
@@ -648,8 +652,15 @@ def hoi_dong_chuyen_gia(cau_hoi, groq_key_override=None, docs=None, force_full=F
                     gia = info.get("gia") or 0
                     pe = info.get("pe") or "?"
                     pb = info.get("pb") or "?"
+                    roe_tg = info.get("roe")
+                    roe_tg_s = f"{roe_tg}%" if isinstance(roe_tg, (int, float)) else "?"
+                    eps_tg = info.get("eps")
+                    eps_tg_s = f"{eps_tg:,.2f}" if isinstance(eps_tg, (int, float)) else "?"
+                    ct_d = info.get("co_tuc_d") or 0
+                    ct_pct = info.get("co_tuc_pct") or 0
                     vh_val = info.get("von_hoa") or 0
-                    row_parts.append(f"{ma}({gia:,.0f},PE{pe}/PB{pb},VH{vh_val:,.0f})")
+                    beta_tg = info.get("beta") or "?"
+                    row_parts.append(f"{ma}({gia:,.0f},PE{pe}/PB{pb},R{roe_tg_s},EPS{eps_tg_s},Ct${ct_d:,.2f}/{ct_pct:,.0f}%,VH{vh_val:,.2f}T,B{beta_tg})")
                 lines.append(" ".join(row_parts))
         if lines:
             thi_truong_context = "\n".join(lines)
@@ -728,17 +739,17 @@ def _run_expert_panel(question, api_keys, thi_truong_context="", force_full=Fals
         else:
             expert_results.append(f"⏭️ {exp['name']} — chuyên gia không cần thiết cho câu hỏi này.")
 
-    chairman_result = None
-    chairman_key = api_keys.get("groq") or api_keys.get("openai")
-    # Luôn thử Chủ tịch nếu có ít nhất 1 chuyên gia trả lời thành công
-    if chairman_key and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
-        try:
-            chairman_result = _call_chairman(question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys)
-        except Exception as e:
-            logger.warning(f"Chairman failed: {e}")
-        # Nếu API failed, dùng tổng hợp local
-        if not chairman_result or chairman_result.startswith("⚠️"):
-            chairman_result = _local_chairman_synthesis(question, expert_results, [e["name"] for e in EXPERTS])
+        chairman_result = None
+        chairman_key = api_keys.get("groq") or api_keys.get("openai")
+        # Luôn thử Chủ tịch nếu có ít nhất 1 chuyên gia trả lời thành công
+        if chairman_key and any(r and "❌" not in r and "⏭️" not in r for r in expert_results):
+            try:
+                chairman_result = _call_chairman(question, [raw.get(e["id"], "") for e in EXPERTS], chairman_key, api_keys, thi_truong_context)
+            except Exception as e:
+                logger.warning(f"Chairman failed: {e}")
+            # Nếu API failed, dùng tổng hợp local
+            if not chairman_result or chairman_result.startswith("⚠️"):
+                chairman_result = _local_chairman_synthesis(question, expert_results, [e["name"] for e in EXPERTS])
 
     return {
         "experts": [{"id": e["id"], "name": e["name"], "title": e["title"], "color": e["color"], "response": r} for e, r in zip(EXPERTS, expert_results)],
