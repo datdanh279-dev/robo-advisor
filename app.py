@@ -1187,7 +1187,7 @@ with sidebar:
     st.markdown("---")
 
     if st.button("🏠 Trang chủ", width='stretch'):
-        st.session_state.trang_thai = "deep_analysis"
+        st.session_state.trang_thai = "dashboard"
         st.rerun()
 
     if st.button("📝 Khảo sát rủi ro", width='stretch'):
@@ -1204,7 +1204,7 @@ with sidebar:
         st.rerun()
 
     if st.button("💬 Chat phân tích", width='stretch'):
-        st.session_state.trang_thai = "deep_analysis"
+        st.session_state.trang_thai = "chat"
         st.rerun()
 
     if st.session_state.deep_unlocked:
