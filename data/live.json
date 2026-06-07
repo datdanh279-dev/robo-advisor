@@ -1755,9 +1755,9 @@
   "VEA": {
     "ten": "VEAM",
     "nganh": "Cơ khí",
-    "gia": 34800.0,
+    "gia": 71.41,
     "thay_doi_pct": 0,
-    "pe": 9.5,
+    "pe": 19.0,
     "pb": 9.5,
     "khoi_luong": 1.4
   },
@@ -2417,5 +2417,1391 @@
     "khoi_luong": 0.0,
     "w52_high": 11000.0,
     "w52_low": 7570.0
+  },
+  "AAPL": {
+    "ten": "Apple",
+    "nganh": "Tech",
+    "gia": 307.34,
+    "pe": 37.2,
+    "pb": 42.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 2.8
+  },
+  "MSFT": {
+    "ten": "Microsoft",
+    "nganh": "Tech",
+    "gia": 416.67,
+    "pe": 24.8,
+    "pb": 7.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.8
+  },
+  "GOOGL": {
+    "ten": "Alphabet",
+    "nganh": "Tech",
+    "gia": 368.53,
+    "pe": 28.1,
+    "pb": 9.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.0
+  },
+  "AMZN": {
+    "ten": "Amazon",
+    "nganh": "Bán lẻ",
+    "gia": 246.03,
+    "pe": 31.7,
+    "pb": 6.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 2.6
+  },
+  "META": {
+    "ten": "Meta",
+    "nganh": "Tech",
+    "gia": 593.0,
+    "pe": 21.5,
+    "pb": 6.2,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.0
+  },
+  "NVDA": {
+    "ten": "NVIDIA",
+    "nganh": "Bán dẫn",
+    "gia": 205.1,
+    "pe": 31.5,
+    "pb": 31.7,
+    "khoi_luong": 0,
+    "thay_doi_pct": -4.9
+  },
+  "TSLA": {
+    "ten": "Tesla",
+    "nganh": "Xe điện",
+    "gia": 391.0,
+    "pe": 358.7,
+    "pb": 17.9,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.5
+  },
+  "JNJ": {
+    "ten": "Johnson & Johnson",
+    "nganh": "Dược",
+    "gia": 232.77,
+    "pe": 26.9,
+    "pb": 6.9,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.4
+  },
+  "PG": {
+    "ten": "Procter & Gamble",
+    "nganh": "Tiêu dùng",
+    "gia": 146.54,
+    "pe": 21.4,
+    "pb": 6.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 3.5
+  },
+  "KO": {
+    "ten": "Coca-Cola",
+    "nganh": "Đồ uống",
+    "gia": 79.48,
+    "pe": 25.0,
+    "pb": 10.2,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.1
+  },
+  "PEP": {
+    "ten": "PepsiCo",
+    "nganh": "Đồ uống",
+    "gia": 141.92,
+    "pe": 22.3,
+    "pb": 9.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.0
+  },
+  "WMT": {
+    "ten": "Walmart",
+    "nganh": "Bán lẻ",
+    "gia": 118.88,
+    "pe": 41.9,
+    "pb": 9.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": -9.4
+  },
+  "MCD": {
+    "ten": "McDonald",
+    "nganh": "Nhà hàng",
+    "gia": 279.84,
+    "pe": 23.1,
+    "pb": -154.6,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.2
+  },
+  "NKE": {
+    "ten": "Nike",
+    "nganh": "Giày dép",
+    "gia": 42.98,
+    "pe": 28.3,
+    "pb": 4.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 4.1
+  },
+  "DIS": {
+    "ten": "Disney",
+    "nganh": "Giải trí",
+    "gia": 99.71,
+    "pe": 16.0,
+    "pb": 1.6,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.1
+  },
+  "UNH": {
+    "ten": "UnitedHealth",
+    "nganh": "Y tế",
+    "gia": 399.47,
+    "pe": 30.1,
+    "pb": 3.7,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.2
+  },
+  "JPM": {
+    "ten": "JPMorgan",
+    "nganh": "Ngân hàng",
+    "gia": 312.37,
+    "pe": 14.9,
+    "pb": 2.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.9
+  },
+  "V": {
+    "ten": "Visa",
+    "nganh": "Thanh toán",
+    "gia": 323.57,
+    "pe": 28.3,
+    "pb": 17.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.9
+  },
+  "MA": {
+    "ten": "Mastercard",
+    "nganh": "Thanh toán",
+    "gia": 491.08,
+    "pe": 28.4,
+    "pb": 64.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.6
+  },
+  "HD": {
+    "ten": "Home Depot",
+    "nganh": "Bán lẻ",
+    "gia": 310.78,
+    "pe": 22.1,
+    "pb": 22.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 2.3
+  },
+  "CRM": {
+    "ten": "Salesforce",
+    "nganh": "SaaS",
+    "gia": 185.66,
+    "pe": 21.5,
+    "pb": 4.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.4
+  },
+  "IBM": {
+    "ten": "IBM",
+    "nganh": "Tech",
+    "gia": 284.84,
+    "pe": 25.2,
+    "pb": 8.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": 13.4
+  },
+  "AMGN": {
+    "ten": "Amgen",
+    "nganh": "Dược sinh học",
+    "gia": 349.58,
+    "pe": 24.3,
+    "pb": 20.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.4
+  },
+  "AXP": {
+    "ten": "American Express",
+    "nganh": "Tài chính",
+    "gia": 310.66,
+    "pe": 19.4,
+    "pb": 6.2,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.9
+  },
+  "CAT": {
+    "ten": "Caterpillar",
+    "nganh": "Máy xây dựng",
+    "gia": 904.28,
+    "pe": 45.0,
+    "pb": 22.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 4.3
+  },
+  "CVX": {
+    "ten": "Chevron",
+    "nganh": "Dầu khí",
+    "gia": 187.31,
+    "pe": 32.7,
+    "pb": 2.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": -4.7
+  },
+  "CSCO": {
+    "ten": "Cisco",
+    "nganh": "Mạng",
+    "gia": 121.64,
+    "pe": 40.5,
+    "pb": 9.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": 4.7
+  },
+  "GS": {
+    "ten": "Goldman Sachs",
+    "nganh": "NH đầu tư",
+    "gia": 1038.68,
+    "pe": 19.0,
+    "pb": 2.9,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.5
+  },
+  "HON": {
+    "ten": "Honeywell",
+    "nganh": "Công nghiệp",
+    "gia": 213.97,
+    "pe": 34.1,
+    "pb": 10.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 6.5
+  },
+  "TRV": {
+    "ten": "Travelers",
+    "nganh": "Bảo hiểm",
+    "gia": 303.25,
+    "pe": 9.0,
+    "pb": 2.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": -2.3
+  },
+  "VZ": {
+    "ten": "Verizon",
+    "nganh": "Viễn thông",
+    "gia": 45.37,
+    "pe": 11.1,
+    "pb": 1.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.9
+  },
+  "BA": {
+    "ten": "Boeing",
+    "nganh": "Máy bay",
+    "gia": 215.45,
+    "pe": 85.5,
+    "pb": 28.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.9
+  },
+  "MMM": {
+    "ten": "3M",
+    "nganh": "Công nghiệp",
+    "gia": 153.76,
+    "pe": 29.6,
+    "pb": 24.6,
+    "khoi_luong": 0,
+    "thay_doi_pct": 4.1
+  },
+  "BRK-B": {
+    "ten": "Berkshire",
+    "nganh": "Holding Buffett",
+    "gia": 488.13,
+    "pe": 14.5,
+    "pb": 0.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.2
+  },
+  "BAC": {
+    "ten": "BoA",
+    "nganh": "NH",
+    "gia": 53.83,
+    "pe": 13.4,
+    "pb": 1.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.3
+  },
+  "WFC": {
+    "ten": "Wells Fargo",
+    "nganh": "NH",
+    "gia": 81.94,
+    "pe": 12.7,
+    "pb": 1.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.4
+  },
+  "C": {
+    "ten": "Citigroup",
+    "nganh": "NH",
+    "gia": 132.47,
+    "pe": 16.4,
+    "pb": 1.2,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.5
+  },
+  "SCHW": {
+    "ten": "Schwab",
+    "nganh": "Môi giới",
+    "gia": 88.84,
+    "pe": 17.7,
+    "pb": 3.6,
+    "khoi_luong": 0,
+    "thay_doi_pct": -5.0
+  },
+  "BLK": {
+    "ten": "BlackRock",
+    "nganh": "Quản lý TS",
+    "gia": 995.6,
+    "pe": 25.1,
+    "pb": 2.7,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.8
+  },
+  "SPGI": {
+    "ten": "S&P Global",
+    "nganh": "Rating",
+    "gia": 424.44,
+    "pe": 26.9,
+    "pb": 4.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.3
+  },
+  "MS": {
+    "ten": "Morgan Stanley",
+    "nganh": "NH đầu tư",
+    "gia": 211.93,
+    "pe": 19.2,
+    "pb": 3.2,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.9
+  },
+  "LLY": {
+    "ten": "Eli Lilly",
+    "nganh": "Dược",
+    "gia": 1131.42,
+    "pe": 40.2,
+    "pb": 32.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 6.3
+  },
+  "PFE": {
+    "ten": "Pfizer",
+    "nganh": "Dược",
+    "gia": 26.04,
+    "pe": 19.9,
+    "pb": 1.6,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.6
+  },
+  "ABBV": {
+    "ten": "AbbVie",
+    "nganh": "Dược",
+    "gia": 227.23,
+    "pe": 110.8,
+    "pb": -60.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.5
+  },
+  "TMO": {
+    "ten": "Thermo Fisher",
+    "nganh": "TBYT",
+    "gia": 472.8,
+    "pe": 26.0,
+    "pb": 3.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.0
+  },
+  "MRK": {
+    "ten": "Merck",
+    "nganh": "Dược",
+    "gia": 120.79,
+    "pe": 34.0,
+    "pb": 6.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 6.4
+  },
+  "ABT": {
+    "ten": "Abbott",
+    "nganh": "TBYT",
+    "gia": 91.07,
+    "pe": 25.5,
+    "pb": 3.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": -3.1
+  },
+  "DHR": {
+    "ten": "Danaher",
+    "nganh": "Khoa học",
+    "gia": 184.3,
+    "pe": 35.7,
+    "pb": 2.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.2
+  },
+  "BMY": {
+    "ten": "Bristol-Myers",
+    "nganh": "Dược",
+    "gia": 57.27,
+    "pe": 16.0,
+    "pb": 5.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.7
+  },
+  "GILD": {
+    "ten": "Gilead",
+    "nganh": "Dược",
+    "gia": 129.16,
+    "pe": 17.6,
+    "pb": 6.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": 2.3
+  },
+  "COST": {
+    "ten": "Costco",
+    "nganh": "Wholesale",
+    "gia": 971.87,
+    "pe": 48.8,
+    "pb": 26.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": -6.5
+  },
+  "SBUX": {
+    "ten": "Starbucks",
+    "nganh": "Cà phê",
+    "gia": 95.29,
+    "pe": 72.7,
+    "pb": -12.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": -4.1
+  },
+  "TGT": {
+    "ten": "Target",
+    "nganh": "Bán lẻ",
+    "gia": 122.57,
+    "pe": 16.2,
+    "pb": 3.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 4.9
+  },
+  "LOW": {
+    "ten": "Lowe",
+    "nganh": "Bán lẻ",
+    "gia": 210.74,
+    "pe": 17.8,
+    "pb": -12.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.9
+  },
+  "TJX": {
+    "ten": "TJX",
+    "nganh": "Bán lẻ",
+    "gia": 160.71,
+    "pe": 31.3,
+    "pb": 17.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.4
+  },
+  "BKNG": {
+    "ten": "Booking",
+    "nganh": "Du lịch",
+    "gia": 165.84,
+    "pe": 21.9,
+    "pb": -14.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": 7.3
+  },
+  "GE": {
+    "ten": "GE",
+    "nganh": "Hàng không",
+    "gia": 328.0,
+    "pe": 40.8,
+    "pb": 18.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.7
+  },
+  "UPS": {
+    "ten": "UPS",
+    "nganh": "Vận chuyển",
+    "gia": 108.54,
+    "pe": 17.6,
+    "pb": 5.7,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.7
+  },
+  "DE": {
+    "ten": "Deere",
+    "nganh": "Nông nghiệp",
+    "gia": 583.44,
+    "pe": 33.0,
+    "pb": 5.7,
+    "khoi_luong": 0,
+    "thay_doi_pct": -5.5
+  },
+  "LMT": {
+    "ten": "Lockheed",
+    "nganh": "Quốc phòng",
+    "gia": 523.76,
+    "pe": 25.4,
+    "pb": 16.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.6
+  },
+  "RTX": {
+    "ten": "RTX",
+    "nganh": "Hàng không",
+    "gia": 180.99,
+    "pe": 34.0,
+    "pb": 3.7,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.4
+  },
+  "UNP": {
+    "ten": "Union Pacific",
+    "nganh": "Đường sắt",
+    "gia": 272.32,
+    "pe": 22.4,
+    "pb": 8.7,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.1
+  },
+  "NOC": {
+    "ten": "Northrop",
+    "nganh": "Quốc phòng",
+    "gia": 544.4,
+    "pe": 17.1,
+    "pb": 4.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.2
+  },
+  "ETN": {
+    "ten": "Eaton",
+    "nganh": "Điện",
+    "gia": 395.94,
+    "pe": 38.7,
+    "pb": 7.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": 7.0
+  },
+  "XOM": {
+    "ten": "ExxonMobil",
+    "nganh": "Dầu khí",
+    "gia": 149.92,
+    "pe": 25.2,
+    "pb": 2.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -5.4
+  },
+  "COP": {
+    "ten": "ConocoPhillips",
+    "nganh": "Dầu khí",
+    "gia": 117.14,
+    "pe": 19.9,
+    "pb": 2.2,
+    "khoi_luong": 0,
+    "thay_doi_pct": -5.9
+  },
+  "SLB": {
+    "ten": "Schlumberger",
+    "nganh": "Dầu khí",
+    "gia": 54.87,
+    "pe": 24.2,
+    "pb": 3.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.4
+  },
+  "OXY": {
+    "ten": "Occidental",
+    "nganh": "Dầu khí",
+    "gia": 56.93,
+    "pe": 76.9,
+    "pb": 1.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": -3.4
+  },
+  "NFLX": {
+    "ten": "Netflix",
+    "nganh": "Streaming",
+    "gia": 82.18,
+    "pe": 26.5,
+    "pb": 11.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.8
+  },
+  "CMCSA": {
+    "ten": "Comcast",
+    "nganh": "Truyền thông",
+    "gia": 23.82,
+    "pe": 4.7,
+    "pb": 1.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.4
+  },
+  "T": {
+    "ten": "AT&T",
+    "nganh": "Viễn thông",
+    "gia": 22.75,
+    "pe": 7.5,
+    "pb": 1.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.2
+  },
+  "AMD": {
+    "ten": "AMD",
+    "nganh": "Bán dẫn",
+    "gia": 466.38,
+    "pe": 156.5,
+    "pb": 11.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": 10.7
+  },
+  "INTC": {
+    "ten": "Intel",
+    "nganh": "Bán dẫn",
+    "gia": 99.17,
+    "pe": 64.2,
+    "pb": 4.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 2.4
+  },
+  "AVGO": {
+    "ten": "Broadcom",
+    "nganh": "Bán dẫn",
+    "gia": 385.73,
+    "pe": 64.1,
+    "pb": 20.9,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.0
+  },
+  "QCOM": {
+    "ten": "Qualcomm",
+    "nganh": "Chip di động",
+    "gia": 215.94,
+    "pe": 23.2,
+    "pb": 8.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 15.3
+  },
+  "TXN": {
+    "ten": "TI",
+    "nganh": "Analog",
+    "gia": 285.06,
+    "pe": 48.8,
+    "pb": 15.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 4.1
+  },
+  "MU": {
+    "ten": "Micron",
+    "nganh": "Bộ nhớ",
+    "gia": 864.01,
+    "pe": 40.8,
+    "pb": 13.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 26.8
+  },
+  "ASML": {
+    "ten": "ASML",
+    "nganh": "Lithography",
+    "gia": 1641.74,
+    "pe": 54.7,
+    "pb": 1453.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 3.1
+  },
+  "TSM": {
+    "ten": "TSMC",
+    "nganh": "Đúc chip",
+    "gia": 415.17,
+    "pe": 35.6,
+    "pb": 63.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.3
+  },
+  "SPY": {
+    "ten": "SPDR S&P 500",
+    "nganh": "S&P 500",
+    "gia": 750.46,
+    "pe": 28.2,
+    "pb": 1.75,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.68005
+  },
+  "VOO": {
+    "ten": "Vanguard S&P",
+    "nganh": "S&P low cost",
+    "gia": 689.96,
+    "pe": 28.2,
+    "pb": 1.77,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.69215
+  },
+  "QQQ": {
+    "ten": "Invesco QQQ",
+    "nganh": "NASDAQ 100",
+    "gia": 729.45,
+    "pe": 35.6,
+    "pb": 2.04,
+    "khoi_luong": 0,
+    "thay_doi_pct": 8.85925
+  },
+  "IWM": {
+    "ten": "Russell 2000",
+    "nganh": "Small cap",
+    "gia": 290.37,
+    "pe": 20.0,
+    "pb": 1.33,
+    "khoi_luong": 0,
+    "thay_doi_pct": 13.16127
+  },
+  "DIA": {
+    "ten": "SPDR Dow",
+    "nganh": "Dow Jones",
+    "gia": 506.88,
+    "pe": 24.2,
+    "pb": 1.42,
+    "khoi_luong": 0,
+    "thay_doi_pct": 3.76658
+  },
+  "VTI": {
+    "ten": "Vanguard Total",
+    "nganh": "Total US",
+    "gia": 369.36,
+    "pe": 27.4,
+    "pb": 2.65,
+    "khoi_luong": 0,
+    "thay_doi_pct": 5.97418
+  },
+  "VWO": {
+    "ten": "Vanguard Emerging",
+    "nganh": "Emerging",
+    "gia": 60.29,
+    "pe": 17.1,
+    "pb": 1.25,
+    "khoi_luong": 0,
+    "thay_doi_pct": 9.09769
+  },
+  "GLD": {
+    "ten": "SPDR Gold",
+    "nganh": "Gold ETF",
+    "gia": 408.49,
+    "pe": 22.5,
+    "pb": 4.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 6.90579
+  },
+  "SLV": {
+    "ten": "iShares Silver",
+    "nganh": "Silver ETF",
+    "gia": 67.5,
+    "pe": 22.5,
+    "pb": 4.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.99829
+  },
+  "TLT": {
+    "ten": "20Y Treasury",
+    "nganh": "TP 20Y",
+    "gia": 85.3,
+    "pe": -4265.0,
+    "pb": 0.57,
+    "khoi_luong": 0,
+    "thay_doi_pct": -0.75373
+  },
+  "HYG": {
+    "ten": "High Yield",
+    "nganh": "TP junk",
+    "gia": 80.13,
+    "pe": 11.0,
+    "pb": 0.91,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.06613
+  },
+  "ARKK": {
+    "ten": "ARK Innovation",
+    "nganh": "Disruptive",
+    "gia": 77.95,
+    "pe": 46.7,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.63019
+  },
+  "HSBA": {
+    "ten": "HSBC",
+    "nganh": "NH",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "BP": {
+    "ten": "BP",
+    "nganh": "Dầu khí",
+    "gia": 42.97,
+    "pe": 34.7,
+    "pb": 7.9,
+    "khoi_luong": 0,
+    "thay_doi_pct": -7.7
+  },
+  "SHEL": {
+    "ten": "Shell",
+    "nganh": "Dầu khí",
+    "gia": 85.4,
+    "pe": 13.3,
+    "pb": 1.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -2.5
+  },
+  "AZN": {
+    "ten": "AstraZeneca",
+    "nganh": "Dược",
+    "gia": 185.95,
+    "pe": 28.0,
+    "pb": 6.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.0
+  },
+  "ULVR": {
+    "ten": "Unilever",
+    "nganh": "Tiêu dùng",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "GSK": {
+    "ten": "GSK",
+    "nganh": "Dược",
+    "gia": 51.52,
+    "pe": 13.5,
+    "pb": 4.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.6
+  },
+  "BARC": {
+    "ten": "Barclays",
+    "nganh": "NH",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "LLOY": {
+    "ten": "Lloyds",
+    "nganh": "NH",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "TSCO": {
+    "ten": "Tesco",
+    "nganh": "Bán lẻ",
+    "gia": 29.78,
+    "pe": 14.7,
+    "pb": 6.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": -2.4
+  },
+  "SAP": {
+    "ten": "SAP",
+    "nganh": "SaaS",
+    "gia": 184.77,
+    "pe": 25.5,
+    "pb": 4.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": -3.2
+  },
+  "SIE": {
+    "ten": "Siemens",
+    "nganh": "Công nghiệp",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "ALV": {
+    "ten": "Allianz",
+    "nganh": "Bảo hiểm",
+    "gia": 127.56,
+    "pe": 13.7,
+    "pb": 3.6,
+    "khoi_luong": 0,
+    "thay_doi_pct": 9.9
+  },
+  "DTE": {
+    "ten": "Deutsche Telekom",
+    "nganh": "Viễn thông",
+    "gia": 145.77,
+    "pe": 24.0,
+    "pb": 2.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.8
+  },
+  "BMW": {
+    "ten": "BMW",
+    "nganh": "Xe hơi",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "VOW3": {
+    "ten": "Volkswagen",
+    "nganh": "Xe hơi",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "MBG": {
+    "ten": "Mercedes",
+    "nganh": "Xe hơi",
+    "gia": 26.23,
+    "pe": 22.5,
+    "pb": 4.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0.5
+  },
+  "BAS": {
+    "ten": "BASF",
+    "nganh": "Hóa chất",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "ADS": {
+    "ten": "Adidas",
+    "nganh": "Giày",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "MC": {
+    "ten": "LVMH",
+    "nganh": "Xa xỉ",
+    "gia": 67.86,
+    "pe": 24.4,
+    "pb": 10.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 2.6
+  },
+  "OR": {
+    "ten": "LOreal",
+    "nganh": "Mỹ phẩm",
+    "gia": 33.87,
+    "pe": 25.3,
+    "pb": 4.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -1.0
+  },
+  "SAN": {
+    "ten": "Sanofi",
+    "nganh": "Dược",
+    "gia": 12.15,
+    "pe": 11.8,
+    "pb": 1.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.7
+  },
+  "AIR": {
+    "ten": "Airbus",
+    "nganh": "Hàng không",
+    "gia": 116.65,
+    "pe": 25.6,
+    "pb": 2.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": 4.9
+  },
+  "BNP": {
+    "ten": "BNP Paribas",
+    "nganh": "NH",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "NESN": {
+    "ten": "Nestlé",
+    "nganh": "Thực phẩm",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "NOVN": {
+    "ten": "Novartis",
+    "nganh": "Dược",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "ROG": {
+    "ten": "Roche",
+    "nganh": "Dược",
+    "gia": 137.67,
+    "pe": 31.5,
+    "pb": 2.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 9.7
+  },
+  "UBSG": {
+    "ten": "UBS",
+    "nganh": "NH",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "7203": {
+    "ten": "Toyota",
+    "nganh": "Xe hơi",
+    "gia": 3030.0,
+    "pe": 10.3,
+    "pb": 0.99,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "6758": {
+    "ten": "Sony",
+    "nganh": "Điện tử",
+    "gia": 3451.0,
+    "pe": 20.1,
+    "pb": 2.51,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "9984": {
+    "ten": "SoftBank",
+    "nganh": "Đầu tư",
+    "gia": 7125.0,
+    "pe": 8.2,
+    "pb": 2.33,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "6861": {
+    "ten": "Keyence",
+    "nganh": "Tự động",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "8306": {
+    "ten": "Mitsubishi UFJ",
+    "nganh": "NH",
+    "gia": 2982.0,
+    "pe": 14.0,
+    "pb": 1.51,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "7974": {
+    "ten": "Nintendo",
+    "nganh": "Game",
+    "gia": 6972.0,
+    "pe": 19.1,
+    "pb": 2.72,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "4063": {
+    "ten": "Shin-Etsu",
+    "nganh": "Hóa chất",
+    "gia": 7344.0,
+    "pe": 29.1,
+    "pb": 3.05,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "8035": {
+    "ten": "Tokyo Electron",
+    "nganh": "Bán dẫn",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "700": {
+    "ten": "Tencent",
+    "nganh": "Tech TQ",
+    "gia": 425.0,
+    "pe": 15.3,
+    "pb": 2.95,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "9988": {
+    "ten": "Alibaba",
+    "nganh": "TMĐT",
+    "gia": 121.8,
+    "pe": 19.2,
+    "pb": 1.85,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "3690": {
+    "ten": "Meituan",
+    "nganh": "Giao hàng",
+    "gia": 73.3,
+    "pe": 13.8,
+    "pb": 2.57,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "1810": {
+    "ten": "Xiaomi",
+    "nganh": "Điện thoại",
+    "gia": 28.56,
+    "pe": 15.9,
+    "pb": 2.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "1024": {
+    "ten": "Kuaishou",
+    "nganh": "Video",
+    "gia": 44.88,
+    "pe": 9.2,
+    "pb": 2.05,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "1398": {
+    "ten": "ICBC",
+    "nganh": "NH",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "939": {
+    "ten": "China Construction",
+    "nganh": "NH",
+    "gia": 8.48,
+    "pe": 5.7,
+    "pb": 0.54,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "941": {
+    "ten": "China Mobile",
+    "nganh": "Viễn thông",
+    "gia": 84.85,
+    "pe": 11.7,
+    "pb": 1.11,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "2318": {
+    "ten": "Ping An",
+    "nganh": "Bảo hiểm",
+    "gia": 59.25,
+    "pe": 7.1,
+    "pb": 0.91,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "005930": {
+    "ten": "Samsung",
+    "nganh": "Điện tử",
+    "gia": 299500.0,
+    "pe": 5.6,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "000660": {
+    "ten": "SK Hynix",
+    "nganh": "Bộ nhớ",
+    "gia": 2289000.0,
+    "pe": 6.0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "035420": {
+    "ten": "NAVER",
+    "nganh": "Internet",
+    "gia": 205000.0,
+    "pe": 13.7,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "2330.TW": {
+    "ten": "TSMC Taipei",
+    "nganh": "Bán dẫn",
+    "gia": 2365.0,
+    "pe": 32.2,
+    "pb": 10.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.8
+  },
+  "2454": {
+    "ten": "MediaTek",
+    "nganh": "Chip",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "2317": {
+    "ten": "Foxconn",
+    "nganh": "iPhone",
+    "gia": 263.0,
+    "pe": 19.6,
+    "pb": 2.07,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "RELIANCE": {
+    "ten": "Reliance",
+    "nganh": "Đa ngành",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "TCS": {
+    "ten": "TCS",
+    "nganh": "IT",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "INFY": {
+    "ten": "Infosys",
+    "nganh": "IT",
+    "gia": 12.4,
+    "pe": 15.5,
+    "pb": 10.3,
+    "khoi_luong": 0,
+    "thay_doi_pct": -3.0
+  },
+  "HDFCBANK": {
+    "ten": "HDFC Bank",
+    "nganh": "NH",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "ICICIBANK": {
+    "ten": "ICICI",
+    "nganh": "NH",
+    "gia": 0,
+    "pe": 0,
+    "pb": 0,
+    "khoi_luong": 0,
+    "thay_doi_pct": 0
+  },
+  "VALE": {
+    "ten": "Vale",
+    "nganh": "Khai mỏ Brazil",
+    "gia": 15.23,
+    "pe": 23.1,
+    "pb": 1.8,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.0
+  },
+  "PBR": {
+    "ten": "Petrobras",
+    "nganh": "Dầu Brazil",
+    "gia": 17.75,
+    "pe": 5.5,
+    "pb": 1.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": -4.4
+  },
+  "BHP.AX": {
+    "ten": "BHP",
+    "nganh": "Khai mỏ Úc",
+    "gia": 61.24,
+    "pe": 21.7,
+    "pb": 4.4,
+    "khoi_luong": 0,
+    "thay_doi_pct": 1.3
+  },
+  "CBA.AX": {
+    "ten": "Commonwealth",
+    "nganh": "NH Úc",
+    "gia": 160.9,
+    "pe": 25.9,
+    "pb": 3.5,
+    "khoi_luong": 0,
+    "thay_doi_pct": -2.6
+  },
+  "COIN": {
+    "ten": "Coinbase",
+    "nganh": "Exchange",
+    "gia": 152.4,
+    "pe": 56.2,
+    "pb": 3.0,
+    "khoi_luong": 0,
+    "thay_doi_pct": -9.2
+  },
+  "MSTR": {
+    "ten": "MicroStrategy",
+    "nganh": "BTC proxy",
+    "gia": 120.44,
+    "pe": 27.0,
+    "pb": 1.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": -7.0
+  },
+  "MARA": {
+    "ten": "Marathon",
+    "nganh": "BTC mining",
+    "gia": 12.32,
+    "pe": -14.2,
+    "pb": 2.1,
+    "khoi_luong": 0,
+    "thay_doi_pct": 9.0
+  },
+  "RIOT": {
+    "ten": "Riot",
+    "nganh": "BTC mining",
+    "gia": 24.66,
+    "pe": -40.1,
+    "pb": 3.9,
+    "khoi_luong": 0,
+    "thay_doi_pct": 13.8
   }
 }
