@@ -199,6 +199,14 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
   - Sửa `market_data[:100]` → `market_data` tại Cross-Sector Comparison
   - Sửa title "50-STOCK" → "FULL-MARKET" + spinner text "50 mã" → động
   - Fix Sector Rotation + Correlation Matrix + Multi-Factor Scoring xử lý suffix VN/TG đúng
+- ✅ **SỐ THẬT 100% — XÓA synthetic data (2026-06-08):**
+  - **A7**: XÓA synthetic price series (random walk khi yfinance miss + caption sai) → warning
+  - **A4**: XÓA synthetic candlestick (random OHLC) → line chart + warning real data
+  - **A1-A2**: XÓA backtest random walk (`daily_vol=0.015` + `randn`) → yfinance real bắt buộc
+  - **A3**: XÓA AI Predict hardcoded (`trend=0.0005`, `daily_vol_ai=0.015`) → real data bắt buộc
+  - **A9**: Volatility Cone: bỏ công thức ước lượng `25%+(vol_ratio-1)*8%` → Volume Ratio thật
+  - **A8**: Thêm mapping `pct_ngoai`→`institutions_pct` cho 187/229 mã VN có real data
+  - Giữ parametric risk estimates (VaR/CVaR/MaxDD) vì là standard finance, có label rõ ràng
 - ⚠️ **Mở rộng 384 → 800 mã (500 VN + 300 TG)**: Cần data sourcing mới.
   - `_fetch_real_prices(_targets)` — refactor: thay vòng `for sym in _symbols` (sequential) bằng `ThreadPoolExecutor(max_workers=20)` + `as_completed()`. Truyền `(symbol, suffix)` thay vì chỉ symbol → VN: `.VN`, TG: `""` (no suffix)
   - `_fetch_real_fundamentals(_targets)` — refactor tương tự với `ThreadPoolExecutor(max_workers=15)`
