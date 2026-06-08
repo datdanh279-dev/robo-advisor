@@ -4058,6 +4058,34 @@ elif st.session_state.trang_thai == "deep_analysis":
                 )
         except Exception:
             pass
+        _yf_count = len(real_prices)
+        import numpy as _np_fb
+        for _ma_fb in (DOCS.get("co_phieu_vn") or {}):
+            if _ma_fb not in real_prices:
+                _vi_fb = (DOCS.get("co_phieu_vn") or {}).get(_ma_fb, {})
+                _gia_fb = float(_vi_fb.get("gia", 0) or 0)
+                _ytd_fb = float(_vi_fb.get("ytd", 0) or 0) / 100.0
+                if _gia_fb > 0:
+                    _days_fb = 126
+                    _idx_fb = pd.bdate_range(end=pd.Timestamp.today(), periods=_days_fb)
+                    if _ytd_fb > -0.99:
+                        _sp_fb = _gia_fb / (1 + _ytd_fb)
+                    else:
+                        _sp_fb = _gia_fb * 0.95
+                    real_prices[_ma_fb] = pd.Series(_np_fb.linspace(_sp_fb, _gia_fb, _days_fb), index=_idx_fb)
+        for _ma_fb in (DOCS.get("co_phieu_tg") or {}):
+            if _ma_fb not in real_prices:
+                _vi_fb = (DOCS.get("co_phieu_tg") or {}).get(_ma_fb, {})
+                _gia_fb = float(_vi_fb.get("gia", 0) or 0)
+                _ytd_fb = float(_vi_fb.get("ytd", 0) or 0) / 100.0
+                if _gia_fb > 0:
+                    _days_fb = 126
+                    _idx_fb = pd.bdate_range(end=pd.Timestamp.today(), periods=_days_fb)
+                    if _ytd_fb > -0.99:
+                        _sp_fb = _gia_fb / (1 + _ytd_fb)
+                    else:
+                        _sp_fb = _gia_fb * 0.95
+                    real_prices[_ma_fb] = pd.Series(_np_fb.linspace(_sp_fb, _gia_fb, _days_fb), index=_idx_fb)
         has_real_pre = len(real_prices) >= 2
         if not has_real_pre:
             _rp_cache = st.session_state.get("_real_prices_cache") or {}
@@ -4204,7 +4232,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         ], index=0)
         st.write("---")
         _full_total = len(DOCS.get("co_phieu_vn") or {}) + len(DOCS.get("co_phieu_tg") or {})
-        st.success(f"✅ Giá yfinance: {len(real_prices)}/{n_ma} DM mã, P/E-P/B-ROE-EPS: {len(real_fund)}/{_full_total} toàn thị trường, VN30: {vn30_label or '—'}")
+        st.success(f"✅ Giá: {_yf_count} yfinance + {len(real_prices) - _yf_count} JSON fallback = {len(real_prices)}/384 mã | P/E-P/B-ROE-EPS: {len(real_fund)}/{_full_total} | VN30: {vn30_label or '—'}")
         market_data = st.session_state.get("chat_market_data") or []
         if not market_data or len(market_data) < 5:
             try:
