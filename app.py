@@ -4231,11 +4231,11 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 📊 Nguồn dữ liệu (Data Source)")
             ds1, ds2, ds3 = st.columns(3)
             with ds1:
-            st.write("**✅ SỐ THẬT 100%:**")
-            st.write(f"- Giá & VC: co_phieu_vn.json + yfinance DM ({len(real_prices)}/{n_ma} mã)")
-            st.write(f"- P/E, P/B, ROE, EPS: co_phieu_vn.json + yfinance ({len(real_fund)}/{_full_total} mã)")
-            st.write("- Beta, thị giá: JSON dữ liệu thật từ VN/TG")
-            st.write("- Vol, Sharpe, VaR: yfinance DM (hoặc JSON thật)")
+                st.write("**✅ SỐ THẬT 100%:**")
+                st.write(f"- Giá & VC: co_phieu_vn.json + yfinance DM ({len(real_prices)}/{n_ma} mã)")
+                st.write(f"- P/E, P/B, ROE, EPS: co_phieu_vn.json + yfinance ({len(real_fund)}/{_full_total} mã)")
+                st.write("- Beta, thị giá: JSON dữ liệu thật từ VN/TG")
+                st.write("- Vol, Sharpe, VaR: yfinance DM (hoặc JSON thật)")
             with ds2:
                 st.write("**📐 DỮ LIỆU:**")
                 st.write("- Monte Carlo: bootstrap từ returns thật yfinance")
