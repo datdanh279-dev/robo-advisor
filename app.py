@@ -85,6 +85,31 @@ import random
 import json
 import os
 import html as html_module
+import hashlib
+
+QUOTES = [
+    {"text": "Hãy mua khi người khác sợ hãi và bán khi người khác tham lam.", "author": "Warren Buffett"},
+    {"text": "Giá cả là những gì bạn trả. Giá trị là những gì bạn nhận được.", "author": "Warren Buffett"},
+    {"text": "Điều quan trọng nhất trong đầu tư là quản lý rủi ro, không phải tìm kiếm lợi nhuận.", "author": "Benjamin Graham"},
+    {"text": "Hãy đầu tư vào bản thân mình nhiều nhất có thể. Bạn là tài sản lớn nhất của chính mình.", "author": "Warren Buffett"},
+    {"text": "Phố Wall là nơi duy nhất mà người ta lái xe Rolls-Royce đến để xin lời khuyên từ những người đi tàu điện ngầm.", "author": "Warren Buffett"},
+    {"text": "Sự đa dạng hóa là sự bảo vệ chống lại sự thiếu hiểu biết.", "author": "Warren Buffett"},
+    {"text": "Thời gian là bạn của doanh nghiệp tốt, là kẻ thù của doanh nghiệp tồi.", "author": "Warren Buffett"},
+    {"text": "Đừng bao giờ đầu tư vào một doanh nghiệp mà bạn không thể hiểu được.", "author": "Warren Buffett"},
+    {"text": "Rủi ro đến từ việc không biết mình đang làm gì.", "author": "Warren Buffett"},
+    {"text": "Điều tốt nhất xảy đến với nhà đầu tư là mắc sai lầm sớm và học được bài học.", "author": "Peter Lynch"},
+    {"text": "Mua cổ phiếu tuyệt vời với giá hợp lý, không phải cổ phiếu hợp lý với giá tuyệt vời.", "author": "Charlie Munger"},
+    {"text": "Hãy sợ hãi khi người khác tham lam, và tham lam khi người khác sợ hãi.", "author": "Warren Buffett"},
+    {"text": "Đầu tư thành công là 80% tâm lý và 20% kỹ thuật.", "author": "Benjamin Graham"},
+    {"text": "Cách tốt nhất để dự đoán tương lai là tự tạo ra nó.", "author": "Peter Drucker"},
+    {"text": "Không phải lúc nào thị trường cũng đúng, nhưng đừng bao giờ đánh cược chống lại nó.", "author": "George Soros"},
+    {"text": "Lợi nhuận lớn nhất đến từ sự kiên nhẫn, không phải sự nhanh nhạy.", "author": "Charlie Munger"},
+    {"text": "Mỗi cổ phiếu bạn mua là một phần của doanh nghiệp — hãy mua như thể bạn sở hữu nó.", "author": "Peter Lynch"},
+    {"text": "Đầu tư không phải là trò chơi đoán giá, mà là quản lý rủi ro.", "author": "Ray Dalio"},
+    {"text": "Người thua nhiều nhất trên thị trường là người không thể chịu được chuỗi thua.", "author": "Warren Buffett"},
+    {"text": "Tiền bạc không làm bạn hạnh phúc, nhưng nó giúp bạn không phải lo lắng.", "author": "Charlie Munger"},
+]
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -1268,6 +1293,17 @@ with sidebar:
 
     st.markdown("---")
     st.markdown("### Thông tin")
+    if "quote_idx" not in st.session_state:
+        import hashlib
+        st.session_state.quote_idx = int(hashlib.md5(str(datetime.now().date()).encode()).hexdigest(), 16) % len(QUOTES)
+    q = QUOTES[st.session_state.quote_idx % len(QUOTES)]
+    st.markdown(
+        f'<div style="background:linear-gradient(135deg,rgba(255,215,0,0.04),rgba(33,150,243,0.02));border-left:2px solid #FFD700;padding:0.5rem 0.8rem;margin-bottom:0.8rem;border-radius:0 6px 6px 0;">'
+        f'<div style="font-size:0.75rem;font-style:italic;color:#C9A84C;line-height:1.4;">"{q["text"]}"</div>'
+        f'<div style="font-size:0.65rem;color:#8e8e93;margin-top:4px;">— {q["author"]}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         """
     <small>
@@ -3118,32 +3154,43 @@ if st.session_state.trang_thai == "survey":
         st.markdown('<div class="main-header" style="font-size:1.8rem;font-weight:700;color:#FFD700;margin:0.5rem 0;">📝 Khảo sát khẩu vị rủi ro</div>', unsafe_allow_html=True)
 
         total_questions = len(CAU_HOI_KHAO_SAT)
-        step_ranges = [(0, 4), (4, 10), (10, 16), (16, total_questions)]
-        step_names = ["Thông tin cá nhân", "Tài chính & Kinh nghiệm", "Mục tiêu & Tâm lý", "Đánh giá toàn diện"]
+        stage_ranges = [(0, 5), (5, 15), (15, total_questions)]
+        stage_names = ["👤 Thông tin cá nhân", "🎯 Khẩu vị rủi ro", "📊 Đánh giá toàn diện"]
+        stage_praise = [
+            "✅ Tuyệt vời! Bạn đã hoàn thành thông tin cơ bản. Hãy tiếp tục để khám phá khẩu vị rủi ro của bạn!",
+            "🌟 Xuất sắc! Chỉ còn một chặng cuối nữa thôi là bạn sẽ nhận được hồ sơ đầu tư cá nhân hóa!",
+            "🎉 Chúc mừng! Bạn đã sẵn sàng nhận báo cáo khẩu vị rủi ro và danh mục đề xuất!"
+        ]
 
         if "survey_step" not in st.session_state:
             st.session_state.survey_step = 0
         if "_survey_opts" not in st.session_state:
             st.session_state._survey_opts = {}
 
-        answered = sum(1 for idx in range(total_questions) if st.session_state._survey_opts.get(idx) and st.session_state._survey_opts[idx][2] is not None)
-        pct = int(answered / total_questions * 100) if total_questions else 0
+        step = st.session_state.survey_step
+        start, end = stage_ranges[step]
+        answered_this = sum(1 for idx in range(start, end) if st.session_state._survey_opts.get(idx) and st.session_state._survey_opts[idx][2] is not None)
+        total_this = end - start
+
+        overall_answered = sum(1 for idx in range(total_questions) if st.session_state._survey_opts.get(idx) and st.session_state._survey_opts[idx][2] is not None)
+        overall_pct = int(overall_answered / total_questions * 100) if total_questions else 0
 
         st.markdown(f"""
-        <div style="margin-bottom: 1rem;">
+        <div style="margin-bottom: 0.8rem;">
             <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:#ECE8E1;margin-bottom:0.3rem;">
-                <span>📊 Tiến độ: {answered}/{total_questions} câu hỏi</span>
-                <span>{pct}%</span>
+                <span>{stage_names[step]}</span>
+                <span>{answered_this}/{total_this}</span>
             </div>
             <div style="height:8px;background:#333;border-radius:4px;overflow:hidden;">
-                <div style="height:100%;width:{pct}%;background:linear-gradient(90deg,#FFD700,#FF6B6B);border-radius:4px;transition:width 0.3s;"></div>
+                <div style="height:100%;width:{answered_this/total_this*100 if total_this else 0}%;background:linear-gradient(90deg,#FFD700,#FF6B6B);border-radius:4px;transition:width 0.3s;"></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        step = st.session_state.survey_step
-        start, end = step_ranges[step]
-        st.markdown(f"#### 📋 {step_names[step]} (Câu {start+1}–{min(end, total_questions)})")
+        if step > 0 and answered_this == 0:
+            st.success(stage_praise[step - 1])
+
+        st.markdown(f"<small style='color:#636366;'>Chặng {step+1}/{len(stage_ranges)}</small>", unsafe_allow_html=True)
 
         for idx in range(start, end):
             cau = CAU_HOI_KHAO_SAT[idx]
@@ -3171,12 +3218,19 @@ if st.session_state.trang_thai == "survey":
                     st.session_state.survey_step = step - 1
                     st.rerun()
 
-        if step < len(step_ranges) - 1:
+        if step < len(stage_ranges) - 1:
             with nav[1]:
-                next_label = f"Tiếp tục câu {end+1}–{min(step_ranges[step+1][1], total_questions)} ➡️"
-                if st.button(next_label, use_container_width=True, type="primary"):
-                    st.session_state.survey_step = step + 1
-                    st.rerun()
+                next_label = f"Tiếp tục ➡️"
+                all_answered_this = all(
+                    st.session_state._survey_opts.get(idx) and st.session_state._survey_opts[idx][2] is not None
+                    for idx in range(start, end)
+                )
+                if all_answered_this:
+                    if st.button(next_label, use_container_width=True, type="primary"):
+                        st.session_state.survey_step = step + 1
+                        st.rerun()
+                else:
+                    st.info(f"Vui lòng trả lời hết {total_this} câu trước khi tiếp tục.")
         else:
             with nav[1]:
                 if st.button("✅ Hoàn thành khảo sát", use_container_width=True, type="primary"):
@@ -4130,7 +4184,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;
             }}
             .risk-card {{
-                background: #1e1e2e; border: 1px solid #2f2f3f; padding: 15px; border-radius: 6px; text-align: center;
+                background: #1e1e2e; border: 1px solid #2f2f3f; padding: 15px; border-radius: 6px; text-align: center; position: relative;
             }}
             .risk-card span {{
                 color: #8e8e93; font-size: 12px; display: block; margin-bottom: 5px;
@@ -4138,20 +4192,31 @@ elif st.session_state.trang_thai == "deep_analysis":
             .risk-card strong {{
                 color: #ffffff; font-size: 22px; font-family: 'Roboto Mono', monospace;
             }}
+            .risk-tip {{
+                display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+                background: #2d2d44; color: #ECE8E1; padding: 8px 12px; border-radius: 6px; font-size: 11px;
+                width: 220px; text-align: left; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+                border: 1px solid #3d3d5c;
+            }}
+            .risk-card:hover .risk-tip {{ display: block; }}
+            .risk-tip::after {{
+                content: ''; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+                border: 5px solid transparent; border-top-color: #2d2d44;
+            }}
             </style>
             <div class="risk-grid">
-                <div class="risk-card"><span>📊 Sharpe Ratio</span><strong>{sharpe:.2f}</strong></div>
-                <div class="risk-card"><span>📈 Alpha (Jensen)</span><strong style="color:{alpha_color};">{alpha*100:+.2f}%</strong></div>
-                <div class="risk-card"><span>⚡ Beta DM</span><strong>{port_beta:.2f}</strong></div>
-                <div class="risk-card"><span>🎯 Điểm rủi ro</span><strong>{risk_grade[0]} — {risk_grade[1]}</strong></div>
-                <div class="risk-card"><span>📉 Volatility (năm)</span><strong>{vol_proxy*100:.1f}%</strong></div>
-                <div class="risk-card"><span>🔴 VaR 95% (1 ngày)</span><strong style="color:{var_color};">{var_95*100:.2f}%</strong></div>
-                <div class="risk-card"><span>🔴 CVaR 95%</span><strong style="color:{cvar_color};">{cvar_95*100:.2f}%</strong></div>
-                <div class="risk-card"><span>📊 Max Drawdown</span><strong style="color:{dd_color};">{max_dd_uoc*100:.1f}%</strong></div>
-                <div class="risk-card"><span>📐 Treynor</span><strong>{treynor:.4f}</strong></div>
-                <div class="risk-card"><span>📐 Info Ratio</span><strong>{info_ratio:.2f}</strong></div>
-                <div class="risk-card"><span>🌐 Đa dạng hóa</span><strong>{diversification*100:.0f}%</strong></div>
-                <div class="risk-card"><span>🏆 Top 1 ({top_ma})</span><strong>{top_w*100:.1f}%</strong></div>
+                <div class="risk-card"><span>📊 Sharpe Ratio <span style="color:#636366;cursor:help;font-weight:700;" title="Đo lường lợi nhuận trên mỗi đơn vị rủi ro. >1 là tốt, >2 là rất tốt.">?</span></span><strong>{sharpe:.2f}</strong></div>
+                <div class="risk-card"><span>📈 Alpha (Jensen) <span style="color:#636366;cursor:help;font-weight:700;" title="Mức độ bạn 'thắng' thị trường. >0 = bạn giỏi hơn VN-Index.">?</span></span><strong style="color:{alpha_color};">{alpha*100:+.2f}%</strong></div>
+                <div class="risk-card"><span>⚡ Beta DM <span style="color:#636366;cursor:help;font-weight:700;" title="Độ lắc lư so với thị trường. 1 = theo kịp, >1 = lắc mạnh hơn.">?</span></span><strong>{port_beta:.2f}</strong></div>
+                <div class="risk-card"><span>🎯 Điểm rủi ro <span style="color:#636366;cursor:help;font-weight:700;" title="Xếp hạng tổng thể rủi ro danh mục. A = tốt nhất, E = rủi ro nhất.">?</span></span><strong>{risk_grade[0]} — {risk_grade[1]}</strong></div>
+                <div class="risk-card"><span>📉 Volatility (năm) <span style="color:#636366;cursor:help;font-weight:700;" title="Mức dao động giá trung bình năm. Càng thấp càng ổn định.">?</span></span><strong>{vol_proxy*100:.1f}%</strong></div>
+                <div class="risk-card"><span>🔴 VaR 95% (1 ngày) <span style="color:#636366;cursor:help;font-weight:700;" title="Trong 95% trường hợp, bạn mất tối đa % này trong 1 ngày.">?</span></span><strong style="color:{var_color};">{var_95*100:.2f}%</strong></div>
+                <div class="risk-card"><span>🔴 CVaR 95% <span style="color:#636366;cursor:help;font-weight:700;" title="Mức lỗ TRUNG BÌNH khi VaR bị vi phạm (5% trường hợp xấu nhất).">?</span></span><strong style="color:{cvar_color};">{cvar_95*100:.2f}%</strong></div>
+                <div class="risk-card"><span>📊 Max Drawdown <span style="color:#636366;cursor:help;font-weight:700;" title="Sụt giảm tối đa từ đỉnh đến đáy trong kỳ. Càng thấp càng ít đau đớn.">?</span></span><strong style="color:{dd_color};">{max_dd_uoc*100:.1f}%</strong></div>
+                <div class="risk-card"><span>📐 Treynor <span style="color:#636366;cursor:help;font-weight:700;" title="Lợi nhuận trên mỗi đơn vị rủi ro hệ thống (Beta). Cao hơn = hiệu quả hơn.">?</span></span><strong>{treynor:.4f}</strong></div>
+                <div class="risk-card"><span>📐 Info Ratio <span style="color:#636366;cursor:help;font-weight:700;" title="Lợi nhuận vượt trội so với rủi ro chủ động. >0.5 là tốt.">?</span></span><strong>{info_ratio:.2f}</strong></div>
+                <div class="risk-card"><span>🌐 Đa dạng hóa <span style="color:#636366;cursor:help;font-weight:700;" title="Mức độ phân bổ vốn giữa các ngành. 100% = không tập trung 1 ngành nào.">?</span></span><strong>{diversification*100:.0f}%</strong></div>
+                <div class="risk-card"><span>🏆 Top 1 ({top_ma}) <span style="color:#636366;cursor:help;font-weight:700;" title="Mã chiếm tỷ trọng lớn nhất trong danh mục. Nên < 30% để tránh rủi ro tập trung.">?</span></span><strong>{top_w*100:.1f}%</strong></div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -4279,7 +4344,24 @@ elif st.session_state.trang_thai == "deep_analysis":
                 })
             if fa_rows:
                 df_fa = pd.DataFrame(fa_rows)
-                st.dataframe(df_fa, use_container_width=True, hide_index=True)
+                _show_full = st.session_state.get("_paywall_unlocked", False)
+                if not _show_full and len(df_fa) > 5:
+                    st.markdown("""
+                    <style>
+                    .pw-blur { filter: blur(4px); pointer-events: none; user-select: none; }
+                    .pw-overlay { position: relative; }
+                    .pw-banner { position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%);
+                        background: linear-gradient(135deg,#1a1a2e,#2d1b4e); border: 2px solid #FFD700;
+                        border-radius: 16px; padding: 20px 36px; z-index: 100; text-align: center; }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    st.markdown('<div class="pw-overlay">', unsafe_allow_html=True)
+                    st.markdown('<div class="pw-banner">👑 <b style="color:#FFD700;font-size:1.2rem;">MỞ KHÓA GÓI PRO</b><br><span style="color:#C9A84C;">Để xem P/E, P/B, ROE của toàn bộ danh mục</span><br><span style="color:#8e8e93;font-size:0.85rem;">Mở sidebar → Mở khóa VIP</span></div>', unsafe_allow_html=True)
+                    st.markdown('<div class="pw-blur">', unsafe_allow_html=True)
+                    st.dataframe(df_fa, use_container_width=True, hide_index=True)
+                    st.markdown('</div></div>', unsafe_allow_html=True)
+                else:
+                    st.dataframe(df_fa, use_container_width=True, hide_index=True)
                 st.caption(f"💡 Chất lượng tính theo percentile thật từ {len(_all_roe)} mã: ROE≥P{(_roe_p75*100):.0f}% + P/E≤P25 ({_pe_p25:.1f}) + Cổ tức≥{_dy_p50*100:.1f}% = Xuất sắc. Vị trí 52W: 0% = đáy, 100% = đỉnh.")
 
         if _chon_nhom == "🎯 Tối ưu":
@@ -7019,7 +7101,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 except Exception as _ple:
                     st.caption(f"⚠️ P&L Tracker lỗi: {str(_ple)[:80]}")
             else:
-                st.info("⚠️ Cần DM có giá vốn + giá thị trường để tính P&L.")
+                st.info("💡 **Chưa có dữ liệu DM?** Hiển thị demo với vốn 100.000.000đ — hãy nhập danh mục thật để xem P&L chính xác!")
 
         if _chon_nhom == "📋 Cơ bản":
             st.markdown('<div class="da-section"><h3>🎲 Earnings Surprise Tracker — Theo dõi bất ngờ lợi nhuận</h3><p style="color:#93C5FD;">Ước lượng earnings surprise dựa trên <b>xu hướng EPS</b> 3 tháng gần nhất. <b>Positive Surprise</b> = EPS tăng mạnh hơn kỳ vọng, <b>Negative Surprise</b> = EPS giảm.</p></div>', unsafe_allow_html=True)

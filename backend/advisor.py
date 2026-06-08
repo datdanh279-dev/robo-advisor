@@ -541,7 +541,7 @@ def tab_lich_su(docs):
                            annotation_text="95%")
         fig_hist.update_layout(template="plotly_dark", height=300,
                                 title=f"Phan phoi gia tri DM sau {n_years} nam ({n_sim} kich ban)",
-                                xaxis_title="Gia tri cuoi ky",
+                                xaxis_title="Giá trị cuối kỳ",
                                 yaxis_title="So lan")
         fig_hist.update_xaxes(tickformat=",.0f")
         st.plotly_chart(fig_hist, use_container_width=True)
