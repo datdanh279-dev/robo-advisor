@@ -3080,17 +3080,21 @@ if st.session_state.trang_thai == "home":
 if st.session_state.is_pro:
     st.markdown(
         '<div style="background:linear-gradient(90deg,#FFD70022,#00C9A722);'
-        'border:1px solid #FFD70055;border-radius:10px;padding:8px 16px;'
-        'margin-bottom:12px;font-size:0.9rem;">'
-        '💎 <b style="color:#FFD700;">GÓI PRO</b> đang kích hoạt — toàn quyền tính năng cao cấp.'
+        'border:1px solid #FFD70055;border-radius:10px;padding:12px 18px;'
+        'margin-bottom:12px;font-size:0.95rem;">'
+        '💎 <b style="color:#FFD700;font-size:1.1rem;">TÀI KHOẢN: GÓI PRO</b><br>'
+        '<span style="color:#ECE8E1;">Toàn quyền tính năng cao cấp — Báo cáo Thuế/Phí, Mô phỏng Monte Carlo, Phân tích Bollinger, Tín hiệu AI thời gian thực.</span>'
         '</div>',
         unsafe_allow_html=True,
     )
 else:
     st.markdown(
-        '<div style="background:#ECE8E10a;border:1px solid #9AABB833;border-radius:10px;'
-        'padding:8px 16px;margin-bottom:12px;font-size:0.85rem;color:#9AABB8;">'
-        'Đang dùng <b style="color:#ECE8E1;">GÓI TIÊU CHUẨN</b> — mở khóa <b style="color:#FFD700;">GÓI PRO</b> tại Sidebar để dùng tính năng VIP.'
+        '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);'
+        'border:2px solid #FFD700;border-radius:12px;padding:14px 18px;'
+        'margin-bottom:12px;box-shadow:0 4px 15px rgba(255,215,0,0.15);">'
+        '💡 <b style="color:#FFD700;font-size:1.05rem;">TÀI KHOẢN: GÓI TIÊU CHUẨN</b><br>'
+        '<span style="color:#9AABB8;font-size:0.85rem;">Bạn đang sử dụng các tính năng cơ bản. Để kích hoạt trọn bộ tính năng VIP (Báo cáo Thuế/Phí tự động, Mô phỏng Monte Carlo, Phân tích Bollinger và Tín hiệu AI thời gian thực), hãy </span>'
+        '<a href="#sidebar-pro-unlock" onclick="document.querySelector(\'[data-testid=\"stSidebar\"] button\')?.click()" style="color:#FFD700;font-weight:700;text-decoration:underline;">MỞ KHÓA GÓI PRO TẠI SIDEBAR 👑</a>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -3099,43 +3103,84 @@ if st.session_state.trang_thai == "survey":
 
     if not st.session_state.get("cau_tra_loi"):
         st.markdown('<div class="main-header" style="font-size:1.8rem;font-weight:700;color:#FFD700;margin:0.5rem 0;">📝 Khảo sát khẩu vị rủi ro</div>', unsafe_allow_html=True)
-        st.markdown(
-            "Trả lời 12 câu hỏi để chúng tôi đánh giá mức độ chấp nhận rủi ro và mục tiêu tài chính của bạn!"
-        )
-        st.markdown("---")
 
-        with st.form("survey_form", clear_on_submit=True):
-            for idx, cau in enumerate(CAU_HOI_KHAO_SAT):
-                st.markdown(f"**{idx+1}. {cau['cau_hoi']}**")
-                lua_chon_nhan = [opt["nhan"] for opt in cau["lua_chon"]]
-                lua_chon_diem = {opt["nhan"]: opt["diem"] for opt in cau["lua_chon"]}
-                selected = st.radio(
-                    "Chọn:",
-                    lua_chon_nhan,
-                    key=f"survey_q_{idx}",
-                    index=None,
-                    label_visibility="collapsed",
-                )
-                st.session_state._survey_opts[idx] = (cau["y"], lua_chon_diem, selected)
+        total_questions = len(CAU_HOI_KHAO_SAT)
+        step_ranges = [(0, 4), (4, 10), (10, 16), (16, total_questions)]
+        step_names = ["Thông tin cá nhân", "Tài chính & Kinh nghiệm", "Mục tiêu & Tâm lý", "Đánh giá toàn diện"]
+
+        if "survey_step" not in st.session_state:
+            st.session_state.survey_step = 0
+        if "_survey_opts" not in st.session_state:
+            st.session_state._survey_opts = {}
+
+        answered = sum(1 for idx in range(total_questions) if st.session_state._survey_opts.get(idx) and st.session_state._survey_opts[idx][2] is not None)
+        pct = int(answered / total_questions * 100) if total_questions else 0
+
+        st.markdown(f"""
+        <div style="margin-bottom: 1rem;">
+            <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:#ECE8E1;margin-bottom:0.3rem;">
+                <span>📊 Tiến độ: {answered}/{total_questions} câu hỏi</span>
+                <span>{pct}%</span>
+            </div>
+            <div style="height:8px;background:#333;border-radius:4px;overflow:hidden;">
+                <div style="height:100%;width:{pct}%;background:linear-gradient(90deg,#FFD700,#FF6B6B);border-radius:4px;transition:width 0.3s;"></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        step = st.session_state.survey_step
+        start, end = step_ranges[step]
+        st.markdown(f"#### 📋 {step_names[step]} (Câu {start+1}–{min(end, total_questions)})")
+
+        for idx in range(start, end):
+            cau = CAU_HOI_KHAO_SAT[idx]
+            st.markdown(f"**{idx+1}. {cau['cau_hoi']}**")
+            lua_chon_nhan = [opt["nhan"] for opt in cau["lua_chon"]]
+            lua_chon_diem = {opt["nhan"]: opt["diem"] for opt in cau["lua_chon"]}
+            saved = st.session_state._survey_opts.get(idx)
+            default_idx = lua_chon_nhan.index(saved[2]) if saved and saved[2] in lua_chon_nhan else None
+            selected = st.radio(
+                "Chọn:",
+                lua_chon_nhan,
+                key=f"survey_q_{idx}",
+                index=default_idx,
+                label_visibility="collapsed",
+            )
+            st.session_state._survey_opts[idx] = (cau["y"], lua_chon_diem, selected)
+            if idx < end - 1:
                 st.markdown("---")
 
-            submitted = st.form_submit_button("✅ Hoàn thành khảo sát", use_container_width=True, type="primary")
+        st.markdown("---")
+        nav = st.columns([1, 1, 2])
+        if step > 0:
+            with nav[0]:
+                if st.button("⬅️ Quay lại", use_container_width=True):
+                    st.session_state.survey_step = step - 1
+                    st.rerun()
 
-        if submitted:
-            cau_tra_loi = {}
-            missing = False
-            for idx in range(len(CAU_HOI_KHAO_SAT)):
-                y, lua_chon_diem, selected = st.session_state._survey_opts.get(idx, (None, {}, None))
-                if selected is None or y is None:
-                    missing = True
-                    continue
-                cau_tra_loi[y] = lua_chon_diem[selected]
-
-            if missing:
-                st.warning("Vui lòng trả lời tất cả 12 câu hỏi trước khi hoàn thành.")
-            else:
-                st.session_state.cau_tra_loi = cau_tra_loi
-                st.session_state.loai_nha_dau_tu = None
+        if step < len(step_ranges) - 1:
+            with nav[1]:
+                next_label = f"Tiếp tục câu {end+1}–{min(step_ranges[step+1][1], total_questions)} ➡️"
+                if st.button(next_label, use_container_width=True, type="primary"):
+                    st.session_state.survey_step = step + 1
+                    st.rerun()
+        else:
+            with nav[1]:
+                if st.button("✅ Hoàn thành khảo sát", use_container_width=True, type="primary"):
+                    cau_tra_loi = {}
+                    missing = False
+                    for idx in range(total_questions):
+                        y, lua_chon_diem, selected = st.session_state._survey_opts.get(idx, (None, {}, None))
+                        if selected is None or y is None:
+                            missing = True
+                            continue
+                        cau_tra_loi[y] = lua_chon_diem[selected]
+                    if missing:
+                        st.warning("Vui lòng trả lời tất cả câu hỏi trước khi hoàn thành.")
+                    else:
+                        st.session_state.cau_tra_loi = cau_tra_loi
+                        st.session_state.loai_nha_dau_tu = None
+                        st.rerun()
 
     if st.session_state.get("cau_tra_loi"):
         loai, diem, mo_ta, danh_muc = danh_gia_rui_ro(st.session_state.cau_tra_loi)
@@ -4303,7 +4348,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             if sharpe < 0.5:
                 recs.append(f"⚠️ **Sharpe = {sharpe:.2f}** thấp — lợi nhuận chưa tương xứng rủi ro.")
             if alpha > 0:
-                recs.append(f"✅ **Alpha = {alpha*100:+.2f}%** vượt kỳ vọng CAPM. Duy trì chiến lược.")
+                recs.append(f"✅ **Alpha = {alpha*100:+.2f}%** vượt kỳ vọng CAPM. **Duy trì chiến lược.**")
             if nganh_count < 3:
                 recs.append(f"⚠️ Chỉ **{nganh_count} ngành** — nên đa dạng thêm.")
             if diversification > 0.7:
@@ -5033,7 +5078,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 🤖 AI Phân tích tự động (Dynamic từ dữ liệu thật)")
             ai_insights = []
             if sharpe < 0.5: ai_insights.append("⚠️ **Sharpe thấp** — Lợi nhuận chưa tương xứng rủi ro. Cân nhắc cắt mã yếu hoặc tăng tỷ trọng mã chất lượng cao (ROE>20%, P/E<15).")
-            if sharpe >= 1: ai_insights.append("✅ **Sharpe tốt** — DM đang sinh lời hiệu quả. Duy trì chiến lược hiện tại.")
+            if sharpe >= 1: ai_insights.append("✅ **Sharpe tốt** — DM đang sinh lời hiệu quả. **Duy trì chiến lược hiện tại.**")
             if alpha > 0.02: ai_insights.append(f"✅ **Alpha = {alpha*100:+.2f}%** — DM vượt thị trường {alpha*100:.1f}%. Nhà đầu tư có kỹ năng chọn mã tốt.")
             if alpha < -0.02: ai_insights.append(f"🔴 **Alpha = {alpha*100:+.2f}%** — DM thua thị trường. Cân nhắc chuyển sang ETF VN30 hoặc VFMVN30.")
             if port_beta > 1.3: ai_insights.append(f"⚠️ **Beta = {port_beta:.2f}** — DM lắc lư mạnh. Thêm mã phòng thủ (Ngân hàng, Thực phẩm) để giảm beta về ~1.0.")
@@ -6895,17 +6940,43 @@ elif st.session_state.trang_thai == "deep_analysis":
                         tong_lai = tong_gt - tong_von
                         tong_pct = (tong_lai / tong_von * 100) if tong_von > 0 else 0
                         p1, p2, p3, p4 = st.columns(4)
-                        p1.metric("💰 Tổng vốn", f"{tong_von:.1f}Tỷ")
-                        p2.metric("📊 Tổng GT", f"{tong_gt:.1f}Tỷ")
-                        p3.metric("📈 Tổng Lãi/Lỗ", f"{tong_lai:+.1f}Tỷ", delta=f"{tong_pct:+.2f}%")
-                        winners = int((df_pl["% Lãi/Lỗ"] > 0).sum())
-                        losers = int((df_pl["% Lãi/Lỗ"] < 0).sum())
+                        p1.metric("💰 Tổng vốn", f"{tong_von:.1f}Tỷ" if pl_rows else "-- Tỷ")
+                        p2.metric("📊 Tổng GT", f"{tong_gt:.1f}Tỷ" if pl_rows else "-- Tỷ")
+                        p3.metric("📈 Tổng Lãi/Lỗ", f"{tong_lai:+.1f}Tỷ" if pl_rows else "-- Tỷ", delta=f"{tong_pct:+.2f}%" if pl_rows else None)
+                        winners = int((df_pl["% Lãi/Lỗ"] > 0).sum()) if pl_rows else 0
+                        losers = int((df_pl["% Lãi/Lỗ"] < 0).sum()) if pl_rows else 0
                         p4.metric("✅ Lãi / 🔴 Lỗ", f"{winners} / {losers}")
                         st.write("**Chi tiết từng mã (sắp xếp theo % Lãi/Lỗ):**")
+                        st.markdown("""
+                        <style>
+                        .pl-scroll-container {
+                            max-height: 500px;
+                            overflow-y: auto;
+                            padding-right: 6px;
+                            border: 1px solid #333;
+                            border-radius: 8px;
+                            padding: 8px 12px;
+                            background: rgba(255,255,255,0.02);
+                        }
+                        .pl-scroll-container::-webkit-scrollbar {
+                            width: 6px;
+                        }
+                        .pl-scroll-container::-webkit-scrollbar-track {
+                            background: #1a1a2e;
+                            border-radius: 3px;
+                        }
+                        .pl-scroll-container::-webkit-scrollbar-thumb {
+                            background: #FFD70088;
+                            border-radius: 3px;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
+                        st.markdown('<div class="pl-scroll-container">', unsafe_allow_html=True)
                         for _, r in df_pl.iterrows():
                             color = "#4ADE80" if r["% Lãi/Lỗ"] > 0 else "#F87171" if r["% Lãi/Lỗ"] < 0 else "#FBBF24"
                             icon = "🟢" if r["% Lãi/Lỗ"] > 0 else "🔴" if r["% Lãi/Lỗ"] < 0 else "🟡"
                             st.markdown(f'<div class="da-metric" style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;text-align:left;"><div style="flex:1;"><b style="color:#FFD700;">{r["Mã"]}</b> <span class="da-info">Vol {r["Vol %"]}%</span></div><div style="flex:1;text-align:right;">Vốn: <b>{r["Vốn (Tỷ)"]}Tỷ</b> → GT: <b>{r["GT hiện tại (Tỷ)"]}Tỷ</b></div><div style="flex:0 0 130px;text-align:right;"><span style="color:{color};font-size:1.15rem;font-weight:800;">{icon} {r["% Lãi/Lỗ"]:+.2f}%</span><br><span style="color:{color};font-size:0.85rem;">{r["Lãi/Lỗ (Tỷ)"]:+.2f}Tỷ</span></div></div>', unsafe_allow_html=True)
+                        st.markdown('</div>', unsafe_allow_html=True)
                         st.caption("📐 **% Lãi/Lỗ = (Giá hiện tại − Giá vốn) / Giá vốn × 100**. Vol = độ biến động năm (cao = rủi ro). Mã % cao + Vol thấp = lý tưởng.")
                 except Exception as _ple:
                     st.caption(f"⚠️ P&L Tracker lỗi: {str(_ple)[:80]}")

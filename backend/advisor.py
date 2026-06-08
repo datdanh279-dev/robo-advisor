@@ -1,4 +1,4 @@
-"""Tu van Dau tu — 3-tab flow: Thiet lap muc tieu -> Khuyen nghi DM -> Kiem thu Lich su (v2.1)"""
+"""Tư vấn Đầu tư — 3-tab flow: Thiết lập mục tiêu -> Khuyến nghị DM -> Kiểm thử Lịch sử (v2.1)"""
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
@@ -11,11 +11,11 @@ from datetime import datetime, timedelta
 # ============================================================
 # Constants
 # ============================================================
-RISK_NAMES = ["Bao thu", "Than trong", "Trung dung", "Tang truong", "Tao bao"]
+RISK_NAMES = ["Bảo thủ", "Thận trọng", "Trung dung", "Tăng trưởng", "Táo bạo"]
 RISK_TO_IDX = {v: i for i, v in enumerate(RISK_NAMES)}
 
-ALLOC_ASSETS = ["Trai phieu / Gui tiet kiem", "Co phieu Viet Nam", "Co phieu Quoc te", "Vang / Bat dong san"]
-# Ty trong theo khau vi: [Bao thu, Than trong, Trung dung, Tang truong, Tao bao]
+ALLOC_ASSETS = ["Trái phiếu / Gửi tiết kiệm", "Cổ phiếu Việt Nam", "Cổ phiếu Quốc tế", "Vàng / Bất động sản"]
+# Tỷ trọng theo khẩu vị: [Bảo thủ, Thận trọng, Trung dung, Tăng trưởng, Táo bạo]
 ALLOC_MATRIX = [
     [0.60, 0.40, 0.20, 0.10, 0.00],  # Trai phieu
     [0.25, 0.40, 0.55, 0.55, 0.50],  # CP VN
@@ -26,11 +26,11 @@ EXP_RET = [0.06, 0.09, 0.12, 0.16, 0.20]
 EXP_VOL = [0.05, 0.10, 0.15, 0.20, 0.25]
 
 RISK_DESC = {
-    "Bao thu": "Uu tien bao toan von, chap nhan loi nhuan thap, rui ro toi thieu.",
-    "Than trong": "Can bang giua an toan va tang truong, chap nhan dao dong nhe.",
-    "Trung dung": "Tang truong on dinh, chap nhan rui ro trung binh.",
-    "Tang truong": "Uu tien tang truong cao, chap nhan rui ro lon hon.",
-    "Tao bao": "Toi da hoa loi nhuan, chap nhan rui ro rat cao, dao dong manh.",
+    "Bảo thủ": "Ưu tiên bảo toàn vốn, chấp nhận lợi nhuận thấp, rủi ro tối thiểu.",
+    "Thận trọng": "Cân bằng giữa an toàn và tăng trưởng, chấp nhận dao động nhẹ.",
+    "Trung dung": "Tăng trưởng ổn định, chấp nhận rủi ro trung bình.",
+    "Tăng trưởng": "Ưu tiên tăng trưởng cao, chấp nhận rủi ro lớn hơn.",
+    "Táo bạo": "Tối đa hóa lợi nhuận, chấp nhận rủi ro rất cao, dao động mạnh.",
 }
 
 _tam_sang_cache = {}
@@ -92,10 +92,10 @@ def tinh_lot(tien, gia):
 
 
 # ============================================================
-# TAB 1: Thiet lap muc tieu
+# TAB 1: Thiết lập mục tiêu
 # ============================================================
 def tab_setup():
-    st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f3af Thiet lap Muc tieu Dau tu</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f3af Thiết lập Mục tiêu Đầu tư</div>', unsafe_allow_html=True)
 
     von = st.session_state.get("advisor_capital", 100_000_000)
     nam = st.session_state.get("advisor_years", 5)
@@ -109,14 +109,14 @@ def tab_setup():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Von dau tu", f"{von:,.0f}d")
-        st.metric("Thoi gian", f"{nam} nam")
+        st.metric("Vốn đầu tư", f"{von:,.0f}d")
+        st.metric("Thời gian", f"{nam} nam")
     with col2:
-        st.metric("Loi nhuan ky vong", f"{er*100:.1f}%/nam")
-        st.metric("Muc dao dong (Vol)", f"{vol*100:.0f}%/nam")
+        st.metric("Lợi nhuận kỳ vọng", f"{er*100:.1f}%/nam")
+        st.metric("Mức dao động (Vol)", f"{vol*100:.0f}%/nam")
     with col3:
-        st.metric("Gia tri cuoi ky (co so)", f"{cuoiky:,.0f}d")
-        st.metric("Muc tieu", st.session_state.get("advisor_target", "Ngh?i huu som"))
+        st.metric("Giá trị cuối kỳ (Cơ sở)", f"{cuoiky:,.0f}d")
+        st.metric("Mục tiêu", st.session_state.get("advisor_target", "Nghỉ hưu sớm"))
 
     # Duong tang truong
     years = list(range(nam + 1))
@@ -126,20 +126,20 @@ def tab_setup():
     inf_v = [von * 1.04 ** y for y in years]
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=years, y=base_v, name="Co so", line=dict(color="#00C9A7", width=3)))
-    fig.add_trace(go.Scatter(x=years, y=opt_v, name="Lac quan", line=dict(color="#FFD700", width=2, dash="dash")))
+    fig.add_trace(go.Scatter(x=years, y=base_v, name="Cơ sở", line=dict(color="#00C9A7", width=3)))
+    fig.add_trace(go.Scatter(x=years, y=opt_v, name="Lạc quan", line=dict(color="#FFD700", width=2, dash="dash")))
     fig.add_trace(go.Scatter(x=years, y=pes_v, name="Bi quan", line=dict(color="#FF6B6B", width=2, dash="dot")))
-    fig.add_trace(go.Scatter(x=years, y=inf_v, name="Lam phat 4%", line=dict(color="#ECE8E1", width=1, dash="dot")))
+    fig.add_trace(go.Scatter(x=years, y=inf_v, name="Lạm phát 4%", line=dict(color="#ECE8E1", width=1, dash="dot")))
     fig.update_layout(template="plotly_dark", height=380, hovermode="x unified",
                       legend=dict(orientation="h", y=-0.25), margin=dict(t=30))
     fig.update_yaxes(tickformat=",.0f")
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
-    st.subheader(f"Kha vi: {risk_str}")
+    st.subheader(f"Khẩu vị: {risk_str}")
     st.caption(RISK_DESC.get(risk_str, ""))
-    st.markdown(f"**Loi nhuan ky vong:** {er*100:.1f}%/nam | **Vol:** {vol*100:.0f}%/nam")
-    st.markdown(f"**Gia tri cuoi ky:** Co so {cuoiky:,.0f}d | Lac quan {lacquan:,.0f}d | Bi quan {biquan:,.0f}d")
+    st.markdown(f"**Lợi nhuận kỳ vọng:** {er*100:.1f}%/nam | **Vol:** {vol*100:.0f}%/nam")
+    st.markdown(f"**Giá trị cuối kỳ:** Cơ sở {cuoiky:,.0f}d | Lạc quan {lacquan:,.0f}d | Bi quan {biquan:,.0f}d")
 
     # Ty trong tai san
     alloc = {ALLOC_ASSETS[i]: ALLOC_MATRIX[i][ridx] for i in range(4)}
@@ -149,22 +149,22 @@ def tab_setup():
 
     # Max drawdown
     st.markdown("---")
-    st.subheader("Kich ban sut giam toi da (Max Drawdown)")
+    st.subheader("Kịch bản sụt giảm tối đa (Max Drawdown)")
     port_vol = vol * 0.7
     max_dd = min(0.9, max(0.1, port_vol * 2.5))
     loss_amt = von * max_dd
     recover_years = max(1, int(math.log(2) / math.log(1 + er))) if er > 0 else 10
-    st.markdown(f"- **Sut giam toi da uoc tinh:** {max_dd*100:.0f}% (-{loss_amt:,.0f}d)")
-    st.markdown(f"- **Gia tri DM sau sut giam:** {von - loss_amt:,.0f}d")
-    st.markdown(f"- **Thoi gian phuc hoi (uoc tinh):** {recover_years} nam")
-    st.caption("Luu y: So lieu uoc tinh tu du lieu lich su, khong dam bao ket qua tuong lai.")
+    st.markdown(f"- **Sụt giảm tối đa ước tính:** {max_dd*100:.0f}% (-{loss_amt:,.0f}d)")
+    st.markdown(f"- **Giá trị DM sau sụt giảm:** {von - loss_amt:,.0f}d")
+    st.markdown(f"- **Thời gian phục hồi (ước tính):** {recover_years} nam")
+    st.caption("Lưu ý: Số liệu ước tính từ dữ liệu lịch sử, không đảm bảo kết quả tương lai.")
 
 
 # ============================================================
-# TAB 2: Khuyen nghi Danh muc
+# TAB 2: Khuyến nghị Danh mục
 # ============================================================
 def tab_portfolio(docs):
-    st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f4ca Khuyen nghi Danh muc Dau tu</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f4ca Khuyến nghị Danh mục Đầu tư</div>', unsafe_allow_html=True)
 
     von = st.session_state.get("advisor_capital", 100_000_000)
     risk_str = st.session_state.get("advisor_risk", "Trung dung")
@@ -172,16 +172,16 @@ def tab_portfolio(docs):
 
     bucket_vn = docs.get("co_phieu_vn", {})
 
-    # --- Bo loc Tam Sang ---
-    st.subheader("Bo loc Tam Sang")
-    nguong = st.slider("Nguong diem Tam Sang toi thieu", 0, 100, 40, 5, key="port_nguong",
-                       help="Loai bo CP co diem quan tri & dao duc duoi nguong")
+    # --- Bộ lọc Tam Sang ---
+    st.subheader("Bộ lọc Tam Sang")
+    nguong = st.slider("Ngưỡng điểm Tam Sang tối thiểu", 0, 100, 40, 5, key="port_nguong",
+                       help="Loại bỏ CP có điểm quản trị & đạo đức dưới ngưỡng")
     vn_items = [(ma, info) for ma, info in bucket_vn.items() if (info.get("gia") or 0) > 0 and info.get("pe")]
     vn_sang = loc_tam_sang(vn_items, nguong)
-    st.success(f"Loc: {len(vn_items)} => {len(vn_sang)} CP dat chuan Tam Sang (>= {nguong} diem)")
+    st.success(f"Lọc: {len(vn_items)} => {len(vn_sang)} CP đạt chuẩn Tam Sang (>= {nguong} điểm)")
 
-    # --- Xep hang va phan bo ---
-    st.subheader("Danh muc de xuat")
+    # --- Xếp hạng và phân bổ ---
+    st.subheader("Danh mục đề xuất")
     scored = []
     for ma, info, ts_d in vn_sang:
         pe = info.get("pe")
@@ -208,7 +208,7 @@ def tab_portfolio(docs):
         scored.append((ma, info, ts_d, s))
     scored.sort(key=lambda x: -x[3])
 
-    top_n = st.slider("So CP khuyen nghi", 5, 30, 15, key="port_top_n")
+    top_n = st.slider("Số CP khuyến nghị", 5, 30, 15, key="port_top_n")
     top = scored[:top_n]
     total_s = sum(s[3] for s in top) or 1
 
@@ -241,7 +241,7 @@ def tab_portfolio(docs):
         fig = go.Figure(data=[go.Pie(labels=labels, values=vals, hole=0.45,
                                       textinfo="label+percent", textfont=dict(size=12))])
         fig.update_layout(template="plotly_dark", height=420,
-                          title="Phan bo danh muc khuyen nghi")
+                          title="Phân bổ danh mục khuyến nghị")
         st.plotly_chart(fig, use_container_width=True)
 
         df = pd.DataFrame(rows)
@@ -252,10 +252,10 @@ def tab_portfolio(docs):
                      })
 
         total_invested = sum(r["So CP (lot 100)"] * r["Gia"] for r in rows)
-        st.info(f"**Tong dau tu:** {total_invested:,.0f}d / {von:,.0f}d ({total_invested/von*100:.1f}%) | **So ma:** {sum(1 for r in rows if r['So CP (lot 100)'] > 0)}")
+        st.info(f"**Tổng đầu tư:** {total_invested:,.0f}d / {von:,.0f}d ({total_invested/von*100:.1f}%) | **Số mã:** {sum(1 for r in rows if r['So CP (lot 100)'] > 0)}")
 
         # Apply button
-        if st.button("Ap dung vao Danh muc", use_container_width=True):
+        if st.button("Áp dụng vào Danh mục", use_container_width=True):
             dm = {}
             for r in rows:
                 ma = r["Ma"]
@@ -265,24 +265,24 @@ def tab_portfolio(docs):
                     dm[ma] = {"so_luong": lot, "gia_von": gia}
             if dm:
                 st.session_state["dm"] = dm
-                st.success(f"Da cap nhat DM voi {len(dm)} ma CP!")
+                st.success(f"Đã cập nhật DM với {len(dm)} mã CP!")
             else:
-                st.warning("Khong co CP nao du dieu kien.")
+                st.warning("Không có CP nào đủ điều kiện.")
     else:
-        st.warning("Khong co CP nao dat tieu chuan. Hay giam nguong Tam Sang.")
+        st.warning("Không có CP nào đạt tiêu chuẩn. Hãy giảm ngưỡng Tam Sang.")
 
-    # --- Tai can bang ---
+    # --- Tái cân bằng ---
     st.markdown("---")
-    st.subheader("Tai can bang danh muc (Rebalancing)")
-    st.caption("Nhap so luong CP dang nam giu de nhan de xuat mua/ban.")
+    st.subheader("Tái cân bằng danh mục (Rebalancing)")
+    st.caption("Nhập số lượng CP đang nắm giữ để nhận đề xuất mua/bán.")
 
     if rows:
-        with st.expander("Nhap so luong hien tai", expanded=False):
+        with st.expander("Nhập số lượng hiện tại", expanded=False):
             cur = {}
             for r in rows:
                 ma = r["Ma"]
                 cur[ma] = st.number_input(f"{ma} ({r['Ten'][:20]})", 0, 100000, 0, step=100, key=f"reb_{ma}")
-            if st.button("Tinh toan tai can bang", use_container_width=True):
+            if st.button("Tính toán tái cân bằng", use_container_width=True):
                 rebal = []
                 tong_cur_val = sum(cur.get(r["Ma"], 0) * r["Gia"] for r in rows)
                 tong_target = von
@@ -298,12 +298,12 @@ def tab_portfolio(docs):
                         qty_diff = int(diff / gia / 100) * 100
                     else:
                         qty_diff = 0
-                    act = "MUA" if qty_diff > 0 else ("BAN" if qty_diff < 0 else "---")
+                    act = "MUA" if qty_diff > 0 else ("BÁN" if qty_diff < 0 else "---")
                     rebal.append({
-                        "Ma": ma, "Ty trong HT": f"{cw*100:.1f}%",
+                        "Ma": ma, "Ty trọng HT": f"{cw*100:.1f}%",
                         "Ty trong MT": f"{tw*100:.1f}%",
                         "Chenh lech": f"{(tw-cw)*100:+.1f}%",
-                        "Hanh dong": act,
+                        "Hành dong": act,
                         "So luong": abs(qty_diff),
                         "Gia tri": f"{abs(qty_diff)*gia:,.0f}d",
                     })
@@ -319,15 +319,15 @@ def tab_portfolio(docs):
                     for r in rows
                     if int((von * float(r["Ty trong"].replace("%", "")) / 100 - cur.get(r["Ma"], 0) * r["Gia"]) / r["Gia"] / 100) * 100 < 0
                 )
-                st.info(f"**Can mua them:** {buy_t:,.0f}d | **Can ban ra:** {sell_t:,.0f}d")
+                st.info(f"**Cần mua thêm:** {buy_t:,.0f}d | **Cần bán ra:** {sell_t:,.0f}d")
                 if buy_t > 0:
-                    st.warning("Neu khong du tien, hay giam ty trong cac ma thua hoac bo sung von.")
+                    st.warning("Nếu không đủ tiền, hãy giảm tỷ trọng các mã thừa hoặc bổ sung vốn.")
     else:
-        st.warning("Chua co danh muc de tai can bang.")
+        st.warning("Chưa có danh mục để tái cân bằng.")
 
 
 # ============================================================
-# TAB 3: Kiem thu Lich su (Backtest)
+# TAB 3: Kiểm thử Lịch sử (Backtest)
 # ============================================================
 def _auto_create_dm(bucket_vn, von):
     try:
@@ -398,7 +398,7 @@ def _auto_create_dm(bucket_vn, von):
 
 def tab_lich_su(docs):
     try:
-        st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f4c8 Kiem thu Lich su — Backtest</div>', unsafe_allow_html=True)
+        st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f4c8 Kiểm thử Lịch sử — Backtest</div>', unsafe_allow_html=True)
 
         von = st.session_state.get("advisor_capital", 100_000_000)
         risk_str = st.session_state.get("advisor_risk", "Trung dung")
@@ -414,10 +414,10 @@ def tab_lich_su(docs):
             if dm:
                 st.session_state["dm"] = dm
             else:
-                st.warning("Khong the tao danh muc mau. Vui long quay lai Tab 2.")
+                st.warning("Không thể tạo danh mục mẫu. Vui lòng quay lại Tab 2.")
                 return
 
-        st.subheader("Danh muc hien tai")
+        st.subheader("Danh mục hiện tại")
         dm_info = []
         total_value = 0
         for ma, info_dm in dm.items():
@@ -431,7 +431,7 @@ def tab_lich_su(docs):
         st.dataframe(df_dm, use_container_width=True, hide_index=True,
                      column_config={"Gia": st.column_config.NumberColumn(format="%d d"),
                                     "GT": st.column_config.NumberColumn(format="%d d")})
-        st.metric("Tong gia tri DM", f"{total_value:,.0f}d")
+        st.metric("Tổng giá trị DM", f"{total_value:,.0f}d")
 
         st.divider()
         st.subheader("Mo phong hieu suat")
@@ -551,26 +551,26 @@ def tab_lich_su(docs):
 
 
 # ============================================================
-# MAIN: Tu van Dau tu (3 tab)
+# MAIN: Tư vấn Đầu tư (3 tab)
 # ============================================================
 def render(docs):
     # Sidebar controls
     with st.sidebar:
-        st.markdown("### Tuy chinh Dau tu")
-        cap = st.number_input("Von dau tu (d)", min_value=1_000_000, value=st.session_state.get("advisor_capital", 100_000_000),
+        st.markdown("### Tùy chỉnh Đầu tư")
+        cap = st.number_input("Vốn đầu tư (đ)", min_value=1_000_000, value=st.session_state.get("advisor_capital", 100_000_000),
                               step=10_000_000, format="%d",
-                              help="Tong so tien ban muon dau tu")
-        years = st.slider("Thoi gian dau tu (nam)", 1, 30, st.session_state.get("advisor_years", 5))
-        risk = st.selectbox("Kha vi rui ro", RISK_NAMES,
+                              help="Tổng số tiền bạn muốn đầu tư")
+        years = st.slider("Thời gian đầu tư (năm)", 1, 30, st.session_state.get("advisor_years", 5))
+        risk = st.selectbox("Khẩu vị rủi ro", RISK_NAMES,
                             index=RISK_NAMES.index(st.session_state.get("advisor_risk", "Trung dung")))
-        target = st.selectbox("Muc tieu dau tu",
-                              ["Ngh?i huu som", "Mua nha", "Giao duc con cai", "Tai san dai han", "Kiem loi ngan han"],
-                              index=["Ngh?i huu som", "Mua nha", "Giao duc con cai", "Tai san dai han", "Kiem loi ngan han"].index(
-                                  st.session_state.get("advisor_target", "Ngh?i huu som")))
-        withdrawal = st.slider("Ty le rut tien hang nam (%)", 0, 20,
+        target = st.selectbox("Mục tiêu đầu tư",
+                              ["Nghỉ hưu sớm", "Mua nhà", "Giáo dục con cái", "Tài sản dài hạn", "Kiếm lời ngắn hạn"],
+                              index=["Nghỉ hưu sớm", "Mua nhà", "Giáo dục con cái", "Tài sản dài hạn", "Kiếm lời ngắn hạn"].index(
+                                  st.session_state.get("advisor_target", "Nghỉ hưu sớm")))
+        withdrawal = st.slider("Tỷ lệ rút tiền hàng năm (%)", 0, 20,
                                st.session_state.get("advisor_withdrawal", 0)) / 100
         st.markdown("---")
-        if st.button("Ap dung", use_container_width=True):
+        if st.button("Áp dụng", use_container_width=True):
             st.session_state.advisor_capital = int(cap)
             st.session_state.advisor_years = years
             st.session_state.advisor_risk = risk
@@ -580,9 +580,9 @@ def render(docs):
 
     # Main 3-tab content
     tab1, tab2, tab3 = st.tabs([
-        "\U0001f3af Thiet lap muc tieu",
-        "\U0001f4ca Khuyen nghi Danh muc",
-        "\U0001f4c8 Kiem thu Lich su"])
+        "\U0001f3af Thiết lập mục tiêu",
+        "\U0001f4ca Khuyến nghị Danh mục",
+        "\U0001f4c8 Kiểm thử Lịch sử"])
 
     with tab1:
         tab_setup()
