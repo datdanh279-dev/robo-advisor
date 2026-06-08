@@ -5303,48 +5303,46 @@ elif st.session_state.trang_thai == "deep_analysis":
         if _chon_nhom == "⚠️ Rủi ro":
             st.write("## 💧 Phân tích thanh khoản (ADTV — Khối lượng giao dịch)")
             liq_rows = []
-            for ma in dm.keys():
+            for ma in _full_stock_list:
+                _md_d = _full_md.get(ma, {})
                 vol = 0
-                price = 0
-                vol_source = "yahoo.meta"
+                price = _md_d.get("gia", 0)
+                vol_source = "_full_md"
                 if ma in real_metas:
                     vol = real_metas[ma].get('regularMarketVolume', 0) or 0
-                    price = real_metas[ma].get('regularMarketPrice', 0) or 0
+                    price = real_metas[ma].get('regularMarketPrice', 0) or price
+                    if vol > 0: vol_source = "yahoo.meta"
                 if (vol <= 0 or price <= 0) and ma in real_prices:
                     try:
                         p_series = real_prices[ma]
                         if len(p_series) >= 20:
                             daily_ret = p_series.pct_change().dropna().abs()
-                            price = float(p_series.iloc[-1])
+                            price = float(p_series.iloc[-1]) or price
                             vol_proxy = float(daily_ret.tail(20).mean() * 1000) + 1
                             vol = max(vol, vol_proxy * 1000)
-                            vol_source = "price-derived (yahoo volume miss)"
+                            vol_source = "price-derived"
                     except Exception:
                         pass
                 if (vol <= 0 or price <= 0) and ma in kpi:
                     ki_ma = kpi[ma]
-                    mc = float(ki_ma.get("market_cap", 0) or ki_ma.get("von_hoa", 0) or 0)
-                    if mc > 0:
-                        price = float(dm[ma].get("gia_thi_truong", 0) or 0) or price
-                        if price > 0:
-                            vol = mc * 0.005 / max(price, 1) * 1e6
-                            vol_source = "sector estimate (0.5% mcap/ngay)"
-                if vol <= 0:
-                    price = float(dm[ma].get("gia_thi_truong", 0) or 0) or price
-                    if price > 0:
-                        vol = 100000
-                        vol_source = "default 100K shares (yahoo miss)"
+                    mc = float(ki_ma.get("market_cap", _md_d.get("von_hoa", 0)) or _md_d.get("von_hoa", 0) or 0)
+                    if mc > 0 and price > 0:
+                        vol = mc * 0.005 / max(price, 1) * 1e6
+                        vol_source = "sector estimate (0.5% mcap)"
+                if vol <= 0 and price > 0:
+                    vol = 100000
+                    vol_source = "default 100K"
                 adtv_value = vol * price
                 if adtv_value > 0:
-                    value_dm = dm[ma].get("gia_thi_truong", 0) * dm[ma].get("so_luong", 0)
+                    value_dm = price * (dm[ma].get("so_luong", 0) if ma in dm else 0)
                     days_to_liquidate = value_dm / adtv_value if adtv_value > 0 else 999
                     liq_rows.append({
                         "Mã": ma,
+                        "Vùng": _md_d.get("vung", ""),
                         "ADTV (tỷ)": round(adtv_value/1e9, 2),
-                        "GT DM (tỷ)": round(value_dm/1e9, 1),
-                        "Ngày thoát hàng": round(days_to_liquidate, 1),
+                        "GT (tỷ)": round(value_dm/1e9, 1),
+                        "Ngày thoát": round(days_to_liquidate, 1),
                         "Thanh khoản": "🟢 Cao" if adtv_value > 5e9 else ("🟡 TB" if adtv_value > 1e9 else "🔴 Thấp"),
-                        "Nguồn": vol_source
                     })
             if liq_rows:
                 df_liq = pd.DataFrame(liq_rows)
@@ -5363,16 +5361,16 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if _inst is not None and _inst > 0:
                     _sector_inst_avg.setdefault(_ng_ff, []).append(float(_inst))
             _sector_inst_med = {ng: (sum(v) / len(v)) for ng, v in _sector_inst_avg.items() if v}
-            for ma, info in dm.items():
-                gia_tt = info.get("gia_thi_truong", 0)
-                sl = info.get("so_luong", 0)
-                if gia_tt <= 0 or sl <= 0: continue
+            for ma in _full_stock_list:
+                _md_d = _full_md.get(ma, {})
+                gia_tt = _md_d.get("gia", 0)
+                if gia_tt <= 0: continue
                 ki = kpi.get(ma, {})
-                ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
-                inst_real = ki.get("institutions_pct")
+                ng = (ki.get("nganh", _md_d.get("nganh", "")) or "Khác").strip() or "Khác"
+                inst_real = ki.get("institutions_pct") or _md_d.get("pct_ngoai")
                 if inst_real is not None and inst_real > 0:
                     fo = inst_real
-                    fo_source = "yfinance"
+                    fo_source = "yfinance/JSON"
                 elif ng in _sector_inst_med:
                     fo = _sector_inst_med[ng]
                     fo_source = f"TB ngành ({len(_sector_inst_avg.get(ng, []))} mã có data thật)"
@@ -5387,7 +5385,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     }
                     fo = _sector_default.get(ng, 0.20)
                     fo_source = f"Sector default {ng} ({fo*100:.0f}%)"
-                v = gia_tt * sl
+                v = gia_tt * (dm[ma].get("so_luong", 0) if ma in dm else 0)
                 ff_value = v * fo if fo > 0 else 0
                 momentum_3m = 0
                 vol_30d = 0
@@ -5401,7 +5399,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     px = real_metas[ma].get('regularMarketPrice', gia_tt) or gia_tt
                     adtv_ty = (vol_shares * px) / 1e9
                 flow_signal = "🟢 Mua ròng" if momentum_3m > 5 else ("🔴 Bán ròng" if momentum_3m < -5 else "🟡 Đi ngang")
-                ff_rows.append({"Mã": ma, "Ngành": ng, "NN nắm giữ %": round(fo*100, 1),
+                ff_rows.append({"Mã": ma, "Vùng": _md_d.get("vung", ""), "Ngành": ng, "NN nắm giữ %": round(fo*100, 1),
                     "GT NN (tỷ)": round(ff_value/1e9, 1), "Momentum 3T %": round(momentum_3m, 1),
                     "Vol 30N %": round(vol_30d, 1), "ADTV (tỷ)": round(adtv_ty, 1),
                     "Dòng tiền": flow_signal, "Nguồn": fo_source})
@@ -5452,7 +5450,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 📐 Bollinger Bands & Fibonacci (Kỹ thuật nâng cao)")
             if has_real:
                 bb_rows = []
-                for ma, info in dm.items():
+                for ma in _full_stock_list:
                     if ma in real_prices and len(real_prices[ma]) >= 20:
                         p = real_prices[ma]
                         gia_tt = float(p.iloc[-1])
@@ -5470,7 +5468,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                         elif gia_tt > ma20_v: bb_sig = "🟡 Trên MA20"
                         else: bb_sig = "🟡 Dưới MA20"
                         fib_zone = "Vùng 38.2-61.8%" if fib_382 <= gia_tt <= fib_618 else "Ngoài vùng vàng"
-                        bb_rows.append({"Mã": ma, "Giá": f"{gia_tt:,.0f}", "BB trên": f"{bb_upper:,.0f}",
+                        _vung_bb = _full_md.get(ma, {}).get("vung", "")
+                        bb_rows.append({"Mã": ma, "Vùng": _vung_bb, "Giá": f"{gia_tt:,.0f}", "BB trên": f"{bb_upper:,.0f}",
                             "BB dưới": f"{bb_lower:,.0f}", "Fib 38.2%": f"{fib_382:,.0f}",
                             "Fib 61.8%": f"{fib_618:,.0f}", "Vị trí BB %": round(bb_pos, 0),
                             "Tín hiệu": bb_sig, "Fibonacci": fib_zone})
