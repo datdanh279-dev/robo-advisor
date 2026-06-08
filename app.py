@@ -4105,17 +4105,30 @@ elif st.session_state.trang_thai == "deep_analysis":
         if vn30_close is None and has_real_pre:
             try:
                 _cp_vn = DOCS.get("co_phieu_vn") or {}
-                _md_built = [{"ma": ma, "von_hoa": float(d.get("von_hoa", 0) or 0)} for ma, d in _cp_vn.items()]
+                _md_built = [{"ma": ma, "von_hoa": float(d.get("von_hoa", 0) or 0), "vung": "VN"} for ma, d in _cp_vn.items()]
                 vn30_close, vn30_label = _build_vn30_proxy(dict(real_prices), tuple(_md_built))
+            except Exception:
+                pass
+        if vn30_close is None and has_real_pre:
+            try:
+                _cp_vn = DOCS.get("co_phieu_vn") or {}
+                _md_built = [{"ma": ma, "von_hoa": float(d.get("von_hoa", 0) or 0), "vung": "VN"} for ma, d in _cp_vn.items()]
+                _tg_keys = list(real_prices.keys() & set((DOCS.get("co_phieu_tg") or {}).keys()))
+                if _tg_keys:
+                    vn30_close, vn30_label = _build_vn30_proxy({k: real_prices[k] for k in _tg_keys if k in real_prices}, tuple(_md_built))
+                else:
+                    pass
+            except Exception:
+                pass
+        if vn30_close is None and has_real_pre:
+            try:
+                _cp_vn = DOCS.get("co_phieu_vn") or {}
+                _all_md = [{"ma": ma, "von_hoa": float(d.get("von_hoa", 0) or 0), "vung": d.get("vung", "VN")} for ma, d in {**DOCS.get("co_phieu_vn", {}), **DOCS.get("co_phieu_tg", {})}.items()]
+                vn30_close, vn30_label = _build_vn30_proxy(dict(real_prices), tuple(_all_md))
             except Exception:
                 pass
         if not has_real_pre:
-            try:
-                _cp_vn = DOCS.get("co_phieu_vn") or {}
-                _md_built = [{"ma": ma, "von_hoa": float(d.get("von_hoa", 0) or 0)} for ma, d in _cp_vn.items()]
-                vn30_close, vn30_label = _build_vn30_proxy(dict(real_prices), tuple(_md_built))
-            except Exception:
-                pass
+            pass
         if vn30_close is None and has_real_pre and len(real_prices) >= 5:
             try:
                 _n30 = min(30, len(real_prices))
