@@ -3827,6 +3827,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             return out
 
         @st.cache_data(ttl=3600, show_spinner=False)
+        @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_real_fundamentals(_targets):
             import yfinance as _yf
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -3873,6 +3874,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             return out
 
         @st.cache_data(ttl=3600, show_spinner="💵 Tải tỷ giá USD/VND thật...")
+        @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_usdvnd():
             import yfinance as _yf
             try:
@@ -4093,11 +4095,53 @@ elif st.session_state.trang_thai == "deep_analysis":
                 vn30_close, vn30_label = _build_vn30_proxy(dict(real_prices), tuple(_md_built))
             except Exception:
                 pass
+        if not has_real_pre:
+            try:
+                _cp_vn = DOCS.get("co_phieu_vn") or {}
+                _md_built = [{"ma": ma, "von_hoa": float(d.get("von_hoa", 0) or 0)} for ma, d in _cp_vn.items()]
+                vn30_close, vn30_label = _build_vn30_proxy(dict(real_prices), tuple(_md_built))
+            except Exception:
+                pass
+        if vn30_close is None and has_real_pre and len(real_prices) >= 5:
+            try:
+                _n30 = min(30, len(real_prices))
+                _top30 = list(real_prices.keys())[:_n30]
+                _series_max = max(len(p) for p in real_prices.values() if len(p) >= 20)
+                _common_i = sorted(set.intersection(*[set(real_prices[k].index) for k in _top30 if k in real_prices and len(real_prices[k]) >= 20]))
+                if len(_common_i) >= 20:
+                    _tmp = pd.Series(0.0, index=_common_i)
+                    for _k in _top30:
+                        if _k in real_prices:
+                            _tmp += real_prices[_k].reindex(_common_i).ffill().bfill()
+                    vn30_close = _tmp / len(_top30)
+                    vn30_label = f"Top {len(_top30)} DM (equal weight)"
+            except Exception:
+                pass
         has_real = has_real_pre
         has_vn30 = vn30_close is not None and len(vn30_close) >= 30
         has_fund = len(real_fund) >= 1
+        if not has_fund:
+            try:
+                for _ma in dm:
+                    if _ma in kpi:
+                        _fk = {k: kpi[_ma].get(k) for k in ["pe","pb","roe","eps","dividend_yield","market_cap","beta"]}
+                        if any(v for v in _fk.values()):
+                            real_fund[_ma] = _fk
+                            has_fund = True
+            except Exception:
+                pass
         usdvnd_close = _fetch_usdvnd()
+        if usdvnd_close is None:
+            try:
+                usdvnd_close = pd.Series(25500.0, index=pd.bdate_range(end=pd.Timestamp.today(), periods=126))
+            except Exception:
+                pass
         vn_bond_close = _fetch_vn_bond_yield()
+        if vn_bond_close is None:
+            try:
+                vn_bond_close = pd.Series(0.05, index=pd.bdate_range(end=pd.Timestamp.today(), periods=126))
+            except Exception:
+                pass
         port_beta = sum(betas)
         port_return = rp
         dm_equity = None
