@@ -577,6 +577,9 @@ if 'is_pro' not in st.session_state:
 if 'deep_unlocked' not in st.session_state:
     st.session_state.deep_unlocked = False
 
+if 'advisor_unlocked' not in st.session_state:
+    st.session_state.advisor_unlocked = False
+
 try:
     PASSWORD_PRO = st.secrets.get("PRO_PASSWORD", "hdfkemr rmo8490hd")
 except Exception:
@@ -1228,9 +1231,20 @@ with sidebar:
             st.info("💡 Bạn chưa làm khảo sát rủi ro. Trang sẽ hiện danh mục thực tế và đề xuất mặc định.")
         st.rerun()
 
-    if st.button("🧠 Tư vấn Đầu tư", width='stretch'):
-        st.session_state.trang_thai = "advisor"
-        st.rerun()
+    if st.session_state.advisor_unlocked:
+        if st.button("🧠 Tư vấn Đầu tư", width='stretch'):
+            st.session_state.trang_thai = "advisor"
+            st.rerun()
+    else:
+        with st.expander("🔒 Mở khóa Tư vấn Đầu tư", expanded=False):
+            adv_pwd = st.text_input("Mật khẩu:", type="password", key="adv_pwd_input")
+            if st.button("Xác nhận", key="activate_adv", use_container_width=True):
+                if adv_pwd.strip() == PASSWORD_DEEP or adv_pwd.strip() in _DEEP_PWD_OK:
+                    st.session_state.advisor_unlocked = True
+                    st.success("✅ Đã mở khóa! Nhấn nút bên dưới để vào.")
+                    st.rerun()
+                else:
+                    st.error("❌ Mật khẩu không chính xác!")
 
     if st.button("💬 Chat phân tích", width='stretch'):
         st.session_state.trang_thai = "chat"
@@ -3417,8 +3431,14 @@ elif st.session_state.trang_thai == "portfolio":
         st.info("Chưa có dữ liệu danh mục. Hãy cập nhật dữ liệu trước.")
 
 elif st.session_state.trang_thai == "advisor":
-    from backend.advisor import render as render_advisor
-    render_advisor(DOCS)
+    if not st.session_state.get("advisor_unlocked", False):
+        st.warning("🔒 Vui lòng mở khóa 'Tư vấn Đầu tư' ở sidebar trước.")
+        if st.button("🔑 Mở khóa ngay", use_container_width=True):
+            st.session_state.trang_thai = "dashboard"
+            st.rerun()
+    else:
+        from backend.advisor import render as render_advisor
+        render_advisor(DOCS)
 
 elif st.session_state.trang_thai == "deep_analysis":
     # ============================================
