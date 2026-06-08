@@ -2944,12 +2944,8 @@ def _render_tonghop():
                         cov = df_ret.cov().values * 252
                         data_source_op = f"📊 Real: {len(df_ret)} phiên × {n_assets} mã (yfinance 6T)"
                     else:
-                        np.random.seed(42)
-                        mean_returns = np.random.uniform(0.05, 0.25, n_assets)
-                        cov = np.random.uniform(0.005, 0.04, (n_assets, n_assets))
-                        cov = (cov + cov.T) / 2
-                        np.fill_diagonal(cov, np.random.uniform(0.02, 0.06, n_assets))
-                        data_source_op = "Giá thật yfinance"
+                        st.warning(f"⚠️ Yahoo Finance không có dữ liệu đủ cho {n_assets} mã đã chọn. Không thể tối ưu danh mục.")
+                        st.stop()
                     def neg_sharpe(w):
                         port_ret = np.dot(w, mean_returns)
                         port_vol = np.sqrt(np.dot(w.T, np.dot(cov, w)))
