@@ -8354,6 +8354,33 @@ elif st.session_state.trang_thai == "deep_analysis":
                 tg_count = sum(1 for d in market_data if d.get('vung') == 'TG')
                 st.caption(f"📊 Phân tích TẤT CẢ {len(market_data)} mã ({vn_count} VN + {tg_count} TG) — song song + cache 30 phút")
 
+                _doc_vn_da = DOCS.get("co_phieu_vn") or {}
+                _doc_tg_da = DOCS.get("co_phieu_tg") or {}
+                _jt = []
+                for _d in market_data:
+                    _ma = _d["ma"]
+                    _j = _doc_vn_da.get(_ma) or _doc_tg_da.get(_ma) or {}
+                    _jt.append({
+                        "Mã": _ma, "Vùng": _d.get("vung", ""),
+                        "Giá": _j.get("gia") or _d.get("gia", 0),
+                        "Vốn hóa (tỷ)": round((_j.get("von_hoa") or _d.get("von_hoa", 0) or 0) / 1e9, 0),
+                        "Ngành": _j.get("nganh", _d.get("nganh", "")),
+                        "P/E": _j.get("pe"), "P/B": _j.get("pb"),
+                        "ROE": _j.get("roe"), "EPS": _j.get("eps"),
+                        "Beta": _j.get("beta"),
+                        "Return YTD %": round(float(_j.get("ytd", 0) or 0), 2),
+                        "Vol ratio": round(float(_d.get("vol_ratio", 0) or 0), 2),
+                    })
+                _df_jt = pd.DataFrame(_jt)
+                _df_jt["P/E"] = pd.to_numeric(_df_jt["P/E"], errors="coerce")
+                _df_jt["P/B"] = pd.to_numeric(_df_jt["P/B"], errors="coerce")
+                _df_jt["ROE"] = pd.to_numeric(_df_jt["ROE"], errors="coerce")
+                _df_jt["EPS"] = pd.to_numeric(_df_jt["EPS"], errors="coerce")
+                _df_jt["Beta"] = pd.to_numeric(_df_jt["Beta"], errors="coerce")
+
+                def _has_yf():
+                    return len(st.session_state.get("_real_prices_cache") or {}) >= 5
+
                 from concurrent.futures import ThreadPoolExecutor, as_completed
 
                 def _fetch_one_chart(ma_suffix, range_, interval_, timeout_=3):
@@ -8412,8 +8439,9 @@ elif st.session_state.trang_thai == "deep_analysis":
                 _cal_prog.empty()
             except Exception:
                 pass
+            cal_rows = []
+            cal_source = "yfinance 6T"
             if cal_data:
-                cal_rows = []
                 for d in cal_targets:
                     ma = d["ma"]
                     closes = cal_data.get(ma, [])
@@ -8423,16 +8451,25 @@ elif st.session_state.trang_thai == "deep_analysis":
                             "Vốn hóa (tỷ)": round(d.get("von_hoa", 0) / 1e9, 0) if d.get("von_hoa", 0) > 0 else 0,
                             "Return 6M %": round(ret6m, 2),
                             "Vol ratio": round(float(d.get("vol_ratio", 0) or 0), 2)})
-                if cal_rows:
-                    df_cal = pd.DataFrame(cal_rows).sort_values("Return 6M %", ascending=False)
-                    st.dataframe(df_cal, use_container_width=True, hide_index=True, height=600)
-                    cnt_vn = sum(1 for r in cal_rows if r["Vùng"] == "VN")
-                    cnt_tg = sum(1 for r in cal_rows if r["Vùng"] == "TG")
-                    st.caption(f"📊 Tính từ giá thật 6 tháng yfinance cho {len(cal_rows)}/{len(market_data)} mã ({cnt_vn} VN + {cnt_tg} TG). Return 6M = (giá cuối kỳ / giá đầu kỳ - 1) × 100%. Cache 30 phút.")
-                else:
-                    st.info("⚠️ Không fetch được dữ liệu calendar.")
+            _cal_min_req = max(10, int(len(cal_targets) * 0.2))
+            if len(cal_rows) < _cal_min_req:
+                cal_rows = []
+                for _, _cr in _df_jt.iterrows():
+                    if _cr.get("Return YTD %") and _cr["Return YTD %"] != 0:
+                        cal_rows.append({"Mã": _cr["Mã"], "Vùng": _cr["Vùng"], "Giá": _cr["Giá"],
+                            "Vốn hóa (tỷ)": _cr["Vốn hóa (tỷ)"],
+                            "Return YTD %": _cr["Return YTD %"],
+                            "Vol ratio": _cr["Vol ratio"]})
+                cal_source = "co_phieu_vn.json YTD thật"
+            if cal_rows:
+                df_cal = pd.DataFrame(cal_rows).sort_values(
+                    list(cal_rows[0].keys() & {"Return YTD %", "Return 6M %"})[0], ascending=False)
+                st.dataframe(df_cal, use_container_width=True, hide_index=True, height=600)
+                cnt_vn = sum(1 for r in cal_rows if r["Vùng"] == "VN")
+                cnt_tg = sum(1 for r in cal_rows if r["Vùng"] == "TG")
+                st.caption(f"📊 {cal_source} — {len(cal_rows)}/{len(market_data)} mã ({cnt_vn} VN + {cnt_tg} TG).")
             else:
-                st.info("⚠️ Không fetch được dữ liệu calendar.")
+                st.info("⚠️ Không có dữ liệu calendar.")
 
             st.write("### 🌪️ Volume Ratio Distribution — 384 mã (TOÀN BỘ thị trường)")
             st.caption("📊 **Volume Ratio** = volume hôm nay / TB 20 phiên. >2x = đột biến thanh khoản. <0.5x = kém thanh khoản. Vol thật annualized % ở phần **Higher Moments & Tail Risk** bên dưới.")
@@ -8480,8 +8517,9 @@ elif st.session_state.trang_thai == "deep_analysis":
                 _hm_prog.empty()
             except Exception:
                 pass
+            hm_rows = []
+            hm_source = "yfinance 3T daily"
             if hm_prices:
-                hm_rows = []
                 for d in hm_targets:
                     ma = d["ma"]
                     closes = hm_prices.get(ma, [])
@@ -8497,16 +8535,28 @@ elif st.session_state.trang_thai == "deep_analysis":
                                 "Skewness": round(sk, 2),
                                 "Kurtosis": round(ku, 2),
                                 "VaR 95% (1N) %": round(var95, 2)})
-                if hm_rows:
-                    df_hm = pd.DataFrame(hm_rows).sort_values("VaR 95% (1N) %")
-                    st.dataframe(df_hm, use_container_width=True, hide_index=True, height=600)
-                    cnt_vn = sum(1 for r in hm_rows if r["Vùng"] == "VN")
-                    cnt_tg = sum(1 for r in hm_rows if r["Vùng"] == "TG")
-                    st.caption(f"📊 Skewness<0 = lệch trái, Kurtosis>3 = đuôi dày. Tính từ {len(hm_rows)}/{len(market_data)} mã ({cnt_vn} VN + {cnt_tg} TG) daily returns 3T yfinance. Cache 30 phút.")
-                else:
-                    st.info("⚠️ Không tính được higher moments.")
+            _hm_min_req = max(10, int(len(hm_targets) * 0.2))
+            if len(hm_rows) < _hm_min_req:
+                hm_rows = []
+                for _, _hr in _df_jt.iterrows():
+                    b = _hr.get("Beta")
+                    if b and b > 0:
+                        hm_rows.append({"Mã": _hr["Mã"], "Vùng": _hr["Vùng"],
+                            "Beta": round(b, 2),
+                            "P/E": round(_hr["P/E"], 1) if _hr.get("P/E") and _hr["P/E"] > 0 else 0,
+                            "P/B": round(_hr["P/B"], 2) if _hr.get("P/B") and _hr["P/B"] > 0 else 0,
+                            "ROE": round(_hr["ROE"], 1) if _hr.get("ROE") and _hr["ROE"] > 0 else 0})
+                hm_source = "co_phieu_vn.json Beta-P/E-P/B-ROE thật"
+            if hm_rows:
+                df_hm = pd.DataFrame(hm_rows)
+                sort_col = "VaR 95% (1N) %" if "VaR 95% (1N) %" in df_hm.columns else "Beta"
+                df_hm = df_hm.sort_values(sort_col)
+                st.dataframe(df_hm, use_container_width=True, hide_index=True, height=600)
+                cnt_vn = sum(1 for r in hm_rows if r["Vùng"] == "VN")
+                cnt_tg = sum(1 for r in hm_rows if r["Vùng"] == "TG")
+                st.caption(f"📊 {hm_source} — {len(hm_rows)}/{len(market_data)} mã ({cnt_vn} VN + {cnt_tg} TG).")
             else:
-                st.info("⚠️ Không fetch được dữ liệu 3T.")
+                st.info("⚠️ Không có dữ liệu higher moments.")
 
             st.write("### 📉 Max Drawdown Distribution — 384 mã (TOÀN BỘ thị trường)")
             dd_targets = list(market_data)
@@ -8521,8 +8571,9 @@ elif st.session_state.trang_thai == "deep_analysis":
                 _dd_prog.empty()
             except Exception:
                 pass
+            dd_rows = []
+            dd_source = "yfinance 6T daily"
             if dd_prices:
-                dd_rows = []
                 for d in dd_targets:
                     ma = d["ma"]
                     closes = dd_prices.get(ma, [])
@@ -8536,26 +8587,34 @@ elif st.session_state.trang_thai == "deep_analysis":
                             "Max DD %": round(dd, 2),
                             "RoMaD": round(ret6m / abs(dd), 2) if dd != 0 else 0,
                             "Vốn hóa (tỷ)": round(d.get("von_hoa", 0) / 1e9, 0) if d.get("von_hoa", 0) > 0 else 0})
-                if dd_rows:
-                    df_dd = pd.DataFrame(dd_rows)
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        st.write("**📉 Top 15 sụt giảm mạnh nhất:**")
-                        st.dataframe(df_dd.nsmallest(15, "Max DD %"), use_container_width=True, hide_index=True, height=500)
-                    with c2:
-                        st.write("**🏆 Top 15 RoMaD tốt nhất:**")
-                        st.dataframe(df_dd.nlargest(15, "RoMaD"), use_container_width=True, hide_index=True, height=500)
-                    avg_dd = float(df_dd["Max DD %"].mean())
-                    best_romad = df_dd.nlargest(1, "RoMaD").iloc[0]
-                    cnt_vn = sum(1 for r in dd_rows if r["Vùng"] == "VN")
-                    cnt_tg = sum(1 for r in dd_rows if r["Vùng"] == "TG")
-                    st.metric("📊 Max DD TB toàn thị trường", f"{avg_dd:.1f}%",
-                        help=f"Top performer: {best_romad['Mã']} (RoMaD={best_romad['RoMaD']:.2f})")
-                    st.caption(f"📊 Max DD tính từ drawdown peak-to-trough 6T. RoMaD = Return 6M / |Max DD|. >2 = chất lượng cao. Tính từ {len(df_dd)}/{len(market_data)} mã ({cnt_vn} VN + {cnt_tg} TG). Cache 30 phút.")
-                else:
-                    st.info("⚠️ Không tính được Max DD.")
+            _dd_min_req = max(10, int(len(dd_targets) * 0.2))
+            if len(dd_rows) < _dd_min_req:
+                dd_rows = []
+                for _, _dr in _df_jt.iterrows():
+                    y = _dr.get("Return YTD %")
+                    if y and y != 0:
+                        dd_rows.append({"Mã": _dr["Mã"], "Vùng": _dr["Vùng"],
+                            "Return YTD %": y,
+                            "Beta": round(_dr["Beta"], 2) if _dr.get("Beta") and _dr["Beta"] > 0 else 0,
+                            "P/E": round(_dr["P/E"], 1) if _dr.get("P/E") and _dr["P/E"] > 0 else 0,
+                            "Vốn hóa (tỷ)": _dr["Vốn hóa (tỷ)"]})
+                dd_source = "co_phieu_vn.json YTD-Beta-P/E thật"
+            if dd_rows:
+                df_dd = pd.DataFrame(dd_rows)
+                c1, c2 = st.columns(2)
+                with c1:
+                    sort_col1 = "Max DD %" if "Max DD %" in df_dd.columns else "Return YTD %"
+                    st.write(f"**📉 Top 15 {'sụt giảm' if 'Max DD' in sort_col1 else 'YTD thấp'} nhất:**")
+                    st.dataframe(df_dd.nsmallest(15, sort_col1), use_container_width=True, hide_index=True, height=500)
+                with c2:
+                    sort_col2 = "RoMaD" if "RoMaD" in df_dd.columns else "Return YTD %"
+                    st.write(f"**🏆 Top 15 {'RoMaD' if sort_col2 == 'RoMaD' else 'YTD cao'} nhất:**")
+                    st.dataframe(df_dd.nlargest(15, sort_col2), use_container_width=True, hide_index=True, height=500)
+                cnt_vn = sum(1 for r in dd_rows if r["Vùng"] == "VN")
+                cnt_tg = sum(1 for r in dd_rows if r["Vùng"] == "TG")
+                st.caption(f"📊 {dd_source} — {len(df_dd)}/{len(market_data)} mã ({cnt_vn} VN + {cnt_tg} TG).")
             else:
-                st.info("⚠️ Không fetch được dữ liệu 6T.")
+                st.info("⚠️ Không có dữ liệu.")
 
             st.write("### ⚖️ Beta & Alpha toàn thị trường — Đo lường rủi ro hệ thống (384 mã)")
             @st.cache_data(ttl=3600, show_spinner=False)
@@ -8574,8 +8633,9 @@ elif st.session_state.trang_thai == "deep_analysis":
                         continue
                 return None, None
             bench_prices, bench_label = _fetch_bench()
+            ba_rows = []
+            ba_source = "yfinance 6T daily vs VN30"
             if bench_prices is not None and len(bench_prices) > 30:
-                ba_rows = []
                 ba_prices = dd_prices if dd_prices else _fetch_returns_6mo_daily(tuple([(d["ma"], ".VN" if d.get("vung", "VN") == "VN" else "") for d in market_data]))
                 for d in market_data:
                     ma = d["ma"]
@@ -8596,32 +8656,42 @@ elif st.session_state.trang_thai == "deep_analysis":
                                     "R²": round(corr_v ** 2, 2),
                                     "Vốn hóa (tỷ)": round(d.get("von_hoa", 0) / 1e9, 0) if d.get("von_hoa", 0) > 0 else 0,
                                     "Diễn giải": "🟢 Phòng thủ" if beta < 0.8 else ("🟡 Trung bình" if beta < 1.2 else "🔴 Tăng mạnh")})
-                if ba_rows:
-                    df_ba = pd.DataFrame(ba_rows).sort_values("Beta")
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        st.write(f"**🛡️ Top 15 Beta thấp (phòng thủ tốt) — vs {bench_label}:**")
-                        st.dataframe(df_ba.head(15), use_container_width=True, hide_index=True, height=500)
-                    with c2:
-                        st.write(f"**🚀 Top 15 Beta cao (tăng mạnh theo thị trường) — vs {bench_label}:**")
-                        st.dataframe(df_ba.nlargest(15, "Beta"), use_container_width=True, hide_index=True, height=500)
-                    avg_beta = float(df_ba["Beta"].mean())
-                    cnt_vn = sum(1 for r in ba_rows if r["Vùng"] == "VN")
-                    cnt_tg = sum(1 for r in ba_rows if r["Vùng"] == "TG")
-                    st.metric(f"📊 Beta TB toàn thị trường (vs {bench_label})", f"{avg_beta:.2f}",
-                        help=f"Tính từ {len(ba_rows)} mã ({cnt_vn} VN + {cnt_tg} TG)")
-                    st.caption(f"📊 Beta = hệ số nhạy với {bench_label} benchmark. Tính từ {len(ba_rows)}/{len(market_data)} mã ({cnt_vn} VN + {cnt_tg} TG) daily returns 6T. Alpha = return vượt benchmark/ngày.")
-                else:
-                    st.info("⚠️ Không tính được Beta.")
+            _ba_min_req = max(10, int(len(market_data) * 0.2))
+            if len(ba_rows) < _ba_min_req:
+                ba_rows = []
+                for _, _br in _df_jt.iterrows():
+                    b = _br.get("Beta")
+                    if b and b > 0:
+                        ba_rows.append({"Mã": _br["Mã"], "Vùng": _br["Vùng"],
+                            "Beta": round(b, 2),
+                            "Diễn giải": "🟢 Phòng thủ" if b < 0.8 else ("🟡 Trung bình" if b < 1.2 else "🔴 Tăng mạnh"),
+                            "Vốn hóa (tỷ)": _br["Vốn hóa (tỷ)"]})
+                ba_source = "co_phieu_vn.json Beta thật (không có Alpha vì thiếu VN30)"
+            if ba_rows:
+                df_ba = pd.DataFrame(ba_rows).sort_values("Beta")
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.write(f"**🛡️ Top 15 Beta thấp (phòng thủ tốt) — {'vs ' + bench_label if bench_label else 'thị trường'}:**")
+                    st.dataframe(df_ba.head(15), use_container_width=True, hide_index=True, height=500)
+                with c2:
+                    st.write(f"**🚀 Top 15 Beta cao (tăng mạnh theo thị trường) — {'vs ' + bench_label if bench_label else 'thị trường'}:**")
+                    st.dataframe(df_ba.nlargest(15, "Beta"), use_container_width=True, hide_index=True, height=500)
+                avg_beta = float(df_ba["Beta"].mean())
+                cnt_vn = sum(1 for r in ba_rows if r["Vùng"] == "VN")
+                cnt_tg = sum(1 for r in ba_rows if r["Vùng"] == "TG")
+                st.metric("📊 Beta TB toàn thị trường", f"{avg_beta:.2f}",
+                    help=f"Tính từ {len(ba_rows)} mã ({cnt_vn} VN + {cnt_tg} TG)")
+                st.caption(f"📊 {ba_source} — {len(ba_rows)}/{len(market_data)} mã ({cnt_vn} VN + {cnt_tg} TG).")
             else:
-                st.info("⚠️ Không fetch được VN30/E1VFVN30 để tính beta.")
+                st.info("⚠️ Không có dữ liệu beta.")
 
             st.write("### 🔗 Cross-Correlation Top 50 vốn hóa — Phân nhóm cùng ngành")
             try:
-                from concurrent.futures import ThreadPoolExecutor, as_completed
-                import requests as _rq_xc2, pandas as _pd_xc2, plotly.graph_objects as _go_xc
-                xc_ma_list = [ma for ma, info in dm.items() if info.get("gia_thi_truong", 0) * info.get("so_luong", 0) > 0 and tong_gt > 0]
-                if len(xc_ma_list) >= 2:
+                _xc_dm_list = [ma for ma, info in dm.items() if info.get("gia_thi_truong", 0) * info.get("so_luong", 0) > 0 and tong_gt > 0]
+                _xc_succeeded = False
+                if len(_xc_dm_list) >= 2:
+                    from concurrent.futures import ThreadPoolExecutor, as_completed
+                    import requests as _rq_xc2, pandas as _pd_xc2, plotly.graph_objects as _go_xc
                     _vn_keys_xc = set((DOCS.get("co_phieu_vn") or {}).keys())
                     _xc_prices = {}
                     def _fetch_xc(sym, suffix):
@@ -8641,12 +8711,13 @@ elif st.session_state.trang_thai == "deep_analysis":
                         except: pass
                         return sym, None
                     with ThreadPoolExecutor(max_workers=12) as _ex_xc:
-                        _futs_xc = {_ex_xc.submit(_fetch_xc, m, ".VN" if m in _vn_keys_xc else ""): m for m in xc_ma_list}
+                        _futs_xc = {_ex_xc.submit(_fetch_xc, m, ".VN" if m in _vn_keys_xc else ""): m for m in _xc_dm_list}
                         for _f_xc in as_completed(_futs_xc):
                             _s_xc, _p_xc = _f_xc.result()
                             if _p_xc is not None:
                                 _xc_prices[_s_xc] = _p_xc
                     if len(_xc_prices) >= 2:
+                        _xc_succeeded = True
                         _df_xc = _pd_xc2.DataFrame({k: v.pct_change().dropna() for k, v in _xc_prices.items()}).dropna()
                         if _df_xc.shape[1] >= 2 and len(_df_xc) > 10:
                             _corr_xc = _df_xc.corr()
@@ -8673,14 +8744,25 @@ elif st.session_state.trang_thai == "deep_analysis":
                             st.info(f"⚠️ Cần ≥10 phiên × ≥2 mã. Mới {len(_df_xc)} phiên × {_df_xc.shape[1]} mã.")
                     else:
                         st.info("⚠️ Yahoo Finance không trả dữ liệu. Refresh sau 5-10 phút.")
-                else:
-                    st.info("Cần ≥2 mã trong danh mục.")
+                if not _xc_succeeded:
+                    _xc_sr = _df_jt["Ngành"].value_counts()
+                    if len(_xc_sr) >= 2:
+                        st.write("**📊 Phân bố ngành (thay thế Correlation Matrix — cần daily returns yfinance):**")
+                        _xc_sc = st.columns(min(4, len(_xc_sr)))
+                        for _xi, (_ng, _sl) in enumerate(_xc_sr.items()):
+                            with _xc_sc[_xi % len(_xc_sc)]:
+                                st.metric(_ng[:20], int(_sl))
+                        st.caption(f"📊 {len(_xc_sr)} ngành từ {len(_df_jt)} mã — co_phieu_vn.json dữ liệu thật.")
+                    else:
+                        st.info("Cần ≥2 mã trong danh mục.")
             except Exception as e:
                 st.warning(f"⚠️ Không tính được cross-correlation: {str(e)[:80]}")
 
         if _chon_nhom == "📋 Cơ bản":
             st.write("### 📊 PHÂN TÍCH CHUYÊN SÂU 384 MÃ — ĐẦY ĐỦ METRICS (Sharpe/Alpha/Beta/VaR/CVaR/Sortino/Calmar/MaxDD)")
-            if market_data and len(market_data) >= 10 and dd_prices:
+            _dd_p = locals().get("dd_prices") or {}
+            _has_dd = market_data and len(market_data) >= 10 and len(_dd_p) >= 5
+            if _has_dd:
                 try:
                     bench_label_dm = bench_label if bench_prices is not None else "VN30"
                     if bench_prices is None:
@@ -8759,8 +8841,24 @@ elif st.session_state.trang_thai == "deep_analysis":
                         st.caption(f"📊 Metrics: Return annualized, Vol annualized, Sharpe (rf=3%), Sortino (downside), Calmar (return/|maxDD|), Beta/Alpha vs {bench_label_dm}, VaR/CVaR 95% 1-day, Max DD 6T. Tính từ {len(df_metrics)} mã ({cnt_vn_m} VN + {cnt_tg_m} TG).")
                 except Exception as e:
                     st.warning(f"⚠️ Không tính được metrics 384 mã: {str(e)[:100]}")
-            else:
-                st.info("⚠️ Cần market scan + price data để tính metrics 384 mã.")
+            if not _has_dd or 'metrics_rows' not in dir() or len(metrics_rows or []) < 10:
+                _ms_rows = []
+                for _, _mr in _df_jt.iterrows():
+                    _ms_rows.append({"Mã": _mr["Mã"], "Vùng": _mr["Vùng"], "Giá": _mr["Giá"],
+                        "Beta": round(_mr["Beta"], 2) if _mr.get("Beta") and _mr["Beta"] > 0 else 0,
+                        "P/E": round(_mr["P/E"], 1) if _mr.get("P/E") and _mr["P/E"] > 0 else 0,
+                        "P/B": round(_mr["P/B"], 2) if _mr.get("P/B") and _mr["P/B"] > 0 else 0,
+                        "ROE": round(_mr["ROE"], 1) if _mr.get("ROE") and _mr["ROE"] > 0 else 0,
+                        "Return YTD %": _mr["Return YTD %"],
+                        "Vốn hóa (tỷ)": _mr["Vốn hóa (tỷ)"]})
+                if _ms_rows:
+                    df_ms = pd.DataFrame(_ms_rows)
+                    st.dataframe(df_ms, use_container_width=True, hide_index=True, height=600)
+                    cnt_vn_m = sum(1 for r in _ms_rows if r["Vùng"] == "VN")
+                    cnt_tg_m = sum(1 for r in _ms_rows if r["Vùng"] == "TG")
+                    st.caption(f"📊 Beta-P/E-P/B-ROE-YTD từ co_phieu_vn.json dữ liệu thật — {len(df_ms)}/{len(market_data)} mã ({cnt_vn_m} VN + {cnt_tg_m} TG). Thiếu Sharpe/Sortino/Calmar/VaR/CVaR do cần daily returns yfinance 6T.")
+                else:
+                    st.info("⚠️ Không có dữ liệu.")
         st.write("---")
         if _chon_nhom == "📋 Cơ bản":
             st.write("## 🔗 FULL-MARKET CORRELATION MATRIX — Ma trận tương quan toàn thị trường")
