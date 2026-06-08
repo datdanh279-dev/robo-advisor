@@ -8414,39 +8414,38 @@ elif st.session_state.trang_thai == "deep_analysis":
             else:
                 st.info("⚠️ Không fetch được dữ liệu calendar.")
 
-            st.write("### 🌪️ Volatility Cone — 384 mã (TOÀN BỘ thị trường)")
+            st.write("### 🌪️ Volume Ratio Distribution — 384 mã (TOÀN BỘ thị trường)")
+            st.caption("📊 **Volume Ratio** = volume hôm nay / TB 20 phiên. >2x = đột biến thanh khoản. <0.5x = kém thanh khoản. Vol thật annualized % ở phần **Higher Moments & Tail Risk** bên dưới.")
             vol_rows = []
             for d in market_data:
                 vr = d.get("vol_ratio", 0) or 0
                 if vr > 0:
-                    v_est = max(10, min(80, 25 + (vr - 1) * 8))
                     vol_rows.append({"Mã": d["ma"], "Vùng": d.get("vung", ""),
-                        "Vol %/năm": round(v_est, 1),
-                        "Vol ratio": round(vr, 2),
+                        "Volume Ratio": round(vr, 2),
                         "Vốn hóa (tỷ)": round(d.get("von_hoa", 0) / 1e9, 0) if d.get("von_hoa", 0) > 0 else 0})
             if vol_rows:
                 df_volc = pd.DataFrame(vol_rows)
-                p10 = float(df_volc["Vol %/năm"].quantile(0.10))
-                p25 = float(df_volc["Vol %/năm"].quantile(0.25))
-                p50 = float(df_volc["Vol %/năm"].quantile(0.50))
-                p75 = float(df_volc["Vol %/năm"].quantile(0.75))
-                p90 = float(df_volc["Vol %/năm"].quantile(0.90))
+                p10 = float(df_volc["Volume Ratio"].quantile(0.10))
+                p25 = float(df_volc["Volume Ratio"].quantile(0.25))
+                p50 = float(df_volc["Volume Ratio"].quantile(0.50))
+                p75 = float(df_volc["Volume Ratio"].quantile(0.75))
+                p90 = float(df_volc["Volume Ratio"].quantile(0.90))
                 vc1, vc2, vc3, vc4, vc5 = st.columns(5)
-                vc1.metric("📊 P10 (Yên tĩnh)", f"{p10:.1f}%")
-                vc2.metric("📊 P25", f"{p25:.1f}%")
-                vc3.metric("📊 P50 (Median)", f"{p50:.1f}%")
-                vc4.metric("📊 P75", f"{p75:.1f}%")
-                vc5.metric("📊 P90 (Bất ổn)", f"{p90:.1f}%")
+                vc1.metric("📊 P10 (Im ắng)", f"{p10:.2f}x")
+                vc2.metric("📊 P25", f"{p25:.2f}x")
+                vc3.metric("📊 P50 (Median)", f"{p50:.2f}x")
+                vc4.metric("📊 P75", f"{p75:.2f}x")
+                vc5.metric("📊 P90 (Sôi động)", f"{p90:.2f}x")
                 fig_vc = go.Figure()
-                fig_vc.add_trace(go.Histogram(x=df_volc["Vol %/năm"], nbinsx=30,
-                    marker_color='#4FC3F7', opacity=0.7, name='Phân phối Vol'))
+                fig_vc.add_trace(go.Histogram(x=df_volc["Volume Ratio"], nbinsx=30,
+                    marker_color='#4FC3F7', opacity=0.7, name='Phân phối Volume Ratio'))
                 for p, label, color in [(p10, "P10", '#4CAF50'), (p50, "P50", '#FFD700'), (p90, "P90", '#F44336')]:
                     fig_vc.add_vline(x=p, line_dash="dash", line_color=color, annotation_text=label)
-                fig_vc.update_layout(title=f"Vol Distribution — {len(df_volc)} mã (ước lượng từ vol_ratio)",
-                    xaxis_title="Vol %/năm", yaxis_title="Số mã", height=350,
+                fig_vc.update_layout(title=f"Volume Ratio Distribution — {len(df_volc)} mã",
+                    xaxis_title="Volume Ratio (hôm nay / TB 20D)", yaxis_title="Số mã", height=350,
                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
                 st.plotly_chart(fig_vc, use_container_width=True)
-                st.caption(f"📊 Vol ước lượng = 25% + (vol_ratio-1)*8%, clip [10, 80]%. Tính từ TOÀN BỘ {len(df_volc)} mã (full market scan).")
+                st.caption(f"📊 Volume Ratio scan yfinance thật {len(df_volc)} mã. Vol thật annualized % ở phần Higher Moments bên dưới.")
 
             st.write("### 🧬 Higher Moments & Tail Risk — 384 mã (TOÀN BỘ thị trường)")
             hm_targets = list(market_data)
