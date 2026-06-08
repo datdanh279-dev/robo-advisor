@@ -329,54 +329,225 @@ def tab_portfolio(docs):
 # ============================================================
 # TAB 3: Kiem thu Lich su (Backtest)
 # ============================================================
+def _auto_create_dm(bucket_vn, von):
+    try:
+        items = []
+        for ma, info in bucket_vn.items():
+            if not isinstance(info, dict):
+                continue
+            gia = info.get("gia")
+            if not isinstance(gia, (int, float)) or gia <= 0:
+                continue
+            if not info.get("pe"):
+                continue
+            items.append((ma, info))
+
+        sang = loc_tam_sang(items, 30)
+        scored = []
+        for item in sang[:30]:
+            if not isinstance(item, (list, tuple)) or len(item) < 3:
+                continue
+            ma = str(item[0]) if item[0] else ""
+            info = item[1] if isinstance(item[1], dict) else {}
+            ts_d = item[2] if isinstance(item[2], (int, float)) else 0
+            pe = info.get("pe")
+            if not isinstance(pe, (int, float)) or pe <= 0:
+                continue
+            s = float(ts_d) * 0.5
+            if pe < 10:
+                s += 30
+            elif pe < 15:
+                s += 20
+            roe = info.get("roe")
+            if isinstance(roe, (int, float)) and roe > 15:
+                s += 15
+            scored.append((ma, info, float(ts_d), s))
+
+        if not scored:
+            return {}
+
+        scored.sort(key=lambda x: x[3] if len(x) > 3 else 0, reverse=True)
+        top = scored[:12]
+
+        total = 0.0
+        for item in top:
+            if isinstance(item, (list, tuple)) and len(item) >= 4:
+                total += float(item[3])
+        if total <= 0:
+            total = 1.0
+
+        dm = {}
+        for item in top:
+            if not isinstance(item, (list, tuple)) or len(item) < 4:
+                continue
+            ma = str(item[0]) if item[0] else ""
+            info = item[1] if isinstance(item[1], dict) else {}
+            s = float(item[3])
+            ty = s / total
+            tien = von * ty
+            gia = info.get("gia")
+            if not isinstance(gia, (int, float)) or gia <= 0:
+                continue
+            lot = int(tien / gia / 100) * 100
+            if lot > 0:
+                dm[ma] = {"so_luong": lot, "gia_von": gia}
+        return dm
+    except Exception:
+        return {}
+
+
 def tab_backtest(docs):
-    st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f4c8 Kiem thu Lich su — Backtest</div>', unsafe_allow_html=True)
+    try:
+        st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f4c8 Kiem thu Lich su — Backtest</div>', unsafe_allow_html=True)
 
-    von = st.session_state.get("advisor_capital", 100_000_000)
-    risk_str = st.session_state.get("advisor_risk", "Trung dung")
-    ridx = RISK_TO_IDX.get(risk_str, 2)
-    er = EXP_RET[ridx]
-    vol = EXP_VOL[ridx]
+        von = st.session_state.get("advisor_capital", 100_000_000)
+        risk_str = st.session_state.get("advisor_risk", "Trung dung")
+        ridx = RISK_TO_IDX.get(risk_str, 2)
+        er = EXP_RET[ridx]
+        vol = EXP_VOL[ridx]
 
-    bucket_vn = docs.get("co_phieu_vn", {})
+        bucket_vn = docs.get("co_phieu_vn", {})
 
-    # Lay danh muc tu session (hoac tao mau)
-    dm = st.session_state.get("dm", {})
-    if not dm:
-        try:
-            vn_items = [(ma, info) for ma, info in bucket_vn.items() if (info.get("gia") or 0) > 0 and info.get("pe")]
-            vn_sang = loc_tam_sang(vn_items, 30)
-            scored = []
-            for item in vn_sang[:30]:
-                if not isinstance(item, (list, tuple)) or len(item) < 3:
-                    continue
-                ma, info, ts_d = item[:3]
-                pe = info.get("pe") if isinstance(info, dict) else None
-                if not isinstance(pe, (int, float)) or pe <= 0:
-                    continue
-                s = ts_d * 0.5
-                if pe < 10: s += 30
-                elif pe < 15: s += 20
-                roe = info.get("roe") if isinstance(info, dict) else None
-                if isinstance(roe, (int, float)) and roe > 15: s += 15
-                scored.append((ma, info, ts_d, s))
-            scored.sort(key=lambda x: -x[3] if isinstance(x, (list, tuple)) and len(x) > 3 else 0)
-            top = [x for x in scored[:12] if isinstance(x, (list, tuple)) and len(x) >= 4]
-            total_s = sum(x[3] for x in top) or 1
-            for item in top:
-                ma, info, ts_d, s = item[0], item[1], item[2], item[3]
-                ty = s / total_s if total_s else 0
-                tien = von * ty
-                gia = info.get("gia") or 0 if isinstance(info, dict) else 0
-                lot, _ = tinh_lot(tien, gia)
-                if lot > 0:
-                    dm[ma] = {"so_luong": lot, "gia_von": gia}
-        except Exception as e:
-            st.warning(f"Loi khi tao danh muc mau: {e}")
-            return
+        dm = st.session_state.get("dm", {})
         if not dm:
-            st.warning("Khong the tao danh muc mau. Vui long quay lai Tab 2.")
-            return
+            dm = _auto_create_dm(bucket_vn, von)
+            if dm:
+                st.session_state["dm"] = dm
+            else:
+                st.warning("Khong the tao danh muc mau. Vui long quay lai Tab 2.")
+                return
+
+        st.subheader("Danh muc hien tai")
+        dm_info = []
+        total_value = 0
+        for ma, info_dm in dm.items():
+            cp_info = bucket_vn.get(ma, {})
+            gia = cp_info.get("gia") or info_dm.get("gia_von", 0)
+            sl = info_dm.get("so_luong", 0)
+            gt = sl * gia
+            dm_info.append({"Ma": ma, "Ten": cp_info.get("ten", ""), "SL": sl, "Gia": gia, "GT": gt})
+            total_value += gt
+        df_dm = pd.DataFrame(dm_info)
+        st.dataframe(df_dm, use_container_width=True, hide_index=True,
+                     column_config={"Gia": st.column_config.NumberColumn(format="%d d"),
+                                    "GT": st.column_config.NumberColumn(format="%d d")})
+        st.metric("Tong gia tri DM", f"{total_value:,.0f}d")
+
+        st.markdown("---")
+        st.subheader("Mo phong hieu suat")
+        n_years = st.slider("So nam backtest", 1, 15, 5)
+
+        np.random.seed(42)
+        annual_returns = np.random.normal(er, vol, n_years)
+        vnindex_start = 1280
+        vnindex_vol = vol * 1.1
+        vnindex_returns = np.random.normal(0.07, vnindex_vol, n_years)
+
+        dm_values = [total_value]
+        vnindex_values = [vnindex_start]
+        for i in range(n_years):
+            dm_values.append(dm_values[-1] * (1 + annual_returns[i]))
+            vnindex_values.append(vnindex_values[-1] * (1 + vnindex_returns[i]))
+
+        years_label = list(range(n_years + 1))
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=years_label, y=dm_values, name="Danh muc cua ban",
+                                 line=dict(color="#00C9A7", width=3)))
+        fig.add_trace(go.Scatter(x=years_label, y=vnindex_values, name="VN-Index",
+                                 line=dict(color="#FFD700", width=2, dash="dash")))
+        fig.update_layout(template="plotly_dark", height=380,
+                          title="Tang truong: Danh muc vs VN-Index",
+                          hovermode="x unified",
+                          legend=dict(orientation="h", y=-0.25))
+        fig.update_yaxes(tickformat=",.0f")
+        st.plotly_chart(fig, use_container_width=True)
+
+        dm_final = dm_values[-1]
+        vnindex_final = vnindex_values[-1]
+        dm_cagr = (dm_final / total_value) ** (1 / n_years) - 1
+        vnindex_cagr = (vnindex_final / vnindex_start) ** (1 / n_years) - 1
+        alpha = dm_cagr - vnindex_cagr
+
+        best_return = max(annual_returns)
+        worst_return = min(annual_returns)
+        max_dd_sim = min(0, worst_return)
+        cum_max = np.maximum.accumulate(dm_values)
+        dd_series = [(dm_values[i] - cum_max[i]) / cum_max[i] for i in range(len(dm_values))]
+        max_dd = min(dd_series)
+        sharpe = (dm_cagr - 0.04) / (np.std(annual_returns) + 1e-10)
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Gia tri cuoi", f"{dm_final:,.0f}d")
+        with col2:
+            st.metric("CAGR", f"{dm_cagr*100:.2f}%", f"{alpha*100:+.2f}% vs VN-Index")
+        with col3:
+            st.metric("Sharpe", f"{sharpe:.2f}")
+        with col4:
+            st.metric("Max Drawdown", f"{max_dd*100:.2f}%")
+
+        fig_dd = go.Figure()
+        fig_dd.add_trace(go.Scatter(x=years_label, y=[v * 100 for v in dd_series],
+                                    fill="tozeroy", name="Drawdown",
+                                    line=dict(color="#FF6B6B", width=2)))
+        fig_dd.update_layout(template="plotly_dark", height=250,
+                             title="Drawdown qua cac nam",
+                             yaxis_title="%", hovermode="x unified")
+        st.plotly_chart(fig_dd, use_container_width=True)
+
+        with st.expander("Chi tiet tung nam"):
+            detail_rows = []
+            for i in range(n_years):
+                detail_rows.append({
+                    "Nam": i + 1,
+                    "DM dau nam": f"{dm_values[i]:,.0f}d",
+                    "Loi nhuan": f"{annual_returns[i]*100:+.2f}%",
+                    "DM cuoi nam": f"{dm_values[i+1]:,.0f}d",
+                    "VN-Index": f"{vnindex_values[i+1]:,.0f}",
+                })
+            st.dataframe(pd.DataFrame(detail_rows), use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+        st.subheader("Monte Carlo — 1000 kich ban")
+        n_sim = 1000
+        sim_results = []
+        for _ in range(n_sim):
+            sim_ret = np.random.normal(er, vol, n_years)
+            sim_final = total_value * np.prod(1 + sim_ret)
+            sim_results.append(sim_final)
+        sim_results = np.array(sim_results)
+
+        p5 = np.percentile(sim_results, 5)
+        p25 = np.percentile(sim_results, 25)
+        p50 = np.percentile(sim_results, 50)
+        p75 = np.percentile(sim_results, 75)
+        p95 = np.percentile(sim_results, 95)
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1: st.metric("Toi te nhat (5%)", f"{p5:,.0f}d")
+        with col2: st.metric("Thap (25%)", f"{p25:,.0f}d")
+        with col3: st.metric("Trung vi", f"{p50:,.0f}d")
+        with col4: st.metric("Cao (75%)", f"{p75:,.0f}d")
+        with col5: st.metric("Toi uu (95%)", f"{p95:,.0f}d")
+
+        fig_hist = go.Figure()
+        fig_hist.add_trace(go.Histogram(x=sim_results, nbinsx=50, name="Phan phoi",
+                                         marker_color="#00C9A7"))
+        fig_hist.add_vline(x=p5, line_dash="dash", line_color="#FF6B6B",
+                           annotation_text="5%")
+        fig_hist.add_vline(x=p50, line_dash="dash", line_color="#FFD700",
+                           annotation_text="50%")
+        fig_hist.add_vline(x=p95, line_dash="dash", line_color="#00C9A7",
+                           annotation_text="95%")
+        fig_hist.update_layout(template="plotly_dark", height=300,
+                                title=f"Phan phoi gia tri DM sau {n_years} nam ({n_sim} kich ban)",
+                                xaxis_title="Gia tri cuoi ky",
+                                yaxis_title="So lan")
+        fig_hist.update_xaxes(tickformat=",.0f")
+        st.plotly_chart(fig_hist, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Backtest gap loi: {e}")
 
     # Tinh gia tri DM & backtest
     st.subheader("Danh muc hien tai")
