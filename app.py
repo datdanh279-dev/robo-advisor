@@ -6451,7 +6451,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                             for chunk in chunks:
                                 if len(chunk) > 15:
                                     b_v = float(np.polyfit(vn_r.loc[chunk], dm_r.loc[chunk], 1)[0])
-                                    betas_overtime.append({"Kỳ": f"{pd.Series(dm_r.index).loc[chunk[0]].strftime('%d/%m')}-{pd.Series(dm_r.index).loc[chunk[-1]].strftime('%d/%m')}",
+                                    betas_overtime.append({"Kỳ": f"{chunk[0].strftime('%d/%m')}-{chunk[-1].strftime('%d/%m')}",
                                         "Beta": round(b_v, 3)})
                             if betas_overtime:
                                 _bs_shown = True
