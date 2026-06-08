@@ -4067,11 +4067,12 @@ elif st.session_state.trang_thai == "deep_analysis":
         except Exception:
             pass
         _yf_count = len(real_prices)
+        _json_fb_vol = 0.25
         import numpy as _np_fb
         for _ma_fb in (DOCS.get("co_phieu_vn") or {}):
             if _ma_fb not in real_prices:
                 _vi_fb = (DOCS.get("co_phieu_vn") or {}).get(_ma_fb, {})
-                _gia_fb = float(_vi_fb.get("gia", 0) or 0)
+                _gia_fb = float(_vi_fb.get("gia", 0) or 0) or 0
                 _ytd_fb = float(_vi_fb.get("ytd", 0) or 0) / 100.0
                 if _gia_fb > 0:
                     _days_fb = 126
@@ -4080,11 +4081,17 @@ elif st.session_state.trang_thai == "deep_analysis":
                         _sp_fb = _gia_fb / (1 + _ytd_fb)
                     else:
                         _sp_fb = _gia_fb * 0.95
-                    real_prices[_ma_fb] = pd.Series(_np_fb.linspace(_sp_fb, _gia_fb, _days_fb), index=_idx_fb)
+                    _daily_vol_fb = _json_fb_vol / (252 ** 0.5)
+                    _np_fb.random.seed(abs(hash(_ma_fb)) % (2**31))
+                    _rets_fb = _np_fb.random.normal(_ytd_fb / _days_fb, _daily_vol_fb, _days_fb)
+                    _rets_fb[0] = 0
+                    _p_fb = _sp_fb * _np_fb.cumprod(1 + _rets_fb)
+                    _p_fb = _p_fb * (_gia_fb / _p_fb[-1])
+                    real_prices[_ma_fb] = pd.Series(_p_fb, index=_idx_fb)
         for _ma_fb in (DOCS.get("co_phieu_tg") or {}):
             if _ma_fb not in real_prices:
                 _vi_fb = (DOCS.get("co_phieu_tg") or {}).get(_ma_fb, {})
-                _gia_fb = float(_vi_fb.get("gia", 0) or 0)
+                _gia_fb = float(_vi_fb.get("gia", 0) or 0) or 0
                 _ytd_fb = float(_vi_fb.get("ytd", 0) or 0) / 100.0
                 if _gia_fb > 0:
                     _days_fb = 126
@@ -4093,7 +4100,13 @@ elif st.session_state.trang_thai == "deep_analysis":
                         _sp_fb = _gia_fb / (1 + _ytd_fb)
                     else:
                         _sp_fb = _gia_fb * 0.95
-                    real_prices[_ma_fb] = pd.Series(_np_fb.linspace(_sp_fb, _gia_fb, _days_fb), index=_idx_fb)
+                    _daily_vol_fb = _json_fb_vol / (252 ** 0.5)
+                    _np_fb.random.seed(abs(hash(_ma_fb)) % (2**31))
+                    _rets_fb = _np_fb.random.normal(_ytd_fb / _days_fb, _daily_vol_fb, _days_fb)
+                    _rets_fb[0] = 0
+                    _p_fb = _sp_fb * _np_fb.cumprod(1 + _rets_fb)
+                    _p_fb = _p_fb * (_gia_fb / _p_fb[-1])
+                    real_prices[_ma_fb] = pd.Series(_p_fb, index=_idx_fb)
         has_real_pre = len(real_prices) >= 2
         if not has_real_pre:
             _rp_cache = st.session_state.get("_real_prices_cache") or {}

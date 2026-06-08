@@ -1,0 +1,59 @@
+=== has_real checks ===
+  4098: if not has_real_pre:
+  4103: if not has_real_pre:
+  4106: if vn30_close is None and has_real_pre:
+  4109: if vn30_close is None and has_real_pre:
+  4116: if not has_real_pre:
+  4123: if vn30_close is None and has_real_pre and len(real_prices) >= 5:
+  4166: if has_real and len(real_prices) >= 2:
+  4219: if has_real and dm_equity is not None and len(dm_equity) > 20:
+  4488: if has_real and dm_equity is not None and len(dm_equity) > 30:
+  4595: if has_real:
+  4619: if not has_real:
+  4690: if has_real and dm_equity is not None and len(dm_equity) > 20:
+  4705: if has_real and dm_equity is not None and len(dm_equity) > 20:
+  4832: if has_real and dm_equity is not None and len(dm_equity) > 20:
+  5055: if has_real:
+  5153: if has_real and 'dm_value_ts' in dir() and len(dm_equity) > 21:
+  5172: if has_real:
+  5349: if has_real:
+  5450: if has_real and 'dm_equity' in dir():
+  5489: if has_real and len(dm_equity) > 30:
+  5534: if has_real and len(real_prices) >= 2 and tong_gt > 0:
+  5573: if has_real and len(dm_equity) > 60:
+  5601: if has_real and len(dm_equity) > 60:
+  5631: if has_real and len(real_prices) > 0 and len(weights) > 0:
+  5666: if has_real and len(dm_equity) > 30:
+  5710: if has_real and len(real_prices) > 0:
+  5820: if has_real and len(dm_equity) > 30:
+  5850: if has_real and len(dm_equity) > 30:
+  5901: if has_real and dm_equity is not None and len(dm_equity) > 30 and has_vn30:
+  5947: if has_real and dm_equity is not None and len(dm_equity) > 30:
+  5979: if has_real and dm_equity is not None and len(dm_equity) > 120:
+  6015: if has_real and len(real_prices) >= 2 and tong_gt > 0:
+  6058: if has_real and dm_equity is not None and has_vn30 and len(dm_equity) > 30:
+  6106: if has_real and dm_equity is not None and has_vn30 and len(dm_equity) > 60:
+  6149: if has_real and len(real_prices) >= 3:
+  6363: if has_real and len(real_prices) >= 1:
+  6395: if has_real and dm_equity is not None and len(dm_equity) > 10:
+  6440: if has_real and len(real_prices) >= 1:
+  6461: if has_real and dm_equity is not None and len(dm_equity) > 60:
+  6546: if has_real and dm_equity is not None and len(dm_equity) > 60:
+  6582: if has_real and len(real_prices) >= 2 and has_vn30 and dm_equity is not None and len(dm_equity) > 60:
+  6636: if has_real and dm_equity is not None and len(dm_equity) > 60:
+  6667: if has_real and dm_equity is not None and len(dm_equity) > 20:
+  6716: if has_real and has_vn30 and len(real_prices) >= 2:
+  6743: if has_real and dm_equity is not None and len(dm_equity) > 60:
+  6772: if has_real and len(real_prices) >= 5:
+  6820: if has_real and has_vn30 and len(real_prices) >= 10:
+  6895: if _liq_has_real and ma in real_prices and real_prices[ma] is not None and len(real_prices[ma]) >= 20:
+  6911: src = "+ vol thật yfinance" if _liq_has_real else "ước lượng từ vốn hóa"
+  7028: if has_real and len(real_prices) >= 5:
+  7081: if has_real and len(real_prices) >= 3:
+  7144: if has_real and dm and len(dm) > 0:
+  7220: if has_real and len(real_fund) > 0:
+
+=== has_fund checks ===
+  4141: if not has_fund:
+  5321: if has_fund and len(real_fund) > 0:
+  6268: if has_fund and len(real_fund) > 0:
