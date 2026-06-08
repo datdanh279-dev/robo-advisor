@@ -148,21 +148,31 @@ def _estimate_dm_vol_from_sector(dm_tuple, kpi_tuple):
         kpi = dict(kpi_tuple) if isinstance(kpi_tuple, (list, tuple)) else {}
         if not dm:
             return 0.0
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         import yfinance as _yf_v
         sector_vols = {}
+        _sector_repr = {}
         for ma, info in dm.items():
             ng = (kpi.get(ma, {}).get("nganh", "") or info.get("nganh", "") or "Khác").strip() or "Khác"
-            if ng not in sector_vols:
-                try:
-                    s = _yf_v.Ticker(ma + ".VN")
-                    hist = s.history(period="3mo", auto_adjust=True)
-                    if hist is not None and len(hist) > 20:
-                        ret = hist["Close"].pct_change().dropna()
-                        v = float(ret.std() * (252**0.5)) if len(ret) > 20 else 0.0
-                        if v > 0:
-                            sector_vols[ng] = v
-                except Exception:
-                    continue
+            if ng not in _sector_repr:
+                _sector_repr[ng] = ma
+        def _fetch_vol(_ma):
+            try:
+                s = _yf_v.Ticker(_ma + ".VN")
+                hist = s.history(period="3mo", auto_adjust=True)
+                if hist is not None and len(hist) > 20:
+                    ret = hist["Close"].pct_change().dropna()
+                    v = float(ret.std() * (252**0.5)) if len(ret) > 20 else 0.0
+                    return _ma, v
+            except Exception:
+                pass
+            return _ma, None
+        with ThreadPoolExecutor(max_workers=10) as _ex_vol:
+            _futs_vol = {_ex_vol.submit(_fetch_vol, ma): ng for ng, ma in _sector_repr.items()}
+            for _f_vol in as_completed(_futs_vol):
+                _ma_v, _v_v = _f_vol.result()
+                if _v_v and _v_v > 0:
+                    sector_vols[_futs_vol[_f_vol]] = _v_v
         if not sector_vols:
             return 0.0
         total_w = sum(info.get("gia_thi_truong", 0) * info.get("so_luong", 0) for info in dm.values())
@@ -230,7 +240,14 @@ def _safe_msg(kind, msg, key=None):
     if key in cache:
         return
     cache[key] = True
-    st.write(msg)
+    if kind == "error":
+        st.error(msg)
+    elif kind == "warning":
+        st.warning(msg)
+    elif kind == "success":
+        st.success(msg)
+    else:
+        st.info(msg)
 
 if "_safe_msg_cache" not in st.session_state:
     st.session_state._safe_msg_cache = {"error": {}, "warning": {}, "info": {}, "success": {}}
@@ -1905,13 +1922,14 @@ def _render_tonghop():
         st.markdown("Nguồn: **TONG_HOP_v44** + **yfinance** (P/E, P/B, ROE, Vốn hóa — cached 24h)")
         @st.cache_data(ttl=86400, show_spinner="📡 Đang tải dữ liệu yfinance...")
         def _enrich_world_stocks(tickers):
+            from concurrent.futures import ThreadPoolExecutor, as_completed
             import yfinance as yf
             result = {}
-            for ma in tickers:
+            def _fetch_one(ma):
                 try:
                     t = yf.Ticker(ma)
                     info = t.info or {}
-                    result[ma] = {
+                    return ma, {
                         "pe": info.get("trailingPE") or info.get("forwardPE") or 0,
                         "pb": info.get("priceToBook") or 0,
                         "roe": (info.get("returnOnEquity") or 0) * 100,
@@ -1920,7 +1938,12 @@ def _render_tonghop():
                         "dividend_yield": (info.get("dividendYield") or 0) * 100,
                     }
                 except Exception:
-                    result[ma] = {"pe": 0, "pb": 0, "roe": 0, "von_hoa": 0, "eps": 0, "dividend_yield": 0}
+                    return ma, {"pe": 0, "pb": 0, "roe": 0, "von_hoa": 0, "eps": 0, "dividend_yield": 0}
+            with ThreadPoolExecutor(max_workers=15) as _ex_en:
+                _futs_en = {_ex_en.submit(_fetch_one, ma): ma for ma in tickers}
+                for _f_en in as_completed(_futs_en):
+                    ma_en, data_en = _f_en.result()
+                    result[ma_en] = data_en
             return result
         tickers_list = list(DOCS["co_phieu_tg"].keys())
         enriched = _enrich_world_stocks(tuple(tickers_list))
