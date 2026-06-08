@@ -3079,22 +3079,35 @@ if st.session_state.trang_thai == "home":
 # ============================================================
 if st.session_state.is_pro:
     st.markdown(
-        '<div style="background:linear-gradient(90deg,#FFD70022,#00C9A722);'
-        'border:1px solid #FFD70055;border-radius:10px;padding:12px 18px;'
-        'margin-bottom:12px;font-size:0.95rem;">'
-        '💎 <b style="color:#FFD700;font-size:1.1rem;">TÀI KHOẢN: GÓI PRO</b><br>'
-        '<span style="color:#ECE8E1;">Toàn quyền tính năng cao cấp — Báo cáo Thuế/Phí, Mô phỏng Monte Carlo, Phân tích Bollinger, Tín hiệu AI thời gian thực.</span>'
+        '<div style="background: linear-gradient(135deg, #1e1e2f 0%, #2d2d44 100%); border-left: 5px solid #ffb703; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">'
+        '<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">'
+        '<div>'
+        '<span style="background: #ffb703; color: #000; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; margin-right: 10px;">PRO</span>'
+        '<span style="color: #ffffff; font-weight: 500; font-size: 14px;">💎 <b>GÓI PRO</b> đang kích hoạt — toàn quyền tính năng cao cấp.</span>'
+        '</div>'
+        '</div>'
+        '<p style="color: #a0a0b8; font-size: 12px; margin: 8px 0 0 0; line-height: 1.4;">'
+        '* Đã mở khóa trọn bộ 8 tính năng: Quản trị thanh khoản, Theo dõi khối ngoại, Khuyến nghị Tín hiệu AI, Dải Bollinger chuyên sâu, Phòng hộ Tỷ giá FX, Phân tích phái sinh VN30, Tra cứu lịch sử GD nâng cao và Tối ưu hóa Thuế suất.'
+        '</p>'
         '</div>',
         unsafe_allow_html=True,
     )
 else:
     st.markdown(
-        '<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);'
-        'border:2px solid #FFD700;border-radius:12px;padding:14px 18px;'
-        'margin-bottom:12px;box-shadow:0 4px 15px rgba(255,215,0,0.15);">'
-        '💡 <b style="color:#FFD700;font-size:1.05rem;">TÀI KHOẢN: GÓI TIÊU CHUẨN</b><br>'
-        '<span style="color:#9AABB8;font-size:0.85rem;">Bạn đang sử dụng các tính năng cơ bản. Để kích hoạt trọn bộ tính năng VIP (Báo cáo Thuế/Phí tự động, Mô phỏng Monte Carlo, Phân tích Bollinger và Tín hiệu AI thời gian thực), hãy </span>'
-        '<a href="#sidebar-pro-unlock" onclick="document.querySelector(\'[data-testid=\"stSidebar\"] button\')?.click()" style="color:#FFD700;font-weight:700;text-decoration:underline;">MỞ KHÓA GÓI PRO TẠI SIDEBAR 👑</a>'
+        '<div style="background: linear-gradient(135deg, #1e1e2f 0%, #2d2d44 100%); border-left: 5px solid #ffb703; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">'
+        '<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">'
+        '<div>'
+        '<span style="background: #ffb703; color: #000; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; margin-right: 10px;">STANDARD</span>'
+        '<span style="color: #ffffff; font-weight: 500; font-size: 14px;">Bạn đang xem <b>Gói Tiêu Chuẩn</b>.</span>'
+        '</div>'
+        '<a href="#upgrade-pro" style="color: #ffb703; text-decoration: none; font-weight: bold; font-size: 14px; border: 1px dashed #ffb703; padding: 6px 12px; border-radius: 4px; transition: all 0.3s;" '
+        'onmouseover="this.style.background=\'#ffb703\'; this.style.color=\'#000\';" onmouseout="this.style.background=\'transparent\'; this.style.color=\'#ffb703\';">'
+        '👑 MỞ KHÓA GÓI PRO TẠI SIDEBAR ĐỂ DÙNG TÍNH NĂNG VIP ➡️'
+        '</a>'
+        '</div>'
+        '<p style="color: #a0a0b8; font-size: 12px; margin: 8px 0 0 0; line-height: 1.4;">'
+        '* Nâng cấp ngay để mở khóa trọn bộ 8 tính năng mới: Quản trị thanh khoản, Theo dõi khối ngoại, Khuyến nghị Tín hiệu AI, Dải Bollinger chuyên sâu, Phòng hộ Tỷ giá FX, Phân tích phái sinh VN30, Tra cứu lịch sử GD nâng cao và Tối ưu hóa Thuế suất.'
+        '</p>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -4106,23 +4119,41 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "📊 Tổng quan":
             st.write("## 💎 Chỉ số Rủi ro — Lợi nhuận (12 chỉ số)")
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("📊 Sharpe Ratio", f"{sharpe:.2f}")
-            c2.metric("📈 Alpha (Jensen)", f"{alpha*100:+.2f}%")
-            c3.metric("⚡ Beta DM", f"{port_beta:.2f}")
-            c4.metric("🎯 Điểm rủi ro", f"{risk_grade[0]} — {risk_grade[1]}")
-
-            c5, c6, c7, c8 = st.columns(4)
-            c5.metric("📉 Volatility (năm)", f"{vol_proxy*100:.1f}%")
-            c6.metric("🔴 VaR 95% (1 ngày)", f"{var_95*100:.2f}%", delta_color="inverse")
-            c7.metric("🔴 CVaR 95%", f"{cvar_95*100:.2f}%", delta_color="inverse")
-            c8.metric("📊 Max Drawdown", f"{max_dd_uoc*100:.1f}%", delta_color="inverse")
-
-            c9, c10, c11, c12 = st.columns(4)
-            c9.metric("📐 Treynor", f"{treynor:.4f}")
-            c10.metric("📐 Info Ratio", f"{info_ratio:.2f}")
-            c11.metric("🌐 Đa dạng hóa", f"{diversification*100:.0f}%")
-            c12.metric(f"🏆 Top 1 ({top_ma})", f"{top_w*100:.1f}%")
+            alpha_color = "#34c759" if alpha > 0 else "#ff3b30"
+            sharpe_color = "#34c759" if sharpe > 1 else "#ffb703" if sharpe > 0.5 else "#ff3b30"
+            var_color = "#ff3b30"
+            cvar_color = "#ff3b30"
+            dd_color = "#ff3b30"
+            st.markdown(f"""
+            <style>
+            .risk-grid {{
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;
+            }}
+            .risk-card {{
+                background: #1e1e2e; border: 1px solid #2f2f3f; padding: 15px; border-radius: 6px; text-align: center;
+            }}
+            .risk-card span {{
+                color: #8e8e93; font-size: 12px; display: block; margin-bottom: 5px;
+            }}
+            .risk-card strong {{
+                color: #ffffff; font-size: 22px; font-family: 'Roboto Mono', monospace;
+            }}
+            </style>
+            <div class="risk-grid">
+                <div class="risk-card"><span>📊 Sharpe Ratio</span><strong>{sharpe:.2f}</strong></div>
+                <div class="risk-card"><span>📈 Alpha (Jensen)</span><strong style="color:{alpha_color};">{alpha*100:+.2f}%</strong></div>
+                <div class="risk-card"><span>⚡ Beta DM</span><strong>{port_beta:.2f}</strong></div>
+                <div class="risk-card"><span>🎯 Điểm rủi ro</span><strong>{risk_grade[0]} — {risk_grade[1]}</strong></div>
+                <div class="risk-card"><span>📉 Volatility (năm)</span><strong>{vol_proxy*100:.1f}%</strong></div>
+                <div class="risk-card"><span>🔴 VaR 95% (1 ngày)</span><strong style="color:{var_color};">{var_95*100:.2f}%</strong></div>
+                <div class="risk-card"><span>🔴 CVaR 95%</span><strong style="color:{cvar_color};">{cvar_95*100:.2f}%</strong></div>
+                <div class="risk-card"><span>📊 Max Drawdown</span><strong style="color:{dd_color};">{max_dd_uoc*100:.1f}%</strong></div>
+                <div class="risk-card"><span>📐 Treynor</span><strong>{treynor:.4f}</strong></div>
+                <div class="risk-card"><span>📐 Info Ratio</span><strong>{info_ratio:.2f}</strong></div>
+                <div class="risk-card"><span>🌐 Đa dạng hóa</span><strong>{diversification*100:.0f}%</strong></div>
+                <div class="risk-card"><span>🏆 Top 1 ({top_ma})</span><strong>{top_w*100:.1f}%</strong></div>
+            </div>
+            """, unsafe_allow_html=True)
 
         if _chon_nhom == "📈 Kỹ thuật":
             st.write("## 🎯 Phân tích kỹ thuật từng mã (RSI/MACD/MA20/MA50)")
@@ -4342,21 +4373,28 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 💡 Khuyến nghị từ hệ thống")
             recs = []
             if top_w > 0.4:
-                recs.append(f"⚠️ **{top_ma}** chiếm {top_w*100:.0f}% danh mục — quá tập trung. Cân nhắc giảm tỷ trọng.")
+                recs.append(("⚠️", f"**{top_ma}** chiếm {top_w*100:.0f}% danh mục — quá tập trung. Cân nhắc giảm tỷ trọng."))
             if port_beta > 1.3:
-                recs.append(f"⚠️ **Beta = {port_beta:.2f}** lắc lư mạnh hơn thị trường. Thêm mã phòng thủ (beta < 0.8).")
+                recs.append(("⚠️", f"**Beta = {port_beta:.2f}** lắc lư mạnh hơn thị trường. Thêm mã phòng thủ (beta < 0.8)."))
             if sharpe < 0.5:
-                recs.append(f"⚠️ **Sharpe = {sharpe:.2f}** thấp — lợi nhuận chưa tương xứng rủi ro.")
+                recs.append(("⚠️", f"**Sharpe = {sharpe:.2f}** thấp — lợi nhuận chưa tương xứng rủi ro."))
             if alpha > 0:
-                recs.append(f"✅ **Alpha = {alpha*100:+.2f}%** vượt kỳ vọng CAPM. **Duy trì chiến lược.**")
+                recs.append(("✅", f"**Alpha = {alpha*100:+.2f}%** vượt kỳ vọng CAPM. **Duy trì chiến lược.**"))
             if nganh_count < 3:
-                recs.append(f"⚠️ Chỉ **{nganh_count} ngành** — nên đa dạng thêm.")
+                recs.append(("⚠️", f"Chỉ **{nganh_count} ngành** — nên đa dạng thêm."))
             if diversification > 0.7:
-                recs.append(f"✅ **Đa dạng hóa = {diversification*100:.0f}%** — danh mục cân bằng.")
+                recs.append(("✅", f"**Đa dạng hóa = {diversification*100:.0f}%** — danh mục cân bằng."))
             if not recs:
-                recs.append("✅ Danh mục đạt các tiêu chí rủi ro–lợi nhuận cơ bản.")
-            for r in recs:
-                st.write(f"- {r}")
+                recs.append(("✅", "Danh mục đạt các tiêu chí rủi ro–lợi nhuận cơ bản."))
+            good_color = "#34c759"
+            warn_color = "#ffb703"
+            box_items = ""
+            for icon, text in recs:
+                col = good_color if "✅" in icon else warn_color
+                box_items += f'<p style="margin: 5px 0; color: {col}; font-size: 13px; font-weight: 500;">{icon} {text}</p>'
+            st.markdown(
+                f'<div style="background: rgba(52, 199, 89, 0.08); border-left: 4px solid {good_color}; padding: 12px; border-radius: 4px; margin-bottom: 25px;">{box_items}</div>',
+                unsafe_allow_html=True)
 
         if _chon_nhom == "📊 Tổng quan":
             st.write("## 📈 Đường vốn (Equity Curve) 6 tháng qua")
