@@ -3806,7 +3806,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             return out
 
         @st.cache_data(ttl=3600, show_spinner=False)
-        def _fetch_real_fundamentals(_targets):
+        def _fetch_price_metadata(_targets):
             import requests as _rq_f, json as _j_f
             from concurrent.futures import ThreadPoolExecutor, as_completed
             out = {}
@@ -3885,7 +3885,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_vn30_proxy():
             import requests as _rq, pandas as _pd
-            for tk in ["E1VFVN30.VN", "FUEVFVND.VN", "FUEKIV30.VN"]:
+            for tk in ["E1VFVN30.VN", "FUEVFVND.VN", "FUEKIV30.VN", "^VNINDEX"]:
                 try:
                     r = _rq.get(
                         f"https://query1.finance.yahoo.com/v8/finance/chart/{tk}",
@@ -3967,7 +3967,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         _fetch_result = _fetch_real_prices(_targets_all)
         try:
             if _st_real_ph is not None:
-                _st_real_ph.update(label=f"📊 Tải yfinance P/E, P/B, ROE: 0/{n_ma_all} mã")
+                _st_real_ph.update(label=f"📊 Tải yfinance: giá hiện tại + 52W high/low: 0/{n_ma_all} mã")
         except Exception:
             pass
         real_prices = _fetch_result[0] if isinstance(_fetch_result, tuple) else _fetch_result
@@ -4003,7 +4003,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 if w52l: kpi[ma]['w52_low'] = float(w52l)
                 if cur_px and dm[ma].get('gia_thi_truong', 0) <= 0:
                     dm[ma]['gia_thi_truong'] = float(cur_px)
-        real_fund = _fetch_real_fundamentals(_targets_all)
+        real_fund = _fetch_price_metadata(_targets_all)
         for ma, fund in real_fund.items():
             if ma in kpi and fund:
                 for k, v in fund.items():
@@ -4045,11 +4045,12 @@ elif st.session_state.trang_thai == "deep_analysis":
             if _st_real_ph is not None:
                 _st_real_ph.update(
                     state="complete",
-                    label=f"✅ yfinance: {len(real_prices)}/{n_ma_all} giá, {len(real_fund)}/{n_ma_all} P/E-P/B-ROE-EPS"
+                    label=f"✅ yfinance: {len(real_prices)}/{n_ma_all} giá (current_price + 52W), P/E-P/B-ROE từ co_phieu_vn.json ({len(real_fund)}/{n_ma_all})"
                 )
         except Exception:
             pass
         _yf_count = len(real_prices)
+        _synth_flags = {}
         _json_fb_vol = 0.25
         import numpy as _np_fb
         for _ma_fb in (DOCS.get("co_phieu_vn") or {}):
@@ -4071,6 +4072,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     _p_fb = _sp_fb * _np_fb.cumprod(1 + _rets_fb)
                     _p_fb = _p_fb * (_gia_fb / _p_fb[-1])
                     real_prices[_ma_fb] = pd.Series(_p_fb, index=_idx_fb)
+                    _synth_flags[_ma_fb] = True
         for _ma_fb in (DOCS.get("co_phieu_tg") or {}):
             if _ma_fb not in real_prices:
                 _vi_fb = (DOCS.get("co_phieu_tg") or {}).get(_ma_fb, {})
@@ -4090,6 +4092,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     _p_fb = _sp_fb * _np_fb.cumprod(1 + _rets_fb)
                     _p_fb = _p_fb * (_gia_fb / _p_fb[-1])
                     real_prices[_ma_fb] = pd.Series(_p_fb, index=_idx_fb)
+                    _synth_flags[_ma_fb] = True
         has_real_pre = len(real_prices) >= 2
         if not has_real_pre:
             _rp_cache = st.session_state.get("_real_prices_cache") or {}
@@ -4251,7 +4254,8 @@ elif st.session_state.trang_thai == "deep_analysis":
         ], index=0)
         st.write("---")
         _full_total = len(DOCS.get("co_phieu_vn") or {}) + len(DOCS.get("co_phieu_tg") or {})
-        st.success(f"✅ Giá: {_yf_count} yfinance + {len(real_prices) - _yf_count} JSON fallback = {len(real_prices)}/384 mã | P/E-P/B-ROE-EPS: {len(real_fund)}/{_full_total} | VN30: {vn30_label or '—'}")
+        _synth_count = len(_synth_flags)
+        st.success(f"✅ Giá: {_yf_count} yfinance + {_synth_count} mô phỏng vol 25% = {len(real_prices)}/384 mã | P/E-P/B-ROE: {len(real_fund)}/{_full_total} (co_phieu_vn.json) | VN30: {vn30_label or '—'}")
         market_data = st.session_state.get("chat_market_data") or []
         if not market_data or len(market_data) < 5:
             try:
@@ -4279,15 +4283,31 @@ elif st.session_state.trang_thai == "deep_analysis":
                         "co_tuc_pct": _ki.get("co_tuc_pct"), "ytd": _ki.get("ytd")})
                 if len(_fb) >= 5:
                     market_data = _fb
+                    for _d in market_data:
+                        _m_v = _d["ma"]
+                        _ps = real_prices.get(_m_v)
+                        if _ps is not None and len(_ps) >= 20:
+                            _rets_d = _ps.pct_change().dropna().replace([float("inf"), float("-inf")], float("nan")).dropna()
+                            if len(_rets_d) >= 10:
+                                _d["vol"] = float(_rets_d.std() * (252 ** 0.5))
+                                if _d["vol"] > 0:
+                                    _mm = np.mean([_x.get("vol", 0) for _x in market_data if _x.get("vol", 0) > 0]) or 0.25
+                                    _d["vol_ratio"] = round(_d["vol"] / _mm, 2) if _mm > 0 else 1.0
             except Exception:
                 pass
+        _full_stock_list = sorted(k for k in real_prices.keys() if len(real_prices[k]) >= 20) if isinstance(real_prices, dict) else []
+        _full_md = {}
+        if isinstance(market_data, list):
+            for _d in market_data:
+                if isinstance(_d, dict):
+                    _full_md[_d.get("ma")] = _d
         if _chon_nhom == "📊 Tổng quan":
             st.write("## 📊 Nguồn dữ liệu (Data Source)")
             ds1, ds2, ds3 = st.columns(3)
             with ds1:
                 st.write("**✅ SỐ THẬT 100%:**")
                 st.write(f"- Giá & VC: co_phieu_vn.json + yfinance DM ({len(real_prices)}/{n_ma} mã)")
-                st.write(f"- P/E, P/B, ROE, EPS: co_phieu_vn.json + yfinance ({len(real_fund)}/{_full_total} mã)")
+                st.write(f"- P/E, P/B, ROE, EPS: co_phieu_vn.json dữ liệu thật ({len(real_fund)}/{_full_total} mã)")
                 st.write("- Beta, thị giá: JSON dữ liệu thật từ VN/TG")
                 st.write("- Vol, Sharpe, VaR: yfinance DM (hoặc JSON thật)")
             with ds2:
@@ -4410,15 +4430,15 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "📈 Kỹ thuật":
             st.write("## 🎯 Phân tích kỹ thuật từng mã (RSI/MACD/MA20/MA50)")
-            st.caption(f"📊 Tính từ giá thật yfinance ({len(real_prices)} mã, 6 tháng)")
+            st.caption(f"📊 Tính từ real_prices ({len(real_prices)} mã, 6 tháng)")
+            _ta_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="ta_scope", label_visibility="collapsed")
+            _ta_iter = _full_stock_list if "384" in _ta_scope else [k for k in _full_stock_list if k in dm]
             ta_rows = []
-            for ma, info in dm.items():
-                gia_tt = info.get("gia_thi_truong", 0)
-                sl = info.get("so_luong", 0)
-                if gia_tt <= 0 or sl <= 0: continue
+            for ma in _ta_iter:
                 if ma not in real_prices or len(real_prices[ma]) < 30: continue
                 prices = real_prices[ma].values
                 gia_hien_tai = float(prices[-1])
+                if gia_hien_tai <= 0: continue
                 delta = np.diff(prices)
                 gain = np.where(delta > 0, delta, 0)
                 loss = np.where(delta < 0, -delta, 0)
@@ -4439,8 +4459,9 @@ elif st.session_state.trang_thai == "deep_analysis":
                 elif prices[-1] > ma20 > ma50: sig = "GIỮ ↑"
                 elif prices[-1] < ma20 < ma50: sig = "GIỮ ↓"
                 else: sig = "GIỮ →"
+                _vung_ta = _full_md.get(ma, {}).get("vung", "")
                 ta_rows.append({
-                    "Mã": ma,
+                    "Mã": ma, "Vùng": _vung_ta,
                     "Giá": f"{gia_hien_tai:,.0f}",
                     "RSI(14)": f"{rsi:.0f}",
                     "MACD": f"{macd_line:,.0f}",
@@ -4467,20 +4488,25 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.plotly_chart(fig_sec, use_container_width=True)
         if _chon_nhom == "📋 Cơ bản":
             st.write("## 📊 Tỷ trọng & Beta từng mã")
+            _beta_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="beta_scope", label_visibility="collapsed")
+            _beta_iter = _full_stock_list if "384" in _beta_scope else [k for k in _full_stock_list if k in dm]
             rows_chi = []
-            for ma, info in dm.items():
-                gia_tt = info.get("gia_thi_truong", 0)
-                sl = info.get("so_luong", 0)
+            for ma in _beta_iter:
+                _md_d = _full_md.get(ma, {})
+                gia_tt = _md_d.get("gia", 0)
+                sl = dm[ma].get("so_luong", 0) if ma in dm else 0
                 v = gia_tt * sl
-                if v <= 0 or tong_gt <= 0: continue
+                v_show = round(v/tong_gt*100, 1) if v > 0 and tong_gt > 0 else 0
                 ki = kpi.get(ma, {})
+                _loi_lo = round((gia_tt - dm[ma].get("gia_von", gia_tt))/max(dm[ma].get("gia_von", 1), 1)*100, 1) if ma in dm and dm[ma].get("gia_von", 0) > 0 else 0
                 rows_chi.append({
                     "Mã": ma,
-                    "Ngành": ki.get("nganh", "") or "-",
-                    "Tỷ trọng %": round(v/tong_gt*100, 1),
-                    "Beta": round(float(ki.get('beta', 1.0) or 1.0), 2),
-                    "ROE %": round(float(ki.get('roe', 0) or 0)*100, 1),
-                    "Lãi/Lỗ %": round((gia_tt - info.get('gia_von', 0))/max(info.get('gia_von', 1), 1)*100, 1),
+                    "Vùng": _md_d.get("vung", ""),
+                    "Ngành": ki.get("nganh", _md_d.get("nganh", "")) or "-",
+                    "Tỷ trọng %": v_show,
+                    "Beta": round(float(ki.get('beta', _md_d.get('beta', 1.0)) or 1.0), 2),
+                    "ROE %": round(float(ki.get('roe', _md_d.get('roe', 0)) or 0)*100, 1),
+                    "Lãi/Lỗ %": _loi_lo if ma in dm else "—",
                 })
             if rows_chi:
                 df_chi = pd.DataFrame(rows_chi)
@@ -4493,24 +4519,30 @@ elif st.session_state.trang_thai == "deep_analysis":
             _all_pe = [float(ki.get("pe", 0) or 0) for ki in kpi.values() if float(ki.get("pe", 0) or 0) > 0]
             _all_pb = [float(ki.get("pb", 0) or 0) for ki in kpi.values() if float(ki.get("pb", 0) or 0) > 0]
             _all_dy = [float(ki.get("dividend_yield", 0) or 0) for ki in kpi.values() if float(ki.get("dividend_yield", 0) or 0) > 0]
-            _roe_p75 = float(np.percentile(_all_roe, 75)) if len(_all_roe) >= 4 else 0.20
-            _roe_p50 = float(np.percentile(_all_roe, 50)) if len(_all_roe) >= 4 else 0.15
-            _roe_p25 = float(np.percentile(_all_roe, 25)) if len(_all_roe) >= 4 else 0.10
-            _pe_p25 = float(np.percentile(_all_pe, 25)) if len(_all_pe) >= 4 else 15.0
-            _pe_p50 = float(np.percentile(_all_pe, 50)) if len(_all_pe) >= 4 else 20.0
-            _dy_p50 = float(np.percentile(_all_dy, 50)) if len(_all_dy) >= 4 else 0.02
-            for ma, info in dm.items():
-                gia_tt = info.get("gia_thi_truong", 0)
-                sl = info.get("so_luong", 0)
-                if gia_tt <= 0 or sl <= 0: continue
+            _fa_md_all = [_full_md.get(m, {}) for m in _full_stock_list]
+            _all_fa_pe = [float(d.get("pe", 0) or 0) for d in _fa_md_all if float(d.get("pe", 0) or 0) > 0] or _all_pe
+            _all_fa_roe = [float(d.get("roe", 0) or 0) for d in _fa_md_all if float(d.get("roe", 0) or 0) > 0] or _all_roe
+            _all_fa_pb = [float(d.get("pb", 0) or 0) for d in _fa_md_all if float(d.get("pb", 0) or 0) > 0] or _all_pb
+            _roe_p75 = float(np.percentile(_all_fa_roe, 75)) if len(_all_fa_roe) >= 4 else 0.20
+            _roe_p50 = float(np.percentile(_all_fa_roe, 50)) if len(_all_fa_roe) >= 4 else 0.15
+            _roe_p25 = float(np.percentile(_all_fa_roe, 25)) if len(_all_fa_roe) >= 4 else 0.10
+            _pe_p25 = float(np.percentile(_all_fa_pe, 25)) if len(_all_fa_pe) >= 4 else 15.0
+            _pe_p50 = float(np.percentile(_all_fa_pe, 50)) if len(_all_fa_pe) >= 4 else 20.0
+            _dy_p50 = float(np.percentile(_all_fa_pe, 50)) if len(_all_fa_pe) >= 4 else 0.02
+            _fa_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="fa_scope", label_visibility="collapsed")
+            _fa_iter = _full_stock_list if "384" in _fa_scope else [k for k in _full_stock_list if k in dm]
+            for ma in _fa_iter:
+                _md_d = _full_md.get(ma, {})
+                gia_tt = _md_d.get("gia", 0)
+                if gia_tt <= 0: continue
                 ki = kpi.get(ma, {})
-                pe = float(ki.get("pe", 0) or 0)
-                pb = float(ki.get("pb", 0) or 0)
-                roe = float(ki.get("roe", 0) or 0)
+                pe = float(ki.get("pe", _md_d.get("pe", 0)) or 0)
+                pb = float(ki.get("pb", _md_d.get("pb", 0)) or 0)
+                roe = float(ki.get("roe", _md_d.get("roe", 0)) or 0)
                 roa = float(ki.get("roa", 0) or 0)
-                eps = float(ki.get("eps", 0) or 0)
-                dy = float(ki.get("dividend_yield", 0) or 0)
-                mc = float(ki.get("market_cap", 0) or 0)
+                eps = float(ki.get("eps", _md_d.get("eps", 0)) or 0)
+                dy = float(ki.get("dividend_yield", _md_d.get("co_tuc_pct", 0)) or 0)
+                mc = float(ki.get("market_cap", _md_d.get("von_hoa", 0)) or 0)
                 w52h = float(ki.get("w52_high", 0) or 0)
                 w52l = float(ki.get("w52_low", 0) or 0)
                 pos_52w = ((gia_tt - w52l) / max(w52h - w52l, 1)) * 100 if w52h > w52l else 50
@@ -4520,6 +4552,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 else: quality = "🔴 Yếu"
                 fa_rows.append({
                     "Mã": ma,
+                    "Vùng": _md_d.get("vung", ""),
                     "P/E": round(pe, 1),
                     "P/B": round(pb, 1),
                     "ROE %": round(roe*100, 1),
@@ -5132,7 +5165,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                 top3_ma = sorted(dm.items(),
                     key=lambda kv: kv[1].get("gia_thi_truong", 0) * kv[1].get("so_luong", 0),
                     reverse=True)[:3]
-                top3_targets = [(ma, ".VN") for ma, _ in top3_ma]
+                _cp_vn_keys = set((DOCS.get("co_phieu_vn") or {}).keys())
+                top3_targets = [(ma, ".VN" if ma in _cp_vn_keys else "") for ma, _ in top3_ma]
                 ohlc_data = _fetch_ohlc_top3(tuple(top3_targets))
                 rendered_count = 0
                 for ma, _ in top3_ma:
@@ -6283,7 +6317,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                             if len(pairs) >= 20:
                                 idx = _pd_rr.to_datetime([p[0] for p in pairs], unit="s")
                                 return sym, _pd_rr.Series([p[1] for p in pairs], index=idx)
-                    except: pass
+                    except Exception: pass
                     return sym, None
                 with ThreadPoolExecutor(max_workers=12) as ex_rr:
                     _futs_rr = {ex_rr.submit(_fetch_rr, m, ".VN" if m in _vn_keys else ""): m for m in ma_list_rr}
@@ -6301,7 +6335,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                             _mc = float(_ki.get("market_cap", 0) or 0) / 1e3
                             _ng = str(_ki.get("nganh", "") or "")
                             _rr_points.append({"ma": _ma_rr, "ret": _ret, "vol": _vol, "mc": max(_mc, 0.1), "nganh": _ng if _ng else "Khác", "vung": "VN" if _ma_rr in _vn_keys else "TG"})
-                        except: pass
+                        except Exception: pass
                     if len(_rr_points) >= 2:
                         _df_rr = _pd_rr.DataFrame(_rr_points)
                         _df_rr = _df_rr.dropna(subset=["ret", "vol", "mc"])
@@ -6386,7 +6420,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                             if len(pairs) >= 30:
                                 idx = _pd_tr.to_datetime([p[0] for p in pairs], unit="s")
                                 return sym, _pd_tr.Series([p[1] for p in pairs], index=idx)
-                    except: pass
+                    except Exception: pass
                     return sym, None
                 with ThreadPoolExecutor(max_workers=12) as ex_tr:
                     _futs_tr = {ex_tr.submit(_fetch_tr, m, ".VN" if m in _vn_keys else ""): m for m in _tr_ma}
@@ -8820,7 +8854,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                                 if len(pairs) > 20:
                                     idx = _pd_xc2.to_datetime([p[0] for p in pairs], unit="s")
                                     return sym, _pd_xc2.Series([p[1] for p in pairs], index=idx)
-                        except: pass
+                        except Exception: pass
                         return sym, None
                     with ThreadPoolExecutor(max_workers=12) as _ex_xc:
                         _futs_xc = {_ex_xc.submit(_fetch_xc, m, ".VN" if m in _vn_keys_xc else ""): m for m in _xc_dm_list}
@@ -9285,7 +9319,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                             closes = [c for c in cs if c]
                             if len(closes) >= 20:
                                 return name, _pd_gbl2.Series(closes, index=_pd_gbl2.to_datetime(ts[:len(closes)], unit="s"))
-                    except: pass
+                    except Exception: pass
                     return name, None
                 with ThreadPoolExecutor(max_workers=4) as _ex2:
                     _futs2 = {_ex2.submit(_fetch_gbl2, t, n): n for n, t in _gbl_fallback.items()}
