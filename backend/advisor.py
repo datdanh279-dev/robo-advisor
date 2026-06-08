@@ -1,4 +1,4 @@
-"""Tu van Dau tu — 3-tab flow: Thiet lap muc tieu -> Khuyen nghi DM -> Kiem thu Lich su"""
+"""Tu van Dau tu — 3-tab flow: Thiet lap muc tieu -> Khuyen nghi DM -> Kiem thu Lich su (v2.1)"""
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
@@ -396,7 +396,7 @@ def _auto_create_dm(bucket_vn, von):
         return {}
 
 
-def tab_backtest(docs):
+def tab_lich_su(docs):
     try:
         st.markdown('<div class="main-header" style="font-size:1.6rem;font-weight:700;color:#FFD700;">\U0001f4c8 Kiem thu Lich su — Backtest</div>', unsafe_allow_html=True)
 
@@ -589,4 +589,4 @@ def render(docs):
     with tab2:
         tab_portfolio(docs)
     with tab3:
-        tab_backtest(docs)
+        tab_lich_su(docs)
