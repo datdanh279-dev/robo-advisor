@@ -3729,7 +3729,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     r = _rq.get(
                         f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
                         params={"range": "6mo", "interval": "1d"},
-                        timeout=10,
+                        timeout=5,
                         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36"}
                     )
                     if r.status_code == 200:
@@ -3775,7 +3775,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     r = _rq.get(
                         f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
                         params={"range": "1y", "interval": "1d"},
-                        timeout=10,
+                        timeout=5,
                         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36"}
                     )
                     if r.status_code == 200:
@@ -3805,7 +3805,6 @@ elif st.session_state.trang_thai == "deep_analysis":
                         out[sym] = s
             return out
 
-        @st.cache_data(ttl=3600, show_spinner=False)
         @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_real_fundamentals(_targets):
             import yfinance as _yf
@@ -3852,7 +3851,6 @@ elif st.session_state.trang_thai == "deep_analysis":
                         out[sym] = data
             return out
 
-        @st.cache_data(ttl=3600, show_spinner="💵 Tải tỷ giá USD/VND thật...")
         @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_usdvnd():
             import yfinance as _yf
@@ -3960,10 +3958,14 @@ elif st.session_state.trang_thai == "deep_analysis":
                          if info.get("gia_thi_truong", 0) > 0 and info.get("so_luong", 0) > 0]
 
         _targets_all = []
-        for _ma in (DOCS.get("co_phieu_vn") or {}).keys():
-            _targets_all.append((_ma, ".VN"))
-        for _ma in (DOCS.get("co_phieu_tg") or {}).keys():
-            _targets_all.append((_ma, ""))
+        _doc_vn = DOCS.get("co_phieu_vn") or {}
+        _doc_tg = DOCS.get("co_phieu_tg") or {}
+        for _ma in dm:
+            _vk = _doc_vn.get(_ma)
+            if _vk:
+                _targets_all.append((_ma, ".VN"))
+            elif _doc_tg.get(_ma):
+                _targets_all.append((_ma, ""))
         _targets_all = tuple(_targets_all)
         n_ma_all = len(_targets_all)
 
@@ -4016,6 +4018,27 @@ elif st.session_state.trang_thai == "deep_analysis":
                 for k, v in fund.items():
                     if v is not None and v != 0:
                         kpi[ma][k] = v
+        for _ma, _vi in (DOCS.get("co_phieu_vn") or {}).items():
+            if _ma not in real_fund:
+                _f = {"current_price": _vi.get("gia") or _vi.get("gia_hien_tai"),
+                      "pe": _vi.get("pe"), "pb": _vi.get("pb"),
+                      "roe": _vi.get("roe"), "eps": _vi.get("eps"),
+                      "beta": _vi.get("beta"), "market_cap": _vi.get("von_hoa"),
+                      "dividend_yield": _vi.get("co_tuc_pct"),
+                      "institutions_pct": _vi.get("pct_ngoai")}
+                _f = {k: v for k, v in _f.items() if v is not None}
+                if _f:
+                    real_fund[_ma] = _f
+        for _ma, _vi in (DOCS.get("co_phieu_tg") or {}).items():
+            if _ma not in real_fund:
+                _f = {"current_price": _vi.get("gia"), "pe": _vi.get("pe"),
+                      "pb": _vi.get("pb"), "roe": _vi.get("roe"),
+                      "eps": _vi.get("eps"), "beta": _vi.get("beta"),
+                      "market_cap": _vi.get("von_hoa"),
+                      "dividend_yield": _vi.get("co_tuc_pct")}
+                _f = {k: v for k, v in _f.items() if v is not None}
+                if _f:
+                    real_fund[_ma] = _f
         for _ma_w52, _ki_w52 in kpi.items():
             if (not _ki_w52.get("w52_high") or _ki_w52.get("w52_high", 0) <= 0) and _ma_w52 in real_prices and len(real_prices[_ma_w52]) >= 60:
                 try:
@@ -4180,7 +4203,8 @@ elif st.session_state.trang_thai == "deep_analysis":
             "📊 Tổng quan", "📈 Kỹ thuật", "📋 Cơ bản", "⚠️ Rủi ro", "🎯 Tối ưu", "📰 Tin tức & AI"
         ], index=0)
         st.write("---")
-        st.success(f"✅ Yahoo Finance: {len(real_prices)}/384 mã có giá thật, {len(real_fund)}/384 mã có P/E-P/B-ROE-EPS, VN30: {vn30_label or '—'}")
+        _full_total = len(DOCS.get("co_phieu_vn") or {}) + len(DOCS.get("co_phieu_tg") or {})
+        st.success(f"✅ Giá yfinance: {len(real_prices)}/{n_ma} DM mã, P/E-P/B-ROE-EPS: {len(real_fund)}/{_full_total} toàn thị trường, VN30: {vn30_label or '—'}")
         market_data = st.session_state.get("chat_market_data") or []
         if not market_data or len(market_data) < 5:
             try:
@@ -4207,11 +4231,11 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 📊 Nguồn dữ liệu (Data Source)")
             ds1, ds2, ds3 = st.columns(3)
             with ds1:
-                st.write("**✅ SỐ THẬT 100%:**")
-                st.write(f"- Giá hiện tại & lịch sử: yfinance ({len(real_prices)}/{n_ma} mã)")
-                st.write(f"- P/E, P/B, ROE, EPS: yfinance ({len(real_fund)}/{n_ma} mã)")
-                st.write("- W52 High/Low, Volume: yfinance")
-                st.write("- Vol, Sharpe, VaR: tính từ giá thật")
+            st.write("**✅ SỐ THẬT 100%:**")
+            st.write(f"- Giá & VC: co_phieu_vn.json + yfinance DM ({len(real_prices)}/{n_ma} mã)")
+            st.write(f"- P/E, P/B, ROE, EPS: co_phieu_vn.json + yfinance ({len(real_fund)}/{_full_total} mã)")
+            st.write("- Beta, thị giá: JSON dữ liệu thật từ VN/TG")
+            st.write("- Vol, Sharpe, VaR: yfinance DM (hoặc JSON thật)")
             with ds2:
                 st.write("**📐 DỮ LIỆU:**")
                 st.write("- Monte Carlo: bootstrap từ returns thật yfinance")
