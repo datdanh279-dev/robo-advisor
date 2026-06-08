@@ -4134,6 +4134,8 @@ elif st.session_state.trang_thai == "deep_analysis":
         has_real = has_real_pre
         has_vn30 = vn30_close is not None and len(vn30_close) >= 30
         has_fund = len(real_fund) >= 1
+        if not has_vn30:
+            st.info(f"🔄 VN30 proxy chưa có (tự động dùng equal-weight thay thế). Các section CAPM/IR/Brinson sẽ dùng Equal-Weight VN30 thay thế.")
         if not has_fund:
             try:
                 for _ma in dm:
@@ -4287,6 +4289,64 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.write("- Thuế TNCN: 0.1% (NĐ 126/2020)")
 
         if _chon_nhom == "📊 Tổng quan":
+            st.write("## 📊 MARKET DASHBOARD — Toàn cảnh thị trường (384 mã)")
+            if market_data and len(market_data) >= 10:
+                _md_vn = [d for d in market_data if d.get("vung") == "VN"]
+                _md_tg = [d for d in market_data if d.get("vung") == "TG"]
+                _up = sum(1 for d in market_data if float(d.get("thay_doi", 0) or 0) > 0)
+                _down = sum(1 for d in market_data if float(d.get("thay_doi", 0) or 0) < 0)
+                _ret_pos = sum(1 for d in market_data if float(d.get("ret_3m", 0) or 0) > 0)
+                _md1, _md2, _md3, _md4, _md5 = st.columns(5)
+                _md1.metric("📊 Tổng mã", f"{len(market_data)}", help=f"{len(_md_vn)} VN + {len(_md_tg)} TG")
+                _md2.metric("📈 Tăng/🔻 Giảm", f"{_up}/{_down}", help="Số mã tăng/giảm trong ngày", delta_color="off")
+                r3m_pos_pct = round(_ret_pos / max(len(market_data), 1) * 100, 1)
+                _md3.metric("📈 % mã dương 3M", f"{r3m_pos_pct}%", help="Tỷ lệ mã có return 3M > 0")
+                _pe_v = [float(d.get("pe", 0) or 0) for d in market_data if d.get("pe") and 0 < float(d.get("pe", 0)) < 200]
+                _pe_m = round(float(np.median(_pe_v)), 1) if _pe_v else 0
+                _md4.metric("📊 P/E Median", f"{_pe_m}", help="P/E trung vị toàn thị trường")
+                _beta_v = [float(d.get("beta", 0) or 0) for d in market_data if d.get("beta") and 0 < float(d.get("beta", 0)) < 3]
+                _beta_m = round(float(np.median(_beta_v)), 2) if _beta_v else 0
+                _md5.metric("📊 Beta Median", f"{_beta_m}", help="Beta trung vị toàn thị trường")
+                _sector_up = {}
+                for d in market_data:
+                    _s = d.get("nganh", "Khác")
+                    if float(d.get("thay_doi", 0) or 0) > 0:
+                        _sector_up[_s] = _sector_up.get(_s, 0) + 1
+                _sector_up_sorted = sorted(_sector_up.items(), key=lambda x: -x[1])[:5]
+                if _sector_up_sorted:
+                    _su = ", ".join([f"{s}({c})" for s, c in _sector_up_sorted])
+                    st.caption(f"🔥 Ngành tăng mạnh nhất: {_su}")
+                else:
+                    st.caption("📊 Dữ liệu thị trường từ co_phieu_vn.json + yfinance.")
+                st.write("## 📋 BẢNG TOÀN THỊ TRƯỜNG — 384 mã (số liệu thật từ co_phieu_vn.json)")
+                _table_data = []
+                for d in market_data:
+                    _ma_t = d["ma"]
+                    _r3m = float(d.get("ret_3m", 0) or 0)
+                    _pe_t = d.get("pe")
+                    _pb_t = d.get("pb")
+                    _roe_t = d.get("roe")
+                    _beta_t = d.get("beta")
+                    _ytd_t = d.get("ytd")
+                    _row = {"Mã": _ma_t, "Tên": d.get("ten", "")[:20], "Vùng": d.get("vung", ""),
+                        "Ngành": d.get("nganh", "")[:20],
+                        "Giá": d.get("gia", 0),
+                        "Vốn hóa (tỷ)": round(float(d.get("von_hoa", 0) or 0) / 1e9, 0) if d.get("von_hoa", 0) else 0,
+                        "P/E": _pe_t if _pe_t else "", "P/B": _pb_t if _pb_t else "",
+                        "ROE": round(float(_roe_t), 1) if _roe_t else "",
+                        "Beta": round(float(_beta_t), 2) if _beta_t else "",
+                        "Return 3M %": round(_r3m, 2),
+                        "YTD %": round(float(_ytd_t), 2) if _ytd_t else ""}
+                    _table_data.append(_row)
+                if _table_data:
+                    df_table = pd.DataFrame(_table_data)
+                    _sort_opts = ["Return 3M %", "Vốn hóa (tỷ)", "P/E", "Beta", "ROE", "YTD %"]
+                    _sort_col = st.selectbox("📌 Sắp xếp theo:", _sort_opts, key="sort_table")
+                    _asc = st.checkbox("🔼 Tăng dần", key="asc_table")
+                    df_table = df_table.sort_values(_sort_col, ascending=_asc, na_position="last")
+                    st.dataframe(df_table, use_container_width=True, hide_index=True, height=600)
+                    st.caption(f"📊 Bảng {len(df_table)} mã toàn thị trường — tất cả số liệu thật từ co_phieu_vn.json. Click cột để sort.")
+                st.write("---")
             st.write("## 💎 Chỉ số Rủi ro — Lợi nhuận (12 chỉ số)")
             alpha_color = "#34c759" if alpha > 0 else "#ff3b30"
             sharpe_color = "#34c759" if sharpe > 1 else "#ffb703" if sharpe > 0.5 else "#ff3b30"
