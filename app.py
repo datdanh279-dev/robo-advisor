@@ -4431,10 +4431,8 @@ elif st.session_state.trang_thai == "deep_analysis":
         if _chon_nhom == "📈 Kỹ thuật":
             st.write("## 🎯 Phân tích kỹ thuật từng mã (RSI/MACD/MA20/MA50)")
             st.caption(f"📊 Tính từ real_prices ({len(real_prices)} mã, 6 tháng)")
-            _ta_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="ta_scope", label_visibility="collapsed")
-            _ta_iter = _full_stock_list if "384" in _ta_scope else [k for k in _full_stock_list if k in dm]
             ta_rows = []
-            for ma in _ta_iter:
+            for ma in _full_stock_list:
                 if ma not in real_prices or len(real_prices[ma]) < 30: continue
                 prices = real_prices[ma].values
                 gia_hien_tai = float(prices[-1])
@@ -4488,10 +4486,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.plotly_chart(fig_sec, use_container_width=True)
         if _chon_nhom == "📋 Cơ bản":
             st.write("## 📊 Tỷ trọng & Beta từng mã")
-            _beta_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="beta_scope", label_visibility="collapsed")
-            _beta_iter = _full_stock_list if "384" in _beta_scope else [k for k in _full_stock_list if k in dm]
             rows_chi = []
-            for ma in _beta_iter:
+            for ma in _full_stock_list:
                 _md_d = _full_md.get(ma, {})
                 gia_tt = _md_d.get("gia", 0)
                 sl = dm[ma].get("so_luong", 0) if ma in dm else 0
@@ -4529,9 +4525,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             _pe_p25 = float(np.percentile(_all_fa_pe, 25)) if len(_all_fa_pe) >= 4 else 15.0
             _pe_p50 = float(np.percentile(_all_fa_pe, 50)) if len(_all_fa_pe) >= 4 else 20.0
             _dy_p50 = float(np.percentile(_all_fa_pe, 50)) if len(_all_fa_pe) >= 4 else 0.02
-            _fa_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="fa_scope", label_visibility="collapsed")
-            _fa_iter = _full_stock_list if "384" in _fa_scope else [k for k in _full_stock_list if k in dm]
-            for ma in _fa_iter:
+            for ma in _full_stock_list:
                 _md_d = _full_md.get(ma, {})
                 gia_tt = _md_d.get("gia", 0)
                 if gia_tt <= 0: continue
@@ -4988,10 +4982,8 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "📈 Kỹ thuật":
             st.write("## 📈 Momentum từng mã (Returns 1M / 3M / 6M từ giá thật)")
-            _mom_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="mom_scope", label_visibility="collapsed")
-            _mom_iter = _full_stock_list if "384" in _mom_scope else [k for k in _full_stock_list if k in dm]
             mom_rows = []
-            for ma in _mom_iter:
+            for ma in _full_stock_list:
                 if ma in real_prices and len(real_prices[ma]) >= 20:
                     p = real_prices[ma]
                     last = float(p.iloc[-1])
@@ -5016,10 +5008,8 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "📈 Kỹ thuật":
             st.write("## 🎯 Target Price & Stop Loss (Khuyến nghị giá mục tiêu / cắt lỗ)")
-            _tgt_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="tgt_scope", label_visibility="collapsed")
-            _tgt_iter = _full_stock_list if "384" in _tgt_scope else [k for k in _full_stock_list if k in dm]
             tgt_rows = []
-            for ma in _tgt_iter:
+            for ma in _full_stock_list:
                 _md_d = _full_md.get(ma, {})
                 gia_tt = _md_d.get("gia", 0)
                 if gia_tt <= 0: continue
@@ -5217,10 +5207,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                     sector_avg[ng]["pe"].append(pe)
                     sector_avg[ng]["roe"].append(roe)
             sector_avg_calc = {ng: {"pe": np.mean(v["pe"]), "roe": np.mean(v["roe"])} for ng, v in sector_avg.items() if v["pe"]}
-            _peer_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="peer_scope", label_visibility="collapsed")
-            _peer_iter = _full_stock_list if "384" in _peer_scope else [k for k in _full_stock_list if k in dm]
             peer_rows = []
-            for ma in _peer_iter:
+            for ma in _full_stock_list:
                 _md_d = _full_md.get(ma, {})
                 gia_tt = _md_d.get("gia", 0)
                 if gia_tt <= 0: continue
@@ -5242,11 +5230,9 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "📋 Cơ bản":
             st.write("## 💵 Phân tích cổ tức (Dividend Income)")
-            _div_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="div_scope", label_visibility="collapsed")
-            _div_iter = _full_stock_list if "384" in _div_scope else [k for k in _full_stock_list if k in dm]
             div_total = 0
             div_rows = []
-            for ma in _div_iter:
+            for ma in _full_stock_list:
                 _md_d = _full_md.get(ma, {})
                 gia_tt = _md_d.get("gia", 0)
                 sl = dm[ma].get("so_luong", 0) if ma in dm else 0
@@ -5285,11 +5271,9 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "⚠️ Rủi ro":
             st.write("## 🚨 Cảnh báo rủi ro (Risk Alerts)")
-            _alert_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="alert_scope", label_visibility="collapsed")
-            _alert_iter = _full_stock_list if "384" in _alert_scope else [k for k in _full_stock_list if k in dm]
             alerts = []
             if has_real:
-                for ma in _alert_iter:
+                for ma in _full_stock_list:
                     if ma in real_prices and len(real_prices[ma]) >= 50:
                         p = real_prices[ma]
                         ma50 = float(p.rolling(50).mean().iloc[-1])
