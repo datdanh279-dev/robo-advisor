@@ -433,7 +433,7 @@ def tab_backtest(docs):
                                     "GT": st.column_config.NumberColumn(format="%d d")})
         st.metric("Tong gia tri DM", f"{total_value:,.0f}d")
 
-        st.markdown("---")
+        st.divider()
         st.subheader("Mo phong hieu suat")
         n_years = st.slider("So nam backtest", 1, 15, 5, key="bt_n_years")
 
@@ -507,7 +507,7 @@ def tab_backtest(docs):
                 })
             st.dataframe(pd.DataFrame(detail_rows), use_container_width=True, hide_index=True)
 
-        st.markdown("---")
+        st.divider()
         st.subheader("Monte Carlo — 1000 kich ban")
         n_sim = 1000
         sim_results = []
