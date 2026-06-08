@@ -3807,56 +3807,39 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         @st.cache_data(ttl=3600, show_spinner=False)
         def _fetch_real_fundamentals(_targets):
-            import yfinance as _yf
+            import requests as _rq_f, json as _j_f
             from concurrent.futures import ThreadPoolExecutor, as_completed
             out = {}
 
             def _one(sym, suffix):
                 try:
-                    t = _yf.Ticker(f"{sym}{suffix}")
-                    info = t.info
-                    if not info or 'symbol' not in info:
+                    r = _rq_f.get(
+                        f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}{suffix}",
+                        params={"range": "6mo", "interval": "1d"},
+                        timeout=5,
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64) AppleWebKit/537.36"}
+                    )
+                    if r.status_code != 200:
                         return sym, None
-                    inst_pct = None
-                    try:
-                        mh = t.major_holders
-                        if mh is not None and not mh.empty:
-                            for _, row in mh.iterrows():
-                                if 'institutionsPercentHeld' in str(row.get('Breakdown', '')):
-                                    inst_pct = float(row.get('Value', 0) or 0)
-                                    break
-                    except Exception:
-                        pass
-                    return sym, {
-                        "pe": float(info.get("trailingPE") or 0) or None,
-                        "pb": float(info.get("priceToBook") or 0) or None,
-                        "roe": (float(info.get("returnOnEquity") or 0) or None),
-                        "roa": (float(info.get("returnOnAssets") or 0) or None),
-                        "dividend_yield": (float(info.get("dividendYield") or 0) or 0) / 100.0,
-                        "market_cap": float(info.get("marketCap") or 0) or None,
-                        "eps": float(info.get("epsCurrentYear") or info.get("trailingEps") or 0) or None,
-                        "beta": float(info.get("beta") or 0) or None,
-                        "current_price": float(info.get("currentPrice") or info.get("regularMarketPrice") or 0) or None,
-                        "institutions_pct": inst_pct,
-                    }
+                    meta = r.json().get("chart", {}).get("result", [{}])[0].get("meta", {})
+                    if not meta:
+                        return sym, None
+                    cp = meta.get("regularMarketPrice") or meta.get("chartPreviousClose") or 0
+                    w52h = meta.get("fiftyTwoWeekHigh") or 0
+                    w52l = meta.get("fiftyTwoWeekLow") or 0
+                    return sym, {"current_price": float(cp) if cp else None,
+                                 "w52_high": float(w52h) if w52h else None,
+                                 "w52_low": float(w52l) if w52l else None}
                 except Exception:
                     pass
                 return sym, None
 
             with ThreadPoolExecutor(max_workers=15) as ex:
                 futs = [ex.submit(_one, sym, suffix) for sym, suffix in _targets]
-                import concurrent.futures as _cf
-                done_set = set()
-                try:
-                    for f in _cf.as_completed(futs, timeout=25):
-                        done_set.add(f)
-                        sym, data = f.result()
-                        if data is not None:
-                            out[sym] = data
-                except TimeoutError:
-                    pass
-                for f in set(futs) - done_set:
-                    f.cancel()
+                for f in as_completed(futs):
+                    sym, data = f.result()
+                    if data is not None:
+                        out[sym] = data
             return out
 
         @st.cache_data(ttl=3600, show_spinner=False)
@@ -4264,14 +4247,21 @@ elif st.session_state.trang_thai == "deep_analysis":
                         "gia": float(_ki.get("gia_hien_tai") or _ki.get("current_price") or _ki.get("gia") or 0),
                         "thay_doi": float(_ki.get("thay_doi_ngay") or _ki.get("change_pct") or 0),
                         "ret_3m": float(_ki.get("ret_3m") or 0), "vol": 0, "vol_ratio": 1.0,
-                        "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0)})
+                        "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0),
+                        "pe": _ki.get("pe"), "pb": _ki.get("pb"), "roe": _ki.get("roe"),
+                        "eps": _ki.get("eps"), "beta": _ki.get("beta"),
+                        "co_tuc_pct": _ki.get("co_tuc_pct"), "ytd": _ki.get("ytd"),
+                        "pct_ngoai": _ki.get("pct_ngoai")})
                 for _m, _ki in list((DOCS.get("co_phieu_tg") or {}).items())[:155]:
                     _fb.append({"ma": _m, "ten": _ki.get("ten", _m)[:30], "nganh": _ki.get("nganh", "Khác"),
                         "vung": "TG", "tien": "USD",
                         "gia": float(_ki.get("gia_hien_tai") or _ki.get("current_price") or _ki.get("gia") or 0),
                         "thay_doi": float(_ki.get("thay_doi_ngay") or _ki.get("change_pct") or 0),
                         "ret_3m": float(_ki.get("ret_3m") or 0), "vol": 0, "vol_ratio": 1.0,
-                        "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0)})
+                        "von_hoa": float(_ki.get("von_hoa") or _ki.get("market_cap") or 0),
+                        "pe": _ki.get("pe"), "pb": _ki.get("pb"), "roe": _ki.get("roe"),
+                        "eps": _ki.get("eps"), "beta": _ki.get("beta"),
+                        "co_tuc_pct": _ki.get("co_tuc_pct"), "ytd": _ki.get("ytd")})
                 if len(_fb) >= 5:
                     market_data = _fb
             except Exception:
@@ -8966,7 +8956,18 @@ elif st.session_state.trang_thai == "deep_analysis":
                         use_container_width=True, hide_index=True)
                     st.caption(f"📊 Correlation = Pearson trên daily returns 3T. >0.7 = cùng xu hướng mạnh. <0.3 = phân tán tốt. Tính từ {len(corr.columns)} mã giá thật yfinance.")
             else:
-                st.info("⚠️ Cần dữ liệu thị trường.")
+                st.info("⚠️ Correlation yfinance không khả dụng — dùng JSON sector data thay thế.")
+                _corr_seg = _df_jt.groupby("Ngành").size().sort_values(ascending=False)
+                if len(_corr_seg) >= 2:
+                    st.write("**🏭 Phân bố ngành toàn thị trường:**")
+                    _corr_seg.plot(kind="bar", title=f"Phân bố {len(_corr_seg)} ngành — {len(_df_jt)} mã")
+                    _corr_sc = st.columns(min(4, len(_corr_seg)))
+                    for _ci, (_ng, _sl) in enumerate(_corr_seg.items()):
+                        with _corr_sc[_ci % len(_corr_sc)]:
+                            st.metric(_ng[:20], int(_sl))
+                    st.caption(f"📊 Phân bố {len(_corr_seg)} ngành — dữ liệu thật từ co_phieu_vn.json.")
+                else:
+                    st.info("⚠️ Cần dữ liệu thị trường.")
 
         if _chon_nhom == "📋 Cơ bản":
             st.write("## 📊 DISTRIBUTION ANALYSIS — Phân phối P/E, ROE, Vol toàn thị trường")
@@ -8995,7 +8996,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                                 continue
                 if not dist_data:
                     for d in market_data:
-                        pe = d.get("pe") or d.get("trailingPE")
+                        pe = d.get("pe")
                         roe = d.get("roe")
                         beta = d.get("beta")
                         if pe and 0 < float(pe) < 200:
@@ -9022,7 +9023,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                     d4.metric("📊 ROE Mean", f"{df_dist['roe'].dropna().mean():.1f}%" if df_dist['roe'].notna().any() else "N/A")
                     d5.metric("📊 Beta Median", f"{df_dist['beta'].dropna().median():.2f}" if df_dist['beta'].notna().any() else "N/A")
                     d6.metric("📊 Beta Mean", f"{df_dist['beta'].dropna().mean():.2f}" if df_dist['beta'].notna().any() else "N/A")
-                    st.caption(f"📊 Histogram phân phối P/E, ROE, Beta cho {len(df_dist)} mã từ yfinance. P/E median 12-15 = thị trường hợp lý. ROE median 12-15% = chất lượng tốt.")
+                    _dist_src = "yfinance" if dist_data else "co_phieu_vn.json"
+                    st.caption(f"📊 Histogram phân phối P/E, ROE, Beta cho {len(df_dist)} mã từ {_dist_src}. P/E median 12-15 = thị trường hợp lý. ROE median 12-15% = chất lượng tốt.")
             else:
                 st.info("⚠️ Cần dữ liệu thị trường.")
 
