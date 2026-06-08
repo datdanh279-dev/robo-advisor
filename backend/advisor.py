@@ -174,7 +174,7 @@ def tab_portfolio(docs):
 
     # --- Bo loc Tam Sang ---
     st.subheader("Bo loc Tam Sang")
-    nguong = st.slider("Nguong diem Tam Sang toi thieu", 0, 100, 40, 5,
+    nguong = st.slider("Nguong diem Tam Sang toi thieu", 0, 100, 40, 5, key="port_nguong",
                        help="Loai bo CP co diem quan tri & dao duc duoi nguong")
     vn_items = [(ma, info) for ma, info in bucket_vn.items() if (info.get("gia") or 0) > 0 and info.get("pe")]
     vn_sang = loc_tam_sang(vn_items, nguong)
@@ -208,7 +208,7 @@ def tab_portfolio(docs):
         scored.append((ma, info, ts_d, s))
     scored.sort(key=lambda x: -x[3])
 
-    top_n = st.slider("So CP khuyen nghi", 5, 30, 15)
+    top_n = st.slider("So CP khuyen nghi", 5, 30, 15, key="port_top_n")
     top = scored[:top_n]
     total_s = sum(s[3] for s in top) or 1
 
@@ -435,7 +435,7 @@ def tab_backtest(docs):
 
         st.markdown("---")
         st.subheader("Mo phong hieu suat")
-        n_years = st.slider("So nam backtest", 1, 15, 5)
+        n_years = st.slider("So nam backtest", 1, 15, 5, key="bt_n_years")
 
         np.random.seed(42)
         annual_returns = np.random.normal(er, vol, n_years)
