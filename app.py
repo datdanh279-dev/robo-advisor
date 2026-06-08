@@ -6370,7 +6370,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 💵 Tổng return vs Price return (có cổ tức)")
             if has_fund and len(real_fund) > 0:
                 tr_rows = []
-                for ma, info in dm.items():
+                for ma in _full_stock_list:
                     ki = kpi.get(ma, {})
                     dy = float(ki.get("dividend_yield", 0) or 0) * 100
                     if ma in real_prices and len(real_prices[ma]) >= 30:
@@ -6378,7 +6378,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                         total_ret_6m = pr6m + dy * 0.5
                         pr1y_approx = pr6m * 2
                         total_ret_1y = pr1y_approx + dy
-                        tr_rows.append({"Mã": ma, "Price 6M %": round(pr6m, 2),
+                        _vung_tr = _full_md.get(ma, {}).get("vung", "")
+                        tr_rows.append({"Mã": ma, "Vùng": _vung_tr, "Price 6M %": round(pr6m, 2),
                             "Cổ tức/năm %": round(dy, 2), "Total Return 6M %": round(total_ret_6m, 2),
                             "Total Return 1Y ước %": round(total_ret_1y, 2),
                             "Cổ tức đóng góp %": round(dy / max(total_ret_1y, 0.1) * 100, 1) if total_ret_1y > 0 else 0})
@@ -6465,7 +6466,7 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 📉 Individual Stock Drawdown — Sụt giảm từng mã")
             if has_real and len(real_prices) >= 1:
                 idd_rows = []
-                for ma in dm.keys():
+                for ma in _full_stock_list:
                     if ma in real_prices and len(real_prices[ma]) >= 30:
                         p = real_prices[ma]
                         running_max_i = p.cummax()
@@ -6478,8 +6479,9 @@ elif st.session_state.trang_thai == "deep_analysis":
                             cur_dd = float(dd_i.iloc[-1])
                         else:
                             in_dd_now = (float(p.iloc[-1]) / float(p.iloc[0]) - 1) * 100
-                            cur_dd = cur_dd if cur_dd < 0 else 0
-                        idd_rows.append({"Mã": ma, "Max DD %": round(worst_dd, 1),
+                            cur_dd = 0
+                        _vung_idd = _full_md.get(ma, {}).get("vung", "")
+                        idd_rows.append({"Mã": ma, "Vùng": _vung_idd, "Max DD %": round(worst_dd, 1),
                             "DD hiện tại %": round(cur_dd, 1), "Return từ đỉnh %": round(in_dd_now, 1),
                             "Trạng thái": "🔴 Dưới đỉnh" if cur_dd < -5 else ("🟡 Hồi phục" if cur_dd < 0 else "🟢 Trên đỉnh")})
                 if idd_rows:
@@ -6542,13 +6544,14 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 📊 Vol-Adjusted Momentum — Momentum đã điều chỉnh rủi ro")
             if has_real and len(real_prices) >= 1:
                 vam_rows = []
-                for ma in dm.keys():
+                for ma in _full_stock_list:
                     if ma in real_prices and len(real_prices[ma]) >= 63:
                         p = real_prices[ma]
                         ret_3m = (float(p.iloc[-1]) / float(p.iloc[-63]) - 1) * 100
                         vol_3m = float(p.tail(63).pct_change().dropna().std() * (252**0.5) * 100)
                         vam = ret_3m / vol_3m if vol_3m > 0 else 0
-                        vam_rows.append({"Mã": ma, "Return 3M %": round(ret_3m, 1), "Vol 3M %": round(vol_3m, 1),
+                        _vung_vam = _full_md.get(ma, {}).get("vung", "")
+                        vam_rows.append({"Mã": ma, "Vùng": _vung_vam, "Return 3M %": round(ret_3m, 1), "Vol 3M %": round(vol_3m, 1),
                             "Vol-Adj Momentum": round(vam, 3),
                             "Xếp loại": "🔥 Top" if vam > 0.5 else ("✅ Tốt" if vam > 0.2 else ("🟡 TB" if vam > 0 else "🔴 Yếu"))})
                 if vam_rows:
