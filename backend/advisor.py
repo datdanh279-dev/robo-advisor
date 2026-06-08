@@ -343,30 +343,37 @@ def tab_backtest(docs):
     # Lay danh muc tu session (hoac tao mau)
     dm = st.session_state.get("dm", {})
     if not dm:
-        # Tao mau tu khuyen nghi
-        vn_items = [(ma, info) for ma, info in bucket_vn.items() if (info.get("gia") or 0) > 0 and info.get("pe")]
-        vn_sang = loc_tam_sang(vn_items, 30)
-        scored = []
-        for ma, info, ts_d in vn_sang[:30]:
-            pe = info.get("pe")
-            if not isinstance(pe, (int, float)) or pe <= 0:
-                continue
-            s = ts_d * 0.5
-            if pe < 10: s += 30
-            elif pe < 15: s += 20
-            roe = info.get("roe")
-            if isinstance(roe, (int, float)) and roe > 15: s += 15
-            scored.append((ma, info, ts_d, s))
-        scored.sort(key=lambda x: -x[3])
-        top = scored[:12]
-        total_s = sum(s for _, _, _, s in top) or 1
-        for ma, info, ts_d, s in top:
-            ty = s / total_s if total_s else 0
-            tien = von * ty
-            gia = info.get("gia") or 0
-            lot, _ = tinh_lot(tien, gia)
-            if lot > 0:
-                dm[ma] = {"so_luong": lot, "gia_von": gia}
+        try:
+            vn_items = [(ma, info) for ma, info in bucket_vn.items() if (info.get("gia") or 0) > 0 and info.get("pe")]
+            vn_sang = loc_tam_sang(vn_items, 30)
+            scored = []
+            for item in vn_sang[:30]:
+                if not isinstance(item, (list, tuple)) or len(item) < 3:
+                    continue
+                ma, info, ts_d = item[:3]
+                pe = info.get("pe") if isinstance(info, dict) else None
+                if not isinstance(pe, (int, float)) or pe <= 0:
+                    continue
+                s = ts_d * 0.5
+                if pe < 10: s += 30
+                elif pe < 15: s += 20
+                roe = info.get("roe") if isinstance(info, dict) else None
+                if isinstance(roe, (int, float)) and roe > 15: s += 15
+                scored.append((ma, info, ts_d, s))
+            scored.sort(key=lambda x: -x[3] if isinstance(x, (list, tuple)) and len(x) > 3 else 0)
+            top = [x for x in scored[:12] if isinstance(x, (list, tuple)) and len(x) >= 4]
+            total_s = sum(x[3] for x in top) or 1
+            for item in top:
+                ma, info, ts_d, s = item[0], item[1], item[2], item[3]
+                ty = s / total_s if total_s else 0
+                tien = von * ty
+                gia = info.get("gia") or 0 if isinstance(info, dict) else 0
+                lot, _ = tinh_lot(tien, gia)
+                if lot > 0:
+                    dm[ma] = {"so_luong": lot, "gia_von": gia}
+        except Exception as e:
+            st.warning(f"Loi khi tao danh muc mau: {e}")
+            return
         if not dm:
             st.warning("Khong the tao danh muc mau. Vui long quay lai Tab 2.")
             return
