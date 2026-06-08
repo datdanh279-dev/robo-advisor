@@ -2429,12 +2429,10 @@ def _render_tonghop():
                         "open": _chart_open, "high": _chart_high, "low": _chart_low, "close": _chart_prices
                     })
                 else:
-                    np.random.seed(hash(ma_chon) % 2**32)
+                    st.info(f"ℹ️ Yahoo Finance không có dữ liệu OHLC (open/high/low/close) cho {ma_chon}. Hiển thị biểu đồ đường từ dữ liệu cơ bản.")
                     n_days = 120
                     base_price = max(gia_hien_tai * 0.85, 1000)
-                    noise = np.cumsum(np.random.randn(n_days) * 0.012) + np.log(max(gia_hien_tai, 1) / base_price)
-                    prices = base_price * np.exp(noise)
-                    prices[-1] = gia_hien_tai if gia_hien_tai > 0 else prices[-1]
+                    prices = np.linspace(base_price, gia_hien_tai, n_days)
                     dates = pd.date_range(end=pd.Timestamp.today(), periods=n_days, freq="D")
                     df_chart = pd.DataFrame({"date": dates, "price": prices})
                 df_chart["MA20"] = df_chart["price"].rolling(20).mean()
@@ -2451,9 +2449,8 @@ def _render_tonghop():
                         low=df_chart["low"], close=df_chart["close"],
                         name=ma_chon))
                 else:
-                    fig.add_trace(go.Candlestick(x=df_chart["date"], open=df_chart["price"],
-                        high=df_chart["price"]*1.01, low=df_chart["price"]*0.99,
-                        close=df_chart["price"], name="Giá"))
+                    fig.add_trace(go.Scatter(x=df_chart["date"], y=df_chart["price"],
+                        mode="lines", name="Giá đóng cửa", line=dict(color="#FFD700", width=2)))
                 fig.add_trace(go.Scatter(x=df_chart["date"], y=df_chart["MA20"], mode="lines", name="MA 20", line=dict(color="#FFD700", width=1.5)))
                 fig.add_trace(go.Scatter(x=df_chart["date"], y=df_chart["MA50"], mode="lines", name="MA 50", line=dict(color="#2196F3", width=1.5)))
                 fig.update_layout(height=400, xaxis_rangeslider_visible=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
@@ -2769,25 +2766,21 @@ def _render_tonghop():
                 try:
                     info = DOCS.get("co_phieu_vn", {}).get(ma_bt, {})
                     gia_goc = info.get("gia", 50000)
-                    np.random.seed(hash(ma_bt) % 2**32)
-                    daily_vol = 0.015
-                    try:
-                        import requests as _rq_bt
-                        r = _rq_bt.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma_bt}.VN?range=6mo&interval=1d",
-                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-                        if r.status_code == 200:
-                            d = r.json()
-                            cs = d.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
-                            valid = [c for c in cs if c]
-                            if len(valid) > 30:
-                                p = pd.Series(valid)
-                                r_real = p.pct_change().dropna()
-                                if len(r_real) > 20:
-                                    daily_vol = float(r_real.std())
-                    except Exception:
-                        pass
-                    ret = np.random.randn(n_days_bt) * daily_vol
-                    prices = gia_goc * np.exp(np.cumsum(ret))
+                    import requests as _rq_bt
+                    r = _rq_bt.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma_bt}.VN?range=6mo&interval=1d",
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                    if r.status_code != 200:
+                        st.warning(f"⚠️ Yahoo Finance không có dữ liệu giá cho {ma_bt}. Không thể chạy backtest.")
+                        st.stop()
+                    d = r.json()
+                    cs = d.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                    valid = [c for c in cs if c]
+                    if len(valid) < 30:
+                        st.warning(f"⚠️ Không đủ dữ liệu giá cho {ma_bt} (cần ≥30 phiên).")
+                        st.stop()
+                    p = pd.Series(valid)
+                    daily_vol = float(p.pct_change().dropna().std())
+                    prices = p.values[-n_days_bt:] if len(p) >= n_days_bt else p.values
                     df_bt = pd.DataFrame({"price": prices})
                     df_bt["MA20"] = df_bt["price"].rolling(20).mean()
                     df_bt["MA50"] = df_bt["price"].rolling(50).mean()
@@ -2876,32 +2869,21 @@ def _render_tonghop():
                     from sklearn.linear_model import LinearRegression
                     info = DOCS.get("co_phieu_vn", {}).get(ma_ai, {})
                     gia_goc = info.get("gia", 50000)
-                    np.random.seed(hash(ma_ai) % 2**32)
-                    trend = 0.0005
-                    daily_vol_ai = 0.015
-                    hist_prices = None
-                    try:
-                        import requests as _rq_ai
-                        r = _rq_ai.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma_ai}.VN?range=1y&interval=1d",
-                            headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-                        if r.status_code == 200:
-                            d = r.json()
-                            cs = d.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
-                            valid = [c for c in cs if c]
-                            if len(valid) > n_days_hist:
-                                hist_prices = np.array(valid[-n_days_hist:], dtype=float)
-                                gia_goc = hist_prices[0]
-                                r_real = pd.Series(valid).pct_change().dropna()
-                                if len(r_real) > 20:
-                                    daily_vol_ai = float(r_real.std())
-                    except Exception:
-                        pass
-                    if hist_prices is not None:
-                        hist = hist_prices
-                    else:
-                        ret = np.random.randn(n_days_hist + n_days_pred) * daily_vol_ai + trend
-                        all_prices = gia_goc * np.exp(np.cumsum(ret))
-                        hist = all_prices[:n_days_hist]
+                    import requests as _rq_ai
+                    r = _rq_ai.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ma_ai}.VN?range=1y&interval=1d",
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                    if r.status_code != 200:
+                        st.warning(f"⚠️ Yahoo Finance không có dữ liệu giá cho {ma_ai}. Không thể dự đoán.")
+                        st.stop()
+                    d = r.json()
+                    cs = d.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+                    valid = [c for c in cs if c]
+                    if len(valid) < 30:
+                        st.warning(f"⚠️ Không đủ dữ liệu giá cho {ma_ai} (cần ≥30 phiên).")
+                        st.stop()
+                    hist_prices = np.array(valid[-n_days_hist:], dtype=float)
+                    gia_goc = hist_prices[0]
+                    hist = hist_prices
                     X = np.arange(n_days_hist).reshape(-1, 1)
                     y = hist
                     model = LinearRegression()
@@ -3703,6 +3685,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     "von_hoa": ("von_hoa", lambda v: float(v) if v else None),
                     "market_cap": ("von_hoa", lambda v: float(v) if v else None),
                     "current_price": ("gia", lambda v: float(v) if v else None),
+                    "institutions_pct": ("pct_ngoai", lambda v: float(v) / 100.0 if v else None),
                 }
                 for k_real, (k_static, conv) in _field_map.items():
                     cur = ki.get(k_real)
@@ -4063,27 +4046,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 real_prices = dict(_rp_cache)
                 has_real_pre = True
         if not has_real_pre:
-            try:
-                _fallback_prices = {}
-                _dm_fallback = [(ma, info) for ma, info in dm.items() if info.get("gia_thi_truong", 0) > 0 and info.get("so_luong", 0) > 0]
-                if len(_dm_fallback) >= 2:
-                    np.random.seed(42)
-                    for _ma, _info in _dm_fallback:
-                        _price = float(_info["gia_thi_truong"])
-                        _vol = _estimate_dm_vol_from_sector(tuple(dm.items()), tuple(kpi.items()))
-                        _daily_vol = _vol / (252 ** 0.5) if _vol > 0 else 0.015
-                        _n = 126
-                        _rets = np.random.normal(_daily_vol * 0.08, _daily_vol, _n)
-                        _rets[0] = 0
-                        _prices = _price * np.exp(np.cumsum(_rets))
-                        _prices = np.maximum(_prices, _price * 0.3)
-                        _dates = pd.bdate_range(end=pd.Timestamp.today(), periods=_n)
-                        _fallback_prices[_ma] = pd.Series(_prices, index=_dates)
-                    real_prices = _fallback_prices
-                    has_real_pre = True
-                    st.caption("📡 yfinance tạm không khả dụng, dùng giá từ dữ liệu thị trường (số liệu thật từ co_phieu_vn.json)")
-            except Exception as _fb_err:
-                print(f"[FALLBACK] price gen failed: {_fb_err}", file=sys.stderr)
+            st.warning("⚠️ yfinance tạm không khả dụng. Các section phân tích sẽ hiển thị 'Cần giá thật 6T' cho đến khi dữ liệu được tải lại. F5 browser sau 1-2 phút để thử lại.")
         vn30_close, vn30_label = _fetch_vn30_proxy()
         if vn30_close is None and has_real_pre:
             _md_for_vn30 = st.session_state.get("chat_market_data") or []
