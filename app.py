@@ -7860,7 +7860,7 @@ elif st.session_state.trang_thai == "deep_analysis":
         if _chon_nhom == "📋 Cơ bản":
             st.write("## 🏛️ Real Sector P/E Benchmark — So sánh P/E mã vs ngành")
             if market_data and len(market_data) >= 5:
-                with st.spinner("📡 Đang tải P/E + ngành cho 50 mã..."):
+                with st.spinner(f"📡 Đang tải P/E + ngành cho {len(market_data)} mã..."):
                     pe_dist_full = _get_pe_distribution(tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]))
                 if pe_dist_full:
                     pe_by_ma = {r["ma"]: r for r in pe_dist_full}
@@ -8010,13 +8010,14 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.write("## 🔄 Real Sector Rotation Matrix — Hiệu suất ngành theo thời kỳ")
             if market_data and len(market_data) >= 5:
                 @st.cache_data(ttl=1800)
-                def _compute_sector_rotation(symbols, sectors):
+                def _compute_sector_rotation(targets, sectors):
                     import requests as _rq_sr
                     period_returns = {"1W": 5, "1M": 21, "3M": 63, "6M": 126, "1Y": 252}
                     sector_data = {}
-                    for s, ng in zip(symbols, sectors):
+                    for t, ng in zip(targets, sectors):
+                        s, suf = t[0], t[1] if len(t) > 1 else ""
                         try:
-                            r = _rq_sr.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=1y&interval=1d",
+                            r = _rq_sr.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}{suf}?range=1y&interval=1d",
                                 headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
                             if r.status_code == 200:
                                 data = r.json()
@@ -8041,7 +8042,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                     return out
                 with st.spinner(f"📡 Tính sector rotation cho {len(market_data)} mã..."):
                     rot = _compute_sector_rotation(
-                        tuple([d["ma"] for d in market_data]),
+                        tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]),
                         tuple([d.get("nganh", "Khác") for d in market_data])
                     )
                 if rot:
@@ -8285,15 +8286,16 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.info("⚠️ Cần dữ liệu thị trường.")
 
         if _chon_nhom == "🎯 Tối ưu":
-            st.write("## 🧮 MULTI-FACTOR SCORING — Xếp hạng 50 mã theo nhiều yếu tố")
+            st.write("## 🧮 MULTI-FACTOR SCORING — Xếp hạng toàn thị trường theo nhiều yếu tố")
             if market_data and len(market_data) >= 5:
-                with st.spinner("📡 Tính composite score cho 50 mã..."):
+                with st.spinner(f"📡 Tính composite score cho {len(market_data)} mã..."):
                     score_data = []
                     for d in market_data:
                         ma = d["ma"]
+                        suf = ".VN" if d.get("vung") == "VN" else ""
                         try:
                             import yfinance as _yf_sc
-                            info = _yf_sc.Ticker(ma + ".VN").info
+                            info = _yf_sc.Ticker(ma + suf).info
                             pe = info.get("trailingPE")
                             roe = info.get("returnOnEquity")
                             dy = info.get("dividendYield")
@@ -8353,7 +8355,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                         marker_color=['#4CAF50' if s > 60 else ('#FFD700' if s > 40 else '#F44336') for s in df_sc["composite"]],
                         name='Composite Score'
                     ))
-                    fig_score.update_layout(title="Composite Score cho 50 mã VN (0-100)",
+                    fig_score.update_layout(title=f"Composite Score {len(df_sc)} mã (0-100)",
                         xaxis_title="Mã CP", yaxis_title="Score",
                         height=400, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
                     st.plotly_chart(fig_score, use_container_width=True)
@@ -8779,15 +8781,16 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.info("⚠️ Cần market scan + price data để tính metrics 384 mã.")
         st.write("---")
         if _chon_nhom == "📋 Cơ bản":
-            st.write("## 🔗 50-STOCK CORRELATION MATRIX — Ma trận tương quan 50 mã")
+            st.write("## 🔗 FULL-MARKET CORRELATION MATRIX — Ma trận tương quan toàn thị trường")
             if market_data and len(market_data) >= 5:
                 @st.cache_data(ttl=1800)
-                def _compute_50_corr(symbols):
+                def _compute_corr(targets):
                     import requests as _rq_c
                     prices_dict = {}
-                    for s in symbols:
+                    for t in targets:
+                        s, suf = t[0], t[1] if len(t) > 1 else ""
                         try:
-                            r = _rq_c.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}.VN?range=3mo&interval=1d",
+                            r = _rq_c.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{s}{suf}?range=3mo&interval=1d",
                                 headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
                             if r.status_code == 200:
                                 d = r.json()
@@ -8805,7 +8808,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                         return None
                     return ret.corr()
                 with st.spinner(f"📡 Tính correlation 3T cho {len(market_data)} mã..."):
-                    corr = _compute_50_corr(tuple([d["ma"] for d in market_data]))
+                    corr = _compute_corr(tuple([(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]))
                 if corr is not None and not corr.empty:
                     st.write(f"**🔗 Ma trận tương quan {len(corr.columns)}×{len(corr.columns)} mã VN (3 tháng):**")
                     fig_corr = go.Figure(data=go.Heatmap(
@@ -8816,7 +8819,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                         texttemplate="%{text}",
                         textfont={"size": 8}
                     ))
-                    fig_corr.update_layout(title="Ma trận tương quan 50 mã VN (Pearson, 3T)",
+                    fig_corr.update_layout(title="Ma trận tương quan toàn thị trường (Pearson, 3T)",
                         height=700, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#ECE8E1"))
                     st.plotly_chart(fig_corr, use_container_width=True)
                     pairs = []
@@ -8837,12 +8840,12 @@ elif st.session_state.trang_thai == "deep_analysis":
                 st.info("⚠️ Cần dữ liệu thị trường.")
 
         if _chon_nhom == "📋 Cơ bản":
-            st.write("## 📊 DISTRIBUTION ANALYSIS — Phân phối P/E, ROE, Vol 50 mã")
+            st.write("## 📊 DISTRIBUTION ANALYSIS — Phân phối P/E, ROE, Vol toàn thị trường")
             if market_data and len(market_data) >= 5:
                 dist_data = []
-                with st.spinner("📡 Tải P/E, ROE, Beta song song cho 50 mã..."):
+                with st.spinner(f"📡 Tải P/E, ROE, Beta song song cho {len(market_data)} mã..."):
                     import yfinance as _yf_dist
-                    dist_targets = [(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data[:50]]
+                    dist_targets = [(d["ma"], ".VN" if d.get("vung") == "VN" else "") for d in market_data]
                     with ThreadPoolExecutor(max_workers=15) as _ex_dist:
                         def _fetch_dist(t):
                             _info = _yf_dist.Ticker(t[0] + t[1]).info if t[1] else _yf_dist.Ticker(t[0]).info
@@ -8862,7 +8865,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                             except Exception:
                                 continue
                 if not dist_data:
-                    for d in market_data[:50]:
+                    for d in market_data:
                         pe = d.get("pe") or d.get("trailingPE")
                         roe = d.get("roe")
                         beta = d.get("beta")
@@ -8900,7 +8903,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                 cs_data = []
                 with st.spinner("📡 Tải P/E, ROE, Beta song song theo ngành..."):
                     import yfinance as _yf_cs
-                    cs_targets = [(d["ma"], ".VN" if d.get("vung") == "VN" else "", d.get("nganh", "Khác"), d.get("ret_3m", 0)) for d in market_data[:100]]
+                    cs_targets = [(d["ma"], ".VN" if d.get("vung") == "VN" else "", d.get("nganh", "Khác"), d.get("ret_3m", 0)) for d in market_data]
                     with ThreadPoolExecutor(max_workers=15) as _ex_cs:
                         def _fetch_cs(t):
                             _info = _yf_cs.Ticker(t[0] + t[1]).info if t[1] else _yf_cs.Ticker(t[0]).info
@@ -8920,7 +8923,7 @@ elif st.session_state.trang_thai == "deep_analysis":
                             except Exception:
                                 continue
                 if not cs_data:
-                    for d in market_data[:100]:
+                    for d in market_data:
                         pe = d.get("pe") or d.get("trailingPE")
                         roe = d.get("roe")
                         beta = d.get("beta")

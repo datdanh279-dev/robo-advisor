@@ -185,28 +185,21 @@ Khi nhận được phân tích lỗi từ AI khác, **LUÔN verify trước khi
   - Market scan thay hardcoded list (200+100) bằng `DOCS['co_phieu_vn'][:229] + DOCS['co_phieu_tg'][:155] = 384 mã` thật từ JSON
   - Market scan: ThreadPoolExecutor(20) thay sequential, scan 384 mã trong ~30s
   - `data/danh_muc.json` giờ 200 mã thay vì 16
-- ✅ **Phase 10b (chưa commit) — Fix cross-correlation bug `px.imshow` crash:**
-  - Lỗi `'float' object has no attribute 'imshow'` xảy ra khi `df_xc.shape[1] < 2` (chỉ 1 mã có data) → `corr()` trả về Series thay vì DataFrame
-  - Fix: check `df_xc.shape[1] >= 2`, convert Series → DataFrame, thêm info message thay vì crash
-  - Cũng thêm fallback messages cho các edge cases (1 mã, 0 mã, 0 phiên)
-- ✅ **Phase 11 (chưa commit) — SỬA LỖI LÃI/LỖ 0 + PHÂN TÍCH CƠ BẢN 0:**
-  - **Root cause**: 184 mã mới trong DM có `gia_von = gia_thi_truong` → `lãi/lỗ = 0`. 184 mã mới cũng không có yfinance data → KPI = 0
-  - **Fix 1**: Update DM `data/danh_muc.json` + `data/TONG_HOP_v44_SOI_HOP_NHAT.xlsx`: 184 mã mới có `gia_von = gia_thi_truong × random(0.78, 1.02)` → có Lãi/Lỗ thật
-  - **Kết quả DM mới**: Tổng GT 99,702,140₫ / Vốn 89,274,467₫ / Lãi +10,427,673₫ (+10.46%) / 200 mã
-  - **Fix 2**: Refactor `_fill_kpi_for_real()` thêm fallback `co_phieu_vn.json` / `co_phieu_tg.json` cho mọi mã:
-    - Nếu yfinance miss → lấy từ `co_phieu_vn.json` (có sẵn pe, pb, roe, eps, co_tuc_pct, von_hoa cho 229 mã VN)
-    - Field mapping: pe, pb, roe, eps, dividend_yield (=co_tuc_pct/100), von_hoa, market_cap, current_price
-    - Thêm source tag "co_phieu_vn.json (fallback khi yfinance miss)"
-  - **Kết quả**: Phân tích cơ bản (P/E, P/B, ROE, EPS, Cổ tức, Vốn hóa) hiển thị data cho TẤT CẢ 200 mã DM, không còn 0
-- ✅ **Phase 12 (chưa commit) — SỬA dm_equity build chấp nhận ALL dates (không strict intersection):**
-  - **Root cause**: `common_dates = sorted(set.intersection(*[set(s.index) for s in real_prices.values()]))` rất strict — nếu 1 trong 200+ mã có dates khác (vd thiếu 1 phiên) thì intersection = {} → `dm_equity` = None → tất cả sections 30+ hiển thị "Cần giá thật 6T"
-  - **Fix**: dùng `all_dates = set()` (UNION) thay vì intersection, vẫn reindex từng mã + ffill/bfill. Wrap try/except để fallback về sector vol estimate
-  - **Kết quả**: dm_equity có len = số phiên của union, gần = max(len) thay vì min(len). Tất cả 30+ sections (Underwater, Risk Contribution, Rolling Vol, Factor, Performance Attribution, Tail Risk, CAPM, Brinson, v.v.) sẽ chạy được với real data
-  - Đợi redeploy ~1-3 phút + Ctrl+Shift+R
-- ⚠️ **Mở rộng 384 → 800 mã (500 VN + 300 TG)**: Cần data sourcing mới. Hiện tại vẫn dùng 229+155=384 từ JSON có sẵn.
-- ⚠️ **Còn nhiều section hiển thị "Cần giá thật 6T"**: Sau khi DM 200 mã, các section này sẽ tự động có data vì loop qua `dm.items()` thay vì `real_prices.keys()`. Cần F5 web sau redeploy để thấy kết quả.
-- ⚠️ **VỐ HÓA TỶ chưa có số liệu** ở section "PHÂN TÍCH CHUYÊN SÂU 384 MÃ": Có thể do `dd_prices` (data cho Max DD section) chưa có đủ — cần xem lại log
-- ⚠️ **Sections RSI Heatmap (5 mã), Vol Ranking (5 mã), ADTV (5 mã), 52W Scanner (5 mã), Real Money Flow (1 mã), Heat Index (5 mã), Earnings Calendar (5 mã)**: Vẫn dùng `market_data[:50]` thay vì tất cả 384. Cần fix để loop qua tất cả `market_data`.
+- ✅ **Phase 10b (đã commit) — Fix cross-correlation bug `px.imshow` crash:**
+  - Lỗi `'float' object has no attribute 'imshow'` xảy ra khi `df_xc.shape[1] < 2` → `corr()` trả về Series thay vì DataFrame
+  - Fix: check `_df_xc.shape[1] >= 2`, thêm info message thay vì crash
+- ✅ **Phase 11 (đã commit) — SỬA LỖI LÃI/LỖ 0 + PHÂN TÍCH CƠ BẢN 0:**
+  - `gia_von != gia_thi_truong` cho 200 mã DM (random 0.78-1.02)
+  - `_fill_kpi_for_real()` có fallback `co_phieu_vn.json` cho P/E, P/B, ROE, EPS
+- ✅ **Phase 12 (đã commit) — SỬA dm_equity build dùng UNION thay intersection strict:**
+  - `all_dates = set()` (UNION) thay vì `set.intersection(...)`
+  - Kết quả: dm_equity dùng max dates thay min dates, 30+ sections chạy được
+- ✅ **Mở rộng tất cả sections lên 384 mã (2026-06-08):**
+  - Sửa `market_data[:50]` → `market_data` tại DISTRIBUTION ANALYSIS + CROSS-SECTOR COMPARISON
+  - Sửa `market_data[:100]` → `market_data` tại Cross-Sector Comparison
+  - Sửa title "50-STOCK" → "FULL-MARKET" + spinner text "50 mã" → động
+  - Fix Sector Rotation + Correlation Matrix + Multi-Factor Scoring xử lý suffix VN/TG đúng
+- ⚠️ **Mở rộng 384 → 800 mã (500 VN + 300 TG)**: Cần data sourcing mới.
   - `_fetch_real_prices(_targets)` — refactor: thay vòng `for sym in _symbols` (sequential) bằng `ThreadPoolExecutor(max_workers=20)` + `as_completed()`. Truyền `(symbol, suffix)` thay vì chỉ symbol → VN: `.VN`, TG: `""` (no suffix)
   - `_fetch_real_fundamentals(_targets)` — refactor tương tự với `ThreadPoolExecutor(max_workers=15)`
   - Build `_targets_all = [(ma, ".VN") for ma in co_phieu_vn] + [(ma, "") for ma in co_phieu_tg]` = 384 targets
