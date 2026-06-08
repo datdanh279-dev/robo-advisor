@@ -4908,9 +4908,10 @@ elif st.session_state.trang_thai == "deep_analysis":
             st.caption("💡 Tin tức theo từng mã cụ thể cần API trả phí (CafeF/VnStock Pro). Hiện đang hiển thị tin tổng hợp thị trường.")
 
         if _chon_nhom == "📊 Tổng quan":
-            st.write("## 🏆 Top tăng/giảm trong DM")
+            st.write("## 🏆 Top tăng/giảm (DM {}/{} mã)".format(len(dm), len(_full_stock_list)))
             pl_rows = []
-            for ma, info in dm.items():
+            for ma in dm:
+                info = dm[ma]
                 gia_tt = info.get("gia_thi_truong", 0)
                 gia_von = info.get("gia_von", 0)
                 sl = info.get("so_luong", 0)
@@ -4987,23 +4988,19 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "📈 Kỹ thuật":
             st.write("## 📈 Momentum từng mã (Returns 1M / 3M / 6M từ giá thật)")
+            _mom_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="mom_scope", label_visibility="collapsed")
+            _mom_iter = _full_stock_list if "384" in _mom_scope else [k for k in _full_stock_list if k in dm]
             mom_rows = []
-            for ma in dm.keys():
+            for ma in _mom_iter:
                 if ma in real_prices and len(real_prices[ma]) >= 20:
                     p = real_prices[ma]
                     last = float(p.iloc[-1])
                     r1m = (last / float(p.iloc[-21]) - 1) * 100 if len(p) >= 21 else None
                     r3m = (last / float(p.iloc[-63]) - 1) * 100 if len(p) >= 63 else None
                     r6m = (last / float(p.iloc[0]) - 1) * 100
-                    mom_rows.append({"Mã": ma, "1 tháng %": round(r1m, 1) if r1m is not None else "—",
+                    _vung_m = _full_md.get(ma, {}).get("vung", "")
+                    mom_rows.append({"Mã": ma, "Vùng": _vung_m, "1 tháng %": round(r1m, 1) if r1m is not None else "—",
                         "3 tháng %": round(r3m, 1) if r3m is not None else "—", "6 tháng %": round(r6m, 1)})
-                else:
-                    info = dm.get(ma, {})
-                    gia_tt = info.get("gia_thi_truong", 0)
-                    gia_von = info.get("gia_von", 0)
-                    if gia_tt > 0 and gia_von > 0:
-                        ret_total = (gia_tt - gia_von) / gia_von * 100
-                        mom_rows.append({"Mã": ma, "1 tháng %": "—", "3 tháng %": "—", "6 tháng %": round(ret_total, 1)})
             if mom_rows:
                 df_mom = pd.DataFrame(mom_rows)
                 st.dataframe(df_mom, use_container_width=True, hide_index=True)
@@ -5019,15 +5016,18 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "📈 Kỹ thuật":
             st.write("## 🎯 Target Price & Stop Loss (Khuyến nghị giá mục tiêu / cắt lỗ)")
+            _tgt_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="tgt_scope", label_visibility="collapsed")
+            _tgt_iter = _full_stock_list if "384" in _tgt_scope else [k for k in _full_stock_list if k in dm]
             tgt_rows = []
-            for ma, info in dm.items():
-                gia_tt = info.get("gia_thi_truong", 0)
+            for ma in _tgt_iter:
+                _md_d = _full_md.get(ma, {})
+                gia_tt = _md_d.get("gia", 0)
                 if gia_tt <= 0: continue
                 ki = kpi.get(ma, {})
                 w52h = float(ki.get("w52_high", 0) or 0)
                 w52l = float(ki.get("w52_low", 0) or 0)
-                beta_ma = float(ki.get("beta", 1.0) or 1.0)
-                roe = float(ki.get("roe", 0) or 0)
+                beta_ma = float(ki.get("beta", _md_d.get("beta", 1.0)) or 1.0)
+                roe = float(ki.get("roe", _md_d.get("roe", 0)) or 0)
                 if w52h > 0 and w52l > 0:
                     target = w52h * 1.05
                     stop = max(w52l * 1.02, gia_tt * (1 - 0.08 * beta_ma))
@@ -5041,7 +5041,8 @@ elif st.session_state.trang_thai == "deep_analysis":
                 elif rr >= 1.5: rating = "✅ Tốt"
                 elif rr >= 1: rating = "🟡 Hòa"
                 else: rating = "🔴 Xấu"
-                tgt_rows.append({"Mã": ma, "Giá hiện tại": f"{gia_tt:,.0f}",
+                _vung_tgt = _md_d.get("vung", "")
+                tgt_rows.append({"Mã": ma, "Vùng": _vung_tgt, "Giá hiện tại": f"{gia_tt:,.0f}",
                     "Target (+5% W52H)": f"{target:,.0f}", "Upside %": f"{upside:+.1f}",
                     "Stop Loss": f"{stop:,.0f}", "Risk %": f"-{risk_dn:.1f}",
                     "R/R": f"{rr:.2f}", "Đánh giá": rating})
@@ -5216,19 +5217,22 @@ elif st.session_state.trang_thai == "deep_analysis":
                     sector_avg[ng]["pe"].append(pe)
                     sector_avg[ng]["roe"].append(roe)
             sector_avg_calc = {ng: {"pe": np.mean(v["pe"]), "roe": np.mean(v["roe"])} for ng, v in sector_avg.items() if v["pe"]}
+            _peer_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="peer_scope", label_visibility="collapsed")
+            _peer_iter = _full_stock_list if "384" in _peer_scope else [k for k in _full_stock_list if k in dm]
             peer_rows = []
-            for ma, info in dm.items():
-                gia_tt = info.get("gia_thi_truong", 0)
+            for ma in _peer_iter:
+                _md_d = _full_md.get(ma, {})
+                gia_tt = _md_d.get("gia", 0)
                 if gia_tt <= 0: continue
                 ki = kpi.get(ma, {})
-                pe = float(ki.get("pe", 0) or 0)
-                roe = float(ki.get("roe", 0) or 0)
-                ng = (ki.get("nganh", "") or "Khác").strip() or "Khác"
+                pe = float(ki.get("pe", _md_d.get("pe", 0)) or 0)
+                roe = float(ki.get("roe", _md_d.get("roe", 0)) or 0)
+                ng = (ki.get("nganh", _md_d.get("nganh", "")) or "Khác").strip() or "Khác"
                 avg_pe = sector_avg_calc.get(ng, {}).get("pe", pe)
                 avg_roe = sector_avg_calc.get(ng, {}).get("roe", roe)
                 pe_vs = "Rẻ hơn" if pe < avg_pe * 0.9 else ("Đắt hơn" if pe > avg_pe * 1.1 else "Tương đương")
                 roe_vs = "Tốt hơn" if roe > avg_roe * 1.1 else ("Yếu hơn" if roe < avg_roe * 0.9 else "Tương đương")
-                peer_rows.append({"Mã": ma, "Ngành": ng, "P/E": round(pe, 1), "P/E ngành": round(avg_pe, 1),
+                peer_rows.append({"Mã": ma, "Vùng": _md_d.get("vung", ""), "Ngành": ng, "P/E": round(pe, 1), "P/E ngành": round(avg_pe, 1),
                     "Định giá": pe_vs, "ROE %": round(roe*100, 1), "ROE ngành %": round(avg_roe*100, 1),
                     "Chất lượng": roe_vs})
             if peer_rows:
@@ -5238,19 +5242,22 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "📋 Cơ bản":
             st.write("## 💵 Phân tích cổ tức (Dividend Income)")
+            _div_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="div_scope", label_visibility="collapsed")
+            _div_iter = _full_stock_list if "384" in _div_scope else [k for k in _full_stock_list if k in dm]
             div_total = 0
             div_rows = []
-            for ma, info in dm.items():
-                gia_tt = info.get("gia_thi_truong", 0)
-                sl = info.get("so_luong", 0)
-                if gia_tt <= 0 or sl <= 0: continue
+            for ma in _div_iter:
+                _md_d = _full_md.get(ma, {})
+                gia_tt = _md_d.get("gia", 0)
+                sl = dm[ma].get("so_luong", 0) if ma in dm else 0
+                if gia_tt <= 0: continue
                 ki = kpi.get(ma, {})
-                dy = float(ki.get("dividend_yield", 0) or 0)
-                v = gia_tt * sl
+                dy = float(ki.get("dividend_yield", _md_d.get("co_tuc_pct", 0)) or 0)
+                v = gia_tt * (sl or 1)
                 div_thu = v * dy
-                div_total += div_thu
-                div_rows.append({"Mã": ma, "Yield %": round(dy*100, 2),
-                    "Giá trị DM": f"{v:,.0f}", "Cổ tức/năm": f"{div_thu:,.0f} ₫"})
+                div_total += div_thu if ma in dm else 0
+                div_rows.append({"Mã": ma, "Vùng": _md_d.get("vung", ""), "Yield %": round(dy*100, 2),
+                    "Giá trị": f"{v:,.0f}", "Cổ tức/năm": f"{div_thu:,.0f} ₫"})
             if div_rows:
                 df_div = pd.DataFrame(div_rows)
                 st.dataframe(df_div, use_container_width=True, hide_index=True)
@@ -5278,15 +5285,18 @@ elif st.session_state.trang_thai == "deep_analysis":
 
         if _chon_nhom == "⚠️ Rủi ro":
             st.write("## 🚨 Cảnh báo rủi ro (Risk Alerts)")
+            _alert_scope = st.radio("Xem:", ["Toàn thị trường (384)", "Danh mục (200)"], horizontal=True, key="alert_scope", label_visibility="collapsed")
+            _alert_iter = _full_stock_list if "384" in _alert_scope else [k for k in _full_stock_list if k in dm]
             alerts = []
             if has_real:
-                for ma in dm.keys():
+                for ma in _alert_iter:
                     if ma in real_prices and len(real_prices[ma]) >= 50:
                         p = real_prices[ma]
                         ma50 = float(p.rolling(50).mean().iloc[-1])
                         last = float(p.iloc[-1])
                         if last < ma50 * 0.95:
-                            alerts.append(f"🔴 **{ma}**: Giá ({last:,.0f}) dưới MA50 ({ma50:,.0f}) 5%+ — xu hướng giảm")
+                            _vung_a = _full_md.get(ma, {}).get("vung", "")
+                            alerts.append(f"🔴 **{ma}** ({_vung_a}): Giá ({last:,.0f}) dưới MA50 ({ma50:,.0f}) 5%+ — xu hướng giảm")
             for ma, info in dm.items():
                 gia_tt = info.get("gia_thi_truong", 0)
                 gia_von = info.get("gia_von", 0)
