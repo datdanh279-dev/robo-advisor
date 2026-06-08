@@ -3845,10 +3845,18 @@ elif st.session_state.trang_thai == "deep_analysis":
 
             with ThreadPoolExecutor(max_workers=15) as ex:
                 futs = [ex.submit(_one, sym, suffix) for sym, suffix in _targets]
-                for f in as_completed(futs):
-                    sym, data = f.result()
-                    if data is not None:
-                        out[sym] = data
+                import concurrent.futures as _cf
+                done_set = set()
+                try:
+                    for f in _cf.as_completed(futs, timeout=25):
+                        done_set.add(f)
+                        sym, data = f.result()
+                        if data is not None:
+                            out[sym] = data
+                except TimeoutError:
+                    pass
+                for f in set(futs) - done_set:
+                    f.cancel()
             return out
 
         @st.cache_data(ttl=3600, show_spinner=False)
